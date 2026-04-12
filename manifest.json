@@ -1,0 +1,20 @@
+{
+  "name": "Abd's Quest — The Redemption Arc",
+  "short_name": "Abd's Quest",
+  "description": "Abdelrahman's personal RPG habit tracker",
+  "start_url": "./AbdQuestV3.html",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%230a0a0f'/%3E%3Cdefs%3E%3CradialGradient id='g' cx='30%25' cy='30%25'%3E%3Cstop offset='0%25' stop-color='%231a0a2e'/%3E%3Cstop offset='100%25' stop-color='%230a1a0a'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='80' fill='url(%23g)' opacity='0.7'/%3E%3Cline x1='256' y1='80' x2='256' y2='400' stroke='%23ffd700' stroke-width='14' stroke-linecap='round'/%3E%3Cpolygon points='256,55 238,105 256,92 274,105' fill='%23ffd700'/%3E%3Crect x='196' y='226' width='120' height='16' rx='8' fill='%23ffd700'/%3E%3Crect x='218' y='388' width='76' height='20' rx='10' fill='%238b6914'/%3E%3Cpath d='M 345 115 A 85 85 0 0 1 345 245 A 65 65 0 0 0 345 115 Z' fill='%23ffd700' opacity='0.95'/%3E%3Ccircle cx='362' cy='155' r='20' fill='%230a0a0f'/%3E%3Ctext x='256' y='472' text-anchor='middle' font-family='Georgia,serif' font-size='56' font-weight='bold' fill='%23ffd700' opacity='0.9'%3EAQ%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "fitness", "productivity"],
+  "lang": "en-GB"
+}
