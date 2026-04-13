@@ -26,7 +26,16 @@ button{-webkit-appearance:none;cursor:pointer;}
 </head>
 <body>
 <div id="app"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script>
+// Show loading indicator immediately
+document.addEventListener('DOMContentLoaded',function(){
+  var app=document.getElementById('app');
+  if(app)app.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#ffd700;font-family:Georgia,serif;"><div style="font-size:60px">⚔️</div><div style="font-size:20px;font-weight:bold">Abd's Quest</div><div style="font-size:13px;color:#6b5b3e">Loading...</div></div>';
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" 
+  onerror="document.getElementById('app').innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;color:#ff6666;font-family:Georgia,serif;padding:20px;text-align:center;\'><div style=\'font-size:40px\'>⚠️</div><div style=\'font-size:16px;color:#ffd700\'>Loading failed</div><div style=\'font-size:13px;color:#aaa\'>Check your internet connection and reload the page</div><button onclick=\'location.reload()\' style=\'margin-top:16px;background:#ffd700;border:none;padding:12px 24px;border-radius:8px;font-size:14px;cursor:pointer;\'>Reload</button></div>';">
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script>
 (function(){
@@ -196,6 +205,405 @@ const toHijri=date=>{
 };
 
 // ─── INIT STATE ───────────────────────────────────────────────────────────────
+// ── STREAK MILESTONES ─────────────────────────────────────────────────────────
+const MILESTONES=[
+  {days:3,xp:50,rarity:'common',title:null,msg:'3 days. Good start.'},
+  {days:7,xp:100,rarity:'rare',title:null,msg:'One week. You actually did it.'},
+  {days:10,xp:150,rarity:'rare',title:'The Consistent',msg:'10 days. Habit is forming.'},
+  {days:14,xp:200,rarity:'epic',title:'Two Weeks Strong',msg:'2 weeks. People notice change.'},
+  {days:25,xp:350,rarity:'epic',title:'Quarter Century',msg:'25 days. This is becoming who you are.'},
+  {days:50,xp:600,rarity:'legendary',title:'The Disciplined',msg:'50 days. Half a century of showing up.'},
+  {days:100,xp:1000,rarity:'legendary',title:'Centurion',msg:'100 days. Most people quit by day 3.'},
+  {days:200,xp:2000,rarity:'legendary',title:'The Unbreakable',msg:'200 days. You are built different.'},
+  {days:365,xp:5000,rarity:'legendary',title:'One Full Year',msg:'365 days. Abdelrahman — you did it.'},
+];
+
+const getPenalty=(xp,daysMissed)=>{if(daysMissed<=0)return 0;const pct=Math.min(1,0.2+(daysMissed-1)*0.13);return Math.round(xp*pct);};
+const getMissColor=(d)=>{if(d===0)return null;if(d===1)return'#ddaa22';if(d<=2)return'#dd7722';if(d<=4)return'#cc3322';return'#aa1111';};
+const getSleepQ=(hrs)=>{if(hrs<5)return{label:'Bad 😴',color:'#cc3322'};if(hrs<7)return{label:'Average 😐',color:'#ddaa22'};if(hrs<9)return{label:'Good 😊',color:'#44aa44'};return{label:'Excellent 🌟',color:'#4488ff'};};
+
+const WEEKLY_CH=[
+  {tier:1,label:'Pray 10 extra prayers toward debt',icon:'🕌',xp:350,desc:'On top of your 5 daily'},
+  {tier:1,label:'Read 2 Juz of Quran this week',icon:'📖',xp:400,desc:'Spread across the week'},
+  {tier:1,label:'Complete a Siemens course section (3+ hrs)',icon:'💻',xp:350,desc:'Logged study sessions'},
+  {tier:1,label:'Hit calorie target 6 out of 7 days',icon:'🍗',xp:300,desc:'One day off allowed'},
+  {tier:1,label:'Zero junk food 5 consecutive days',icon:'🚫',xp:400,desc:'5 days clean in a row'},
+  {tier:1,label:'Log 4 full workout sessions',icon:'⚔️',xp:350,desc:'Any 4 sessions this week'},
+  {tier:1,label:'Drink 2L every single day',icon:'💧',xp:280,desc:'All 7 days, no exceptions'},
+  {tier:1,label:'Sleep before 1AM every night',icon:'🌙',xp:300,desc:'All 7 nights'},
+  {tier:2,label:'Pray 20 extra prayers toward debt',icon:'🕌',xp:650,desc:'Real commitment to clearing debt'},
+  {tier:2,label:'Read 3 Juz of Quran this week',icon:'📖',xp:700,desc:'Roughly half a Juz per day'},
+  {tier:2,label:'7 days hitting calorie target — no exceptions',icon:'🍗',xp:600,desc:'Every single day'},
+  {tier:2,label:'Fajr on time 5 days this week',icon:'🌅',xp:700,desc:'Up before dawn, 5 times'},
+  {tier:2,label:'Complete 5 workout sessions',icon:'⚔️',xp:650,desc:'5 sessions logged'},
+  {tier:2,label:'Zero junk food for the full week',icon:'🚫',xp:700,desc:'All 7 days. No exceptions.'},
+  {tier:3,label:'Pray 30 extra prayers toward debt',icon:'🕌',xp:1100,desc:'4+ extras per day on top of daily'},
+  {tier:3,label:'Read 5 Juz of Quran this week',icon:'📖',xp:1200,desc:'Nearly a full Juz per day'},
+  {tier:3,label:'7 perfect days — every quest every day',icon:'🏆',xp:1500,desc:'The hardest week. No excuses.'},
+  {tier:3,label:'Fajr on time every day this week',icon:'🌅',xp:1300,desc:'7 days of dawn prayer on time'},
+  {tier:4,label:'Pray 50 extra prayers toward debt',icon:'🕌',xp:2500,desc:'Serious debt clearance'},
+  {tier:4,label:'Complete 7 perfect days in a row',icon:'🏆',xp:3500,desc:'Every habit. Every prayer. All week.'},
+  {tier:4,label:'Drop below a new weight milestone',icon:'⚖️',xp:2000,desc:'First time under 140, 130kg etc.'},
+  {tier:4,label:'Read 10 Juz in a week',icon:'📖',xp:2500,desc:'Roughly 1.5 Juz per day'},
+];
+
+const getMondayKey=()=>{const d=new Date();const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1);const mon=new Date(new Date().setDate(new Date().getDate()-new Date().getDay()+(new Date().getDay()===0?-6:1)));return mon.toISOString().split('T')[0];};
+
+function Heatmap({log,C}){
+  const weeks=[];const now=new Date();const start=new Date(now);start.setDate(start.getDate()-175);
+  const logMap={};log.forEach(e=>{logMap[e.date]=e.allDone?1:Object.values(e.done||{}).some(Boolean)?0.5:0;});
+  const cur=new Date(start);let week=[];
+  while(cur<=now){
+    const key=cur.toISOString().split('T')[0];const val=logMap[key];
+    const col=val===1?'#2a8a2a':val===0.5?'#8a6a00':key<=today()?'#1a1a2a':'transparent';
+    week.push(h('div',{key:key,title:key,style:{width:11,height:11,borderRadius:2,background:col,flexShrink:0}}));
+    if(week.length===7){weeks.push(h('div',{key:key+'w',style:{display:'flex',flexDirection:'column',gap:2}},week));week=[];}
+    cur.setDate(cur.getDate()+1);
+  }
+  if(week.length)weeks.push(h('div',{key:'last',style:{display:'flex',flexDirection:'column',gap:2}},week));
+  return h('div',null,h('div',{style:{display:'flex',gap:2,overflowX:'auto',paddingBottom:4}},weeks),h('div',{style:{display:'flex',gap:12,marginTop:8,fontSize:10,color:C.dim}},h('span',null,'⬜ No data'),h('span',{style:{color:'#8a6a00'}},'🟨 Partial'),h('span',{style:{color:'#2a8a2a'}},'🟩 Perfect')));
+}
+
+function generateRC(st,weekLog){
+  const gradeMap=p=>{if(p>=90)return'S';if(p>=80)return'A';if(p>=65)return'B';if(p>=50)return'C';if(p>=35)return'D';return'F';};
+  const allH=[...st.habits,...st.prayers,...st.life];
+  const qd=weekLog.filter(d=>d.allDone).length;const qp=Math.round((qd/7)*100);
+  const pd=weekLog.filter(d=>PIDs.every(p=>d.done?.[p])).length;const pp=Math.round((pd/7)*100);
+  const cd=weekLog.filter(d=>{const c=st.calLog.find(e=>e.date===d.date);return c&&c.cal<=st.calTarget;}).length;const cp=Math.round((cd/7)*100);
+  const wd=weekLog.filter(d=>{const w=st.waterLog.find(e=>e.date===d.date);return w&&w.ml>=2000;}).length;const wp=Math.round((wd/7)*100);
+  const sd=weekLog.filter(d=>{const s=(st.sleepLog||[]).find(e=>e.date===d.date);return s&&s.hrs>=7;}).length;const sp=Math.round((sd/7)*100);
+  const wkd=(st.workouts||[]).filter(w=>weekLog.some(d=>d.date===w.date)).length;const wkp=Math.min(100,Math.round((wkd/4)*100));
+  const ov=Math.round((qp+pp+cp+wp+sp+wkp)/6);
+  return{qp,pp,cp,wp,sp,wkp,ov,grade:gradeMap(ov),date:today()};
+}
+
+function LvlUpScreen({lvl,onClose}){
+  return h('div',{onClick:onClose,style:{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.95)'}},
+    h('div',{style:{textAlign:'center'},className:'popIn'},
+      h('div',{style:{fontSize:14,color:'#ffd700',letterSpacing:'0.3em',marginBottom:16,textTransform:'uppercase'}},'LEVEL UP!'),
+      h('div',{style:{fontSize:80,marginBottom:16,filter:'drop-shadow(0 0 30px #ffd700)'}},lvl.avatar),
+      h('div',{style:{fontSize:32,color:'#ffd700',fontWeight:'bold',marginBottom:8}},`Level ${lvl.level}`),
+      h('div',{style:{fontSize:22,color:'#e8dcc8',marginBottom:16}},lvl.name),
+      h('div',{style:{fontSize:11,color:'#444',letterSpacing:'0.1em',marginTop:20}},'TAP TO CONTINUE')
+    )
+  );
+}
+
+
+// ── FOOD DATABASE (pre-loaded with Dodo's foods + common UK foods) ─────────────
+const FOOD_DB=[
+  // Your meal plan foods
+  {n:'Chicken Breast (cooked)',c:165,p:31},{n:'Chicken Breast (raw)',c:120,p:23},
+  {n:'Lamb Mince (cooked)',c:280,p:25},{n:'Lamb Mince (raw)',c:235,p:18},
+  {n:'Eggs (whole)',c:155,p:13},{n:'Egg White',c:52,p:11},
+  {n:'Tuna in Water',c:86,p:19},{n:'Tuna in Brine',c:99,p:23},
+  {n:'Greek Yoghurt (full fat)',c:97,p:9},{n:'Greek Yoghurt (0%)',c:59,p:10},
+  {n:'Cottage Cheese',c:98,p:11},{n:'Cheddar Cheese',c:403,p:25},
+  {n:'White Rice (cooked)',c:130,p:3},{n:'Brown Rice (cooked)',c:112,p:3},
+  {n:'White Pasta (cooked)',c:131,p:5},{n:'Whole Wheat Pasta (cooked)',c:124,p:5},
+  {n:'Potatoes (boiled)',c:87,p:2},{n:'Sweet Potato (baked)',c:90,p:2},
+  {n:'Frozen Peas',c:69,p:5},{n:'Frozen Sweetcorn',c:86,p:3},
+  {n:'Cucumber',c:15,p:1},{n:'Lettuce',c:15,p:1},
+  {n:'Tomatoes',c:18,p:1},{n:'Onion',c:40,p:1},
+  {n:'Hot Sauce (Tabasco)',c:12,p:0},{n:'Olive Oil',c:884,p:0},
+  {n:'Butter',c:717,p:1},{n:'Bread (white slice)',c:265,p:9},
+  {n:'Bread (wholemeal slice)',c:230,p:10},
+  // Common UK foods
+  {n:'Milk (semi-skimmed)',c:50,p:4},{n:'Milk (whole)',c:68,p:3},
+  {n:'Banana',c:89,p:1},{n:'Apple',c:52,p:0},
+  {n:'Orange',c:47,p:1},{n:'Grapes',c:67,p:1},
+  {n:'Almonds',c:579,p:21},{n:'Peanut Butter',c:588,p:25},
+  {n:'Oats (dry)',c:389,p:17},{n:'Cornflakes',c:357,p:8},
+  {n:'Salmon (baked)',c:208,p:20},{n:'Cod (baked)',c:82,p:18},
+  {n:'Beef Mince (lean, cooked)',c:215,p:26},{n:'Turkey Breast (cooked)',c:135,p:30},
+  {n:'Hummus',c:166,p:8},{n:'Pitta Bread',c:265,p:9},
+  {n:'Naan Bread',c:317,p:9},{n:'Basmati Rice (cooked)',c:121,p:3},
+  {n:'Lentils (cooked)',c:116,p:9},{n:'Chickpeas (cooked)',c:164,p:9},
+  {n:'Broccoli',c:34,p:3},{n:'Spinach',c:23,p:3},
+  {n:'Carrots',c:41,p:1},{n:'Peppers (red)',c:31,p:1},
+  {n:'Mushrooms',c:22,p:3},{n:'Avocado',c:160,p:2},
+  {n:'Protein Shake (whey, mixed)',c:120,p:24},{n:'Skimmed Milk',c:34,p:3},
+  {n:'Orange Juice',c:45,p:1},{n:'Cola (regular)',c:42,p:0},
+  {n:'Crisps (standard packet)',c:530,p:7},{n:'Chocolate (milk)',c:535,p:8},
+  {n:'Pizza (cheese, per 100g)',c:266,p:11},{n:'Chips (oven, cooked)',c:152,p:3},
+  {n:'Kebab Meat (doner)',c:223,p:15},{n:'Fish and Chips (fish)',c:196,p:18},
+];
+
+// ── DUAL SAVE SYSTEM ──────────────────────────────────────────────────────────
+const SK_MAIN='abdquest_v2';
+const SK_BACKUP='abdquest_v2_backup';
+
+function validateState(s){
+  if(!s||typeof s!=='object')return false;
+  const required=['xp','streak','done','habits','prayers'];
+  return required.every(k=>k in s);
+}
+
+function saveMain(state){
+  try{
+    const data=JSON.stringify({...state,_savedAt:Date.now()});
+    localStorage.setItem(SK_MAIN,data);
+    return true;
+  }catch(e){console.warn('Main save failed:',e);return false;}
+}
+
+function saveBackup(state){
+  try{
+    const data=JSON.stringify({...state,_savedAt:Date.now()});
+    localStorage.setItem(SK_BACKUP,data);
+    return true;
+  }catch(e){console.warn('Backup save failed:',e);return false;}
+}
+
+function fullSave(state){
+  saveMain(state);
+  // Backup saves every 30s via heartbeat, not every single change
+}
+
+function loadSafe(){
+  // Try main
+  try{
+    const raw=localStorage.getItem(SK_MAIN);
+    if(raw){const parsed=JSON.parse(raw);if(validateState(parsed)){console.log('Loaded from main save');return parsed;}}
+  }catch(e){console.warn('Main save corrupted, trying backup...');}
+  // Try backup
+  try{
+    const raw=localStorage.getItem(SK_BACKUP);
+    if(raw){const parsed=JSON.parse(raw);if(validateState(parsed)){console.log('Loaded from backup save');return parsed;}}
+  }catch(e){console.warn('Backup also corrupted, starting fresh');}
+  return null;
+}
+
+// ── SVG LOGO (for PWA manifest) ───────────────────────────────────────────────
+const APP_LOGO_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#0a0a0f"/><rect width="512" height="512" rx="80" fill="url(#grad)" opacity="0.6"/><defs><radialGradient id="grad" cx="30%" cy="30%"><stop offset="0%" stop-color="#1a0a2e"/><stop offset="100%" stop-color="#0a1a0a"/></radialGradient></defs><line x1="256" y1="80" x2="256" y2="400" stroke="#ffd700" stroke-width="12" stroke-linecap="round"/><polygon points="256,60 240,100 256,90 272,100" fill="#ffd700"/><rect x="200" y="230" width="112" height="14" rx="7" fill="#ffd700"/><rect x="220" y="390" width="72" height="18" rx="9" fill="#8b6914"/><path d="M 340 120 A 80 80 0 0 1 340 240 A 60 60 0 0 0 340 120 Z" fill="#ffd700" opacity="0.9"/><circle cx="355" cy="155" r="18" fill="#0a0a0f"/><text x="256" y="470" text-anchor="middle" font-family="Georgia,serif" font-size="52" font-weight="bold" fill="#ffd700" opacity="0.9">AQ</text></svg>`;
+
+// ── FOOD TRACKER STATE (integrated into main state) ───────────────────────────
+// foodLog: [{name, grams, calories, protein, time}]
+// stored inside main state as st.foodLog
+
+function searchFood(query){
+  if(!query||query.length<2)return[];
+  const q=query.toLowerCase();
+  return FOOD_DB.filter(f=>f.n.toLowerCase().includes(q)).slice(0,8);
+}
+
+function calcFoodCals(food,grams){
+  return{
+    calories:Math.round((food.c*grams)/100),
+    protein:Math.round(((food.p||0)*grams)/100),
+  };
+}
+
+// ── NOTIFICATION SCHEDULER ────────────────────────────────────────────────────
+function schedulePrayerNotifications(prayerTimes){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  if(!prayerTimes)return;
+  const prayers=[
+    {name:'Fajr',key:'Fajr',msg:"🌅 Fajr time — don't miss the most important prayer of the day"},
+    {name:'Duhr',key:'Dhuhr',msg:"☀️ Duhr time — step away for a moment and pray"},
+    {name:'Asr',key:'Asr',msg:"🌤️ Asr time — yalla Dodo, don't let this one slip"},
+    {name:'Maghrib',key:'Maghrib',msg:"🌇 Maghrib time — sun is setting, prayer time"},
+    {name:'Isha',key:'Isha',msg:"🌙 Isha time — last prayer of the day, make it count"},
+  ];
+  // Clear any existing prayer notification timers
+  if(window._prayerTimers){window._prayerTimers.forEach(t=>clearTimeout(t));}
+  window._prayerTimers=[];
+  const now=new Date();
+  prayers.forEach(pr=>{
+    const timeStr=prayerTimes[pr.key];
+    if(!timeStr)return;
+    const[hh,mm]=timeStr.split(':').map(Number);
+    const pDate=new Date();pDate.setHours(hh,mm,0,0);
+    const diff=pDate-now;
+    if(diff>0&&diff<86400000){
+      const t=setTimeout(()=>{
+        try{new Notification(`${pr.name} Prayer`,{body:pr.msg,icon:'data:image/svg+xml,'+encodeURIComponent(APP_LOGO_SVG),tag:'prayer_'+pr.key,requireInteraction:false});}
+        catch(e){}
+      },diff);
+      window._prayerTimers.push(t);
+    }
+  });
+  console.log('Prayer notifications scheduled for today');
+}
+
+function scheduleNudgeNotifications(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const nudgeTimes=[
+    {h:9,m:0,msg:"Yalla Dodo, etharrak — open the app and tick something"},
+    {h:13,m:0,msg:"Ya3am log your sleep from last night — don't forget"},
+    {h:17,m:0,msg:"El streak bta3tak bet3ab lamma enta bet3ab — check in"},
+    {h:21,m:0,msg:"Evening check — how many quests done today?"},
+    {h:23,m:0,msg:"Final call ya Dodo — sleep before 1AM, tick your remaining quests"},
+  ];
+  if(window._nudgeTimers){window._nudgeTimers.forEach(t=>clearTimeout(t));}
+  window._nudgeTimers=[];
+  const now=new Date();
+  nudgeTimes.forEach(n=>{
+    const nDate=new Date();nDate.setHours(n.h,n.m,0,0);
+    const diff=nDate-now;
+    if(diff>0&&diff<86400000){
+      const t=setTimeout(()=>{
+        try{new Notification("Abd's Quest",{body:n.msg,icon:'data:image/svg+xml,'+encodeURIComponent(APP_LOGO_SVG),tag:'nudge_'+n.h,requireInteraction:false});}
+        catch(e){}
+      },diff);
+      window._nudgeTimers.push(t);
+    }
+  });
+}
+
+async function requestNotificationPermission(){
+  if(!('Notification' in window))return false;
+  if(Notification.permission==='granted')return true;
+  if(Notification.permission==='denied')return false;
+  const result=await Notification.requestPermission();
+  return result==='granted';
+}
+
+// ── FOOD SEARCH COMPONENT ─────────────────────────────────────────────────────
+function FoodTracker({st,setSt,C}){
+  const[query,setQuery]=useState('');
+  const[results,setResults]=useState([]);
+  const[selected,setSelected]=useState(null);
+  const[grams,setGrams]=useState('100');
+  const[apiStatus,setApiStatus]=useState('idle');
+
+  const foodLog=st.foodLog||[];
+  const totalCals=foodLog.reduce((s,f)=>s+f.calories,0);
+  const totalProt=foodLog.reduce((s,f)=>s+(f.protein||0),0);
+
+  function onSearch(q){
+    setQuery(q);setSelected(null);
+    if(q.length<2){setResults([]);return;}
+    // Try local first
+    const local=searchFood(q);
+    setResults(local);
+    // Try Open Food Facts API
+    if(q.length>=3){
+      setApiStatus('loading');
+      fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments&countries_tags=en:united-kingdom`)
+        .then(r=>r.json())
+        .then(data=>{
+          if(data.products&&data.products.length){
+            const apiResults=data.products
+              .filter(p=>p.product_name&&p.nutriments&&p.nutriments['energy-kcal_100g'])
+              .map(p=>({
+                n:p.product_name,
+                c:Math.round(p.nutriments['energy-kcal_100g']),
+                p:Math.round(p.nutriments['proteins_100g']||0),
+                api:true,
+              })).slice(0,6);
+            // Merge: local results first, then API
+            const merged=[...local,...apiResults.filter(a=>!local.some(l=>l.n.toLowerCase()===a.n.toLowerCase()))].slice(0,10);
+            setResults(merged);
+          }
+          setApiStatus('done');
+        }).catch(()=>{setApiStatus('error');});
+    }
+  }
+
+  function selectFood(food){setSelected(food);setGrams('100');setResults([]);setQuery(food.n);}
+
+  function addFood(){
+    if(!selected)return;
+    const g=parseFloat(grams);
+    if(!g||g<=0||g>5000)return;
+    const{calories,protein}=calcFoodCals(selected,g);
+    const entry={name:selected.n,grams:g,calories,protein,time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})};
+    setSt(p=>{
+      const newLog=[...(p.foodLog||[]),entry];
+      const newTotalCals=newLog.reduce((s,f)=>s+f.calories,0);
+      return{...p,foodLog:newLog,
+        // Also update the calLog entry for today so the existing graph stays in sync
+        calLog:[...p.calLog.filter(e2=>e2.date!==today()),{date:today(),cal:newTotalCals,prot:newLog.reduce((s,f)=>s+(f.protein||0),0)}].sort((a,b)=>a.date.localeCompare(b.date))
+      };
+    });
+    setQuery('');setSelected(null);setGrams('100');
+  }
+
+  function removeFood(idx){
+    setSt(p=>{
+      const newLog=(p.foodLog||[]).filter((_,i)=>i!==idx);
+      const newTotalCals=newLog.reduce((s,f)=>s+f.calories,0);
+      return{...p,foodLog:newLog,
+        calLog:[...p.calLog.filter(e=>e.date!==today()),..( newTotalCals>0?[{date:today(),cal:newTotalCals,prot:newLog.reduce((s,f)=>s+(f.protein||0),0)}]:[])].sort((a,b)=>a.date.localeCompare(b.date))
+      };
+    });
+  }
+
+  const calsLeft=st.calTarget-totalCals;
+
+  return h('div',null,
+    // Summary bar
+    h('div',{style:{...cs(C,{marginBottom:12,background:totalCals>=st.calTarget?`${C.grn}22`:`${C.amb}`,border:`1px solid ${totalCals>=st.calTarget?C.grn:C.gold+'33'}`})}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:8}},
+        h('div',null,
+          h('div',{style:{fontSize:11,color:C.dim}},'CALORIES TODAY'),
+          h('div',{style:{fontSize:22,fontWeight:'bold',color:totalCals>=st.calTarget?C.grnT:C.gold}},totalCals),
+        ),
+        h('div',{style:{textAlign:'right'}},
+          h('div',{style:{fontSize:11,color:C.dim}},'REMAINING'),
+          h('div',{style:{fontSize:22,fontWeight:'bold',color:calsLeft>=0?C.blueT:C.redT}},calsLeft>=0?calsLeft:`+${Math.abs(calsLeft)} over`),
+        )
+      ),
+      h('div',{style:{height:8,background:C.bdr,borderRadius:4,overflow:'hidden',marginBottom:6}},
+        h('div',{style:{height:'100%',width:`${Math.min(100,(totalCals/st.calTarget)*100)}%`,background:totalCals>=st.calTarget?`linear-gradient(90deg,${C.grn},${C.grnT})`:`linear-gradient(90deg,${C.goldD},${C.gold})`,borderRadius:4,transition:'width 0.4s'}})
+      ),
+      h('div',{style:{fontSize:11,color:C.dim}},`Protein: ${totalProt}g · Target: ${st.calTarget} kcal`)
+    ),
+    // Search
+    h('div',{style:{...cs(C,{marginBottom:12})}},
+      h('div',{style:{fontSize:12,color:C.gold,marginBottom:8,fontWeight:'bold'}},'🔍 Search & Add Food'),
+      h('input',{value:query,onChange:e=>onSearch(e.target.value),placeholder:'Search food... (e.g. chicken breast, rice)',style:{...ins(C),marginBottom:7}}),
+      // Quick serving buttons when food selected
+      selected&&h('div',null,
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:5}},`Selected: ${selected.n} · ${selected.c} kcal/100g`),
+        h('div',{style:{display:'flex',gap:6,marginBottom:7}},
+          [100,150,200,250,300].map(g=>h('button',{key:g,onClick:()=>setGrams(String(g)),style:{...bs(C,grams===String(g),C.gold),padding:'5px 9px',fontSize:11,flex:1}},`${g}g`))
+        ),
+        h('div',{style:{display:'flex',gap:7}},
+          h('input',{type:'number',value:grams,onChange:e=>setGrams(e.target.value),placeholder:'grams',style:{...ins(C),flex:1,textAlign:'center'},min:'1',max:'5000'}),
+          h('div',{style:{...cs(C,{flex:1,textAlign:'center',padding:'8px',fontSize:11})}},
+            h('div',{style:{color:C.gold,fontWeight:'bold',fontSize:15}},`${calcFoodCals(selected,parseFloat(grams)||0).calories} kcal`),
+            h('div',{style:{color:C.dim,fontSize:10}},`${calcFoodCals(selected,parseFloat(grams)||0).protein}g protein`)
+          )
+        ),
+        h('button',{onClick:addFood,style:{...bs(C,true,C.gold),width:'100%',fontSize:13,padding:'10px',marginTop:7,fontWeight:'bold'}},'+ Add to Today')
+      ),
+      // Search results
+      results.length>0&&!selected&&h('div',{style:{border:`1px solid ${C.bdr}`,borderRadius:8,overflow:'hidden'}},
+        results.map((food,i)=>h('div',{key:i,onClick:()=>selectFood(food),style:{padding:'10px 14px',borderBottom:`1px solid ${C.bdr}`,cursor:'pointer',background:i%2===0?C.card:`${C.bdr}22`,display:'flex',justifyContent:'space-between',alignItems:'center'}},
+          h('div',null,
+            h('div',{style:{fontSize:13,color:C.txt}},food.n),
+            food.api&&h('div',{style:{fontSize:9,color:C.telT}},'Open Food Facts')
+          ),
+          h('div',{style:{textAlign:'right',flexShrink:0,marginLeft:8}},
+            h('div',{style:{fontSize:12,color:C.gold,fontWeight:'bold'}},`${food.c} kcal`),
+            h('div',{style:{fontSize:10,color:C.dim}},'per 100g')
+          )
+        ))
+      ),
+      apiStatus==='loading'&&h('div',{style:{fontSize:11,color:C.dim,textAlign:'center',padding:8}},'Searching online...')
+    ),
+    // Today's food log
+    foodLog.length>0&&h('div',null,
+      h('div',{style:{fontSize:11,color:C.dim,letterSpacing:'0.15em',textTransform:'uppercase',marginBottom:8}},"Today's Food Log"),
+      foodLog.map((entry,i)=>h('div',{key:i,style:{...cs(C,{marginBottom:6,padding:'10px 13px',display:'flex',alignItems:'center',gap:10})}},
+        h('div',{style:{flex:1}},
+          h('div',{style:{fontSize:13,color:C.txt,fontWeight:'bold'}},entry.name),
+          h('div',{style:{fontSize:11,color:C.dim}},`${entry.grams}g · ${entry.time||''}`)
+        ),
+        h('div',{style:{textAlign:'right',flexShrink:0}},
+          h('div',{style:{fontSize:13,color:C.gold,fontWeight:'bold'}},`${entry.calories} kcal`),
+          h('div',{style:{fontSize:10,color:C.blueT}},`${entry.protein||0}g protein`)
+        ),
+        h('button',{onClick:()=>removeFood(i),style:{background:'none',border:'none',color:C.fnt,fontSize:18,lineHeight:1,flexShrink:0}},'×')
+      ))
+    ),
+    foodLog.length===0&&h('div',{style:{textAlign:'center',color:C.fnt,padding:20,fontSize:12}},"No food logged yet. Search above to start tracking.")
+  );
+}
+
+
 function initState(){
   const saved=loadSafe();const td=today();
   const base={
@@ -870,405 +1278,12 @@ function App(){
 }
 
 
-// ── STREAK MILESTONES ─────────────────────────────────────────────────────────
-const MILESTONES=[
-  {days:3,xp:50,rarity:'common',title:null,msg:'3 days. Good start.'},
-  {days:7,xp:100,rarity:'rare',title:null,msg:'One week. You actually did it.'},
-  {days:10,xp:150,rarity:'rare',title:'The Consistent',msg:'10 days. Habit is forming.'},
-  {days:14,xp:200,rarity:'epic',title:'Two Weeks Strong',msg:'2 weeks. People notice change.'},
-  {days:25,xp:350,rarity:'epic',title:'Quarter Century',msg:'25 days. This is becoming who you are.'},
-  {days:50,xp:600,rarity:'legendary',title:'The Disciplined',msg:'50 days. Half a century of showing up.'},
-  {days:100,xp:1000,rarity:'legendary',title:'Centurion',msg:'100 days. Most people quit by day 3.'},
-  {days:200,xp:2000,rarity:'legendary',title:'The Unbreakable',msg:'200 days. You are built different.'},
-  {days:365,xp:5000,rarity:'legendary',title:'One Full Year',msg:'365 days. Abdelrahman — you did it.'},
-];
-
-const getPenalty=(xp,daysMissed)=>{if(daysMissed<=0)return 0;const pct=Math.min(1,0.2+(daysMissed-1)*0.13);return Math.round(xp*pct);};
-const getMissColor=(d)=>{if(d===0)return null;if(d===1)return'#ddaa22';if(d<=2)return'#dd7722';if(d<=4)return'#cc3322';return'#aa1111';};
-const getSleepQ=(hrs)=>{if(hrs<5)return{label:'Bad 😴',color:'#cc3322'};if(hrs<7)return{label:'Average 😐',color:'#ddaa22'};if(hrs<9)return{label:'Good 😊',color:'#44aa44'};return{label:'Excellent 🌟',color:'#4488ff'};};
-
-const WEEKLY_CH=[
-  {tier:1,label:'Pray 10 extra prayers toward debt',icon:'🕌',xp:350,desc:'On top of your 5 daily'},
-  {tier:1,label:'Read 2 Juz of Quran this week',icon:'📖',xp:400,desc:'Spread across the week'},
-  {tier:1,label:'Complete a Siemens course section (3+ hrs)',icon:'💻',xp:350,desc:'Logged study sessions'},
-  {tier:1,label:'Hit calorie target 6 out of 7 days',icon:'🍗',xp:300,desc:'One day off allowed'},
-  {tier:1,label:'Zero junk food 5 consecutive days',icon:'🚫',xp:400,desc:'5 days clean in a row'},
-  {tier:1,label:'Log 4 full workout sessions',icon:'⚔️',xp:350,desc:'Any 4 sessions this week'},
-  {tier:1,label:'Drink 2L every single day',icon:'💧',xp:280,desc:'All 7 days, no exceptions'},
-  {tier:1,label:'Sleep before 1AM every night',icon:'🌙',xp:300,desc:'All 7 nights'},
-  {tier:2,label:'Pray 20 extra prayers toward debt',icon:'🕌',xp:650,desc:'Real commitment to clearing debt'},
-  {tier:2,label:'Read 3 Juz of Quran this week',icon:'📖',xp:700,desc:'Roughly half a Juz per day'},
-  {tier:2,label:'7 days hitting calorie target — no exceptions',icon:'🍗',xp:600,desc:'Every single day'},
-  {tier:2,label:'Fajr on time 5 days this week',icon:'🌅',xp:700,desc:'Up before dawn, 5 times'},
-  {tier:2,label:'Complete 5 workout sessions',icon:'⚔️',xp:650,desc:'5 sessions logged'},
-  {tier:2,label:'Zero junk food for the full week',icon:'🚫',xp:700,desc:'All 7 days. No exceptions.'},
-  {tier:3,label:'Pray 30 extra prayers toward debt',icon:'🕌',xp:1100,desc:'4+ extras per day on top of daily'},
-  {tier:3,label:'Read 5 Juz of Quran this week',icon:'📖',xp:1200,desc:'Nearly a full Juz per day'},
-  {tier:3,label:'7 perfect days — every quest every day',icon:'🏆',xp:1500,desc:'The hardest week. No excuses.'},
-  {tier:3,label:'Fajr on time every day this week',icon:'🌅',xp:1300,desc:'7 days of dawn prayer on time'},
-  {tier:4,label:'Pray 50 extra prayers toward debt',icon:'🕌',xp:2500,desc:'Serious debt clearance'},
-  {tier:4,label:'Complete 7 perfect days in a row',icon:'🏆',xp:3500,desc:'Every habit. Every prayer. All week.'},
-  {tier:4,label:'Drop below a new weight milestone',icon:'⚖️',xp:2000,desc:'First time under 140, 130kg etc.'},
-  {tier:4,label:'Read 10 Juz in a week',icon:'📖',xp:2500,desc:'Roughly 1.5 Juz per day'},
-];
-
-const getMondayKey=()=>{const d=new Date();const day=d.getDay();const diff=d.getDate()-day+(day===0?-6:1);const mon=new Date(new Date().setDate(new Date().getDate()-new Date().getDay()+(new Date().getDay()===0?-6:1)));return mon.toISOString().split('T')[0];};
-
-function Heatmap({log,C}){
-  const weeks=[];const now=new Date();const start=new Date(now);start.setDate(start.getDate()-175);
-  const logMap={};log.forEach(e=>{logMap[e.date]=e.allDone?1:Object.values(e.done||{}).some(Boolean)?0.5:0;});
-  const cur=new Date(start);let week=[];
-  while(cur<=now){
-    const key=cur.toISOString().split('T')[0];const val=logMap[key];
-    const col=val===1?'#2a8a2a':val===0.5?'#8a6a00':key<=today()?'#1a1a2a':'transparent';
-    week.push(h('div',{key:key,title:key,style:{width:11,height:11,borderRadius:2,background:col,flexShrink:0}}));
-    if(week.length===7){weeks.push(h('div',{key:key+'w',style:{display:'flex',flexDirection:'column',gap:2}},week));week=[];}
-    cur.setDate(cur.getDate()+1);
-  }
-  if(week.length)weeks.push(h('div',{key:'last',style:{display:'flex',flexDirection:'column',gap:2}},week));
-  return h('div',null,h('div',{style:{display:'flex',gap:2,overflowX:'auto',paddingBottom:4}},weeks),h('div',{style:{display:'flex',gap:12,marginTop:8,fontSize:10,color:C.dim}},h('span',null,'⬜ No data'),h('span',{style:{color:'#8a6a00'}},'🟨 Partial'),h('span',{style:{color:'#2a8a2a'}},'🟩 Perfect')));
+try{
+  ReactDOM.createRoot(document.getElementById('app')).render(e(App));
+}catch(err){
+  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;color:#ff6666;font-family:Georgia,serif;padding:20px;text-align:center;"><div style="font-size:40px">⚠️</div><div style="font-size:16px;color:#ffd700">App Error</div><div style="font-size:12px;color:#aaa">'+err.message+'</div><button onclick="location.reload()" style="margin-top:16px;background:#ffd700;border:none;padding:12px 24px;border-radius:8px;font-size:14px;cursor:pointer;">Reload</button></div>';
+  console.error('App failed to render:',err);
 }
-
-function generateRC(st,weekLog){
-  const gradeMap=p=>{if(p>=90)return'S';if(p>=80)return'A';if(p>=65)return'B';if(p>=50)return'C';if(p>=35)return'D';return'F';};
-  const allH=[...st.habits,...st.prayers,...st.life];
-  const qd=weekLog.filter(d=>d.allDone).length;const qp=Math.round((qd/7)*100);
-  const pd=weekLog.filter(d=>PIDs.every(p=>d.done?.[p])).length;const pp=Math.round((pd/7)*100);
-  const cd=weekLog.filter(d=>{const c=st.calLog.find(e=>e.date===d.date);return c&&c.cal<=st.calTarget;}).length;const cp=Math.round((cd/7)*100);
-  const wd=weekLog.filter(d=>{const w=st.waterLog.find(e=>e.date===d.date);return w&&w.ml>=2000;}).length;const wp=Math.round((wd/7)*100);
-  const sd=weekLog.filter(d=>{const s=(st.sleepLog||[]).find(e=>e.date===d.date);return s&&s.hrs>=7;}).length;const sp=Math.round((sd/7)*100);
-  const wkd=(st.workouts||[]).filter(w=>weekLog.some(d=>d.date===w.date)).length;const wkp=Math.min(100,Math.round((wkd/4)*100));
-  const ov=Math.round((qp+pp+cp+wp+sp+wkp)/6);
-  return{qp,pp,cp,wp,sp,wkp,ov,grade:gradeMap(ov),date:today()};
-}
-
-function LvlUpScreen({lvl,onClose}){
-  return h('div',{onClick:onClose,style:{position:'fixed',inset:0,zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.95)'}},
-    h('div',{style:{textAlign:'center'},className:'popIn'},
-      h('div',{style:{fontSize:14,color:'#ffd700',letterSpacing:'0.3em',marginBottom:16,textTransform:'uppercase'}},'LEVEL UP!'),
-      h('div',{style:{fontSize:80,marginBottom:16,filter:'drop-shadow(0 0 30px #ffd700)'}},lvl.avatar),
-      h('div',{style:{fontSize:32,color:'#ffd700',fontWeight:'bold',marginBottom:8}},`Level ${lvl.level}`),
-      h('div',{style:{fontSize:22,color:'#e8dcc8',marginBottom:16}},lvl.name),
-      h('div',{style:{fontSize:11,color:'#444',letterSpacing:'0.1em',marginTop:20}},'TAP TO CONTINUE')
-    )
-  );
-}
-
-
-// ── FOOD DATABASE (pre-loaded with Dodo's foods + common UK foods) ─────────────
-const FOOD_DB=[
-  // Your meal plan foods
-  {n:'Chicken Breast (cooked)',c:165,p:31},{n:'Chicken Breast (raw)',c:120,p:23},
-  {n:'Lamb Mince (cooked)',c:280,p:25},{n:'Lamb Mince (raw)',c:235,p:18},
-  {n:'Eggs (whole)',c:155,p:13},{n:'Egg White',c:52,p:11},
-  {n:'Tuna in Water',c:86,p:19},{n:'Tuna in Brine',c:99,p:23},
-  {n:'Greek Yoghurt (full fat)',c:97,p:9},{n:'Greek Yoghurt (0%)',c:59,p:10},
-  {n:'Cottage Cheese',c:98,p:11},{n:'Cheddar Cheese',c:403,p:25},
-  {n:'White Rice (cooked)',c:130,p:3},{n:'Brown Rice (cooked)',c:112,p:3},
-  {n:'White Pasta (cooked)',c:131,p:5},{n:'Whole Wheat Pasta (cooked)',c:124,p:5},
-  {n:'Potatoes (boiled)',c:87,p:2},{n:'Sweet Potato (baked)',c:90,p:2},
-  {n:'Frozen Peas',c:69,p:5},{n:'Frozen Sweetcorn',c:86,p:3},
-  {n:'Cucumber',c:15,p:1},{n:'Lettuce',c:15,p:1},
-  {n:'Tomatoes',c:18,p:1},{n:'Onion',c:40,p:1},
-  {n:'Hot Sauce (Tabasco)',c:12,p:0},{n:'Olive Oil',c:884,p:0},
-  {n:'Butter',c:717,p:1},{n:'Bread (white slice)',c:265,p:9},
-  {n:'Bread (wholemeal slice)',c:230,p:10},
-  // Common UK foods
-  {n:'Milk (semi-skimmed)',c:50,p:4},{n:'Milk (whole)',c:68,p:3},
-  {n:'Banana',c:89,p:1},{n:'Apple',c:52,p:0},
-  {n:'Orange',c:47,p:1},{n:'Grapes',c:67,p:1},
-  {n:'Almonds',c:579,p:21},{n:'Peanut Butter',c:588,p:25},
-  {n:'Oats (dry)',c:389,p:17},{n:'Cornflakes',c:357,p:8},
-  {n:'Salmon (baked)',c:208,p:20},{n:'Cod (baked)',c:82,p:18},
-  {n:'Beef Mince (lean, cooked)',c:215,p:26},{n:'Turkey Breast (cooked)',c:135,p:30},
-  {n:'Hummus',c:166,p:8},{n:'Pitta Bread',c:265,p:9},
-  {n:'Naan Bread',c:317,p:9},{n:'Basmati Rice (cooked)',c:121,p:3},
-  {n:'Lentils (cooked)',c:116,p:9},{n:'Chickpeas (cooked)',c:164,p:9},
-  {n:'Broccoli',c:34,p:3},{n:'Spinach',c:23,p:3},
-  {n:'Carrots',c:41,p:1},{n:'Peppers (red)',c:31,p:1},
-  {n:'Mushrooms',c:22,p:3},{n:'Avocado',c:160,p:2},
-  {n:'Protein Shake (whey, mixed)',c:120,p:24},{n:'Skimmed Milk',c:34,p:3},
-  {n:'Orange Juice',c:45,p:1},{n:'Cola (regular)',c:42,p:0},
-  {n:'Crisps (standard packet)',c:530,p:7},{n:'Chocolate (milk)',c:535,p:8},
-  {n:'Pizza (cheese, per 100g)',c:266,p:11},{n:'Chips (oven, cooked)',c:152,p:3},
-  {n:'Kebab Meat (doner)',c:223,p:15},{n:'Fish and Chips (fish)',c:196,p:18},
-];
-
-// ── DUAL SAVE SYSTEM ──────────────────────────────────────────────────────────
-const SK_MAIN='abdquest_v2';
-const SK_BACKUP='abdquest_v2_backup';
-
-function validateState(s){
-  if(!s||typeof s!=='object')return false;
-  const required=['xp','streak','done','habits','prayers'];
-  return required.every(k=>k in s);
-}
-
-function saveMain(state){
-  try{
-    const data=JSON.stringify({...state,_savedAt:Date.now()});
-    localStorage.setItem(SK_MAIN,data);
-    return true;
-  }catch(e){console.warn('Main save failed:',e);return false;}
-}
-
-function saveBackup(state){
-  try{
-    const data=JSON.stringify({...state,_savedAt:Date.now()});
-    localStorage.setItem(SK_BACKUP,data);
-    return true;
-  }catch(e){console.warn('Backup save failed:',e);return false;}
-}
-
-function fullSave(state){
-  saveMain(state);
-  // Backup saves every 30s via heartbeat, not every single change
-}
-
-function loadSafe(){
-  // Try main
-  try{
-    const raw=localStorage.getItem(SK_MAIN);
-    if(raw){const parsed=JSON.parse(raw);if(validateState(parsed)){console.log('Loaded from main save');return parsed;}}
-  }catch(e){console.warn('Main save corrupted, trying backup...');}
-  // Try backup
-  try{
-    const raw=localStorage.getItem(SK_BACKUP);
-    if(raw){const parsed=JSON.parse(raw);if(validateState(parsed)){console.log('Loaded from backup save');return parsed;}}
-  }catch(e){console.warn('Backup also corrupted, starting fresh');}
-  return null;
-}
-
-// ── SVG LOGO (for PWA manifest) ───────────────────────────────────────────────
-const APP_LOGO_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#0a0a0f"/><rect width="512" height="512" rx="80" fill="url(#grad)" opacity="0.6"/><defs><radialGradient id="grad" cx="30%" cy="30%"><stop offset="0%" stop-color="#1a0a2e"/><stop offset="100%" stop-color="#0a1a0a"/></radialGradient></defs><line x1="256" y1="80" x2="256" y2="400" stroke="#ffd700" stroke-width="12" stroke-linecap="round"/><polygon points="256,60 240,100 256,90 272,100" fill="#ffd700"/><rect x="200" y="230" width="112" height="14" rx="7" fill="#ffd700"/><rect x="220" y="390" width="72" height="18" rx="9" fill="#8b6914"/><path d="M 340 120 A 80 80 0 0 1 340 240 A 60 60 0 0 0 340 120 Z" fill="#ffd700" opacity="0.9"/><circle cx="355" cy="155" r="18" fill="#0a0a0f"/><text x="256" y="470" text-anchor="middle" font-family="Georgia,serif" font-size="52" font-weight="bold" fill="#ffd700" opacity="0.9">AQ</text></svg>`;
-
-// ── FOOD TRACKER STATE (integrated into main state) ───────────────────────────
-// foodLog: [{name, grams, calories, protein, time}]
-// stored inside main state as st.foodLog
-
-function searchFood(query){
-  if(!query||query.length<2)return[];
-  const q=query.toLowerCase();
-  return FOOD_DB.filter(f=>f.n.toLowerCase().includes(q)).slice(0,8);
-}
-
-function calcFoodCals(food,grams){
-  return{
-    calories:Math.round((food.c*grams)/100),
-    protein:Math.round(((food.p||0)*grams)/100),
-  };
-}
-
-// ── NOTIFICATION SCHEDULER ────────────────────────────────────────────────────
-function schedulePrayerNotifications(prayerTimes){
-  if(!('Notification' in window)||Notification.permission!=='granted')return;
-  if(!prayerTimes)return;
-  const prayers=[
-    {name:'Fajr',key:'Fajr',msg:"🌅 Fajr time — don't miss the most important prayer of the day"},
-    {name:'Duhr',key:'Dhuhr',msg:"☀️ Duhr time — step away for a moment and pray"},
-    {name:'Asr',key:'Asr',msg:"🌤️ Asr time — yalla Dodo, don't let this one slip"},
-    {name:'Maghrib',key:'Maghrib',msg:"🌇 Maghrib time — sun is setting, prayer time"},
-    {name:'Isha',key:'Isha',msg:"🌙 Isha time — last prayer of the day, make it count"},
-  ];
-  // Clear any existing prayer notification timers
-  if(window._prayerTimers){window._prayerTimers.forEach(t=>clearTimeout(t));}
-  window._prayerTimers=[];
-  const now=new Date();
-  prayers.forEach(pr=>{
-    const timeStr=prayerTimes[pr.key];
-    if(!timeStr)return;
-    const[hh,mm]=timeStr.split(':').map(Number);
-    const pDate=new Date();pDate.setHours(hh,mm,0,0);
-    const diff=pDate-now;
-    if(diff>0&&diff<86400000){
-      const t=setTimeout(()=>{
-        try{new Notification(`${pr.name} Prayer`,{body:pr.msg,icon:'data:image/svg+xml,'+encodeURIComponent(APP_LOGO_SVG),tag:'prayer_'+pr.key,requireInteraction:false});}
-        catch(e){}
-      },diff);
-      window._prayerTimers.push(t);
-    }
-  });
-  console.log('Prayer notifications scheduled for today');
-}
-
-function scheduleNudgeNotifications(){
-  if(!('Notification' in window)||Notification.permission!=='granted')return;
-  const nudgeTimes=[
-    {h:9,m:0,msg:"Yalla Dodo, etharrak — open the app and tick something"},
-    {h:13,m:0,msg:"Ya3am log your sleep from last night — don't forget"},
-    {h:17,m:0,msg:"El streak bta3tak bet3ab lamma enta bet3ab — check in"},
-    {h:21,m:0,msg:"Evening check — how many quests done today?"},
-    {h:23,m:0,msg:"Final call ya Dodo — sleep before 1AM, tick your remaining quests"},
-  ];
-  if(window._nudgeTimers){window._nudgeTimers.forEach(t=>clearTimeout(t));}
-  window._nudgeTimers=[];
-  const now=new Date();
-  nudgeTimes.forEach(n=>{
-    const nDate=new Date();nDate.setHours(n.h,n.m,0,0);
-    const diff=nDate-now;
-    if(diff>0&&diff<86400000){
-      const t=setTimeout(()=>{
-        try{new Notification("Abd's Quest",{body:n.msg,icon:'data:image/svg+xml,'+encodeURIComponent(APP_LOGO_SVG),tag:'nudge_'+n.h,requireInteraction:false});}
-        catch(e){}
-      },diff);
-      window._nudgeTimers.push(t);
-    }
-  });
-}
-
-async function requestNotificationPermission(){
-  if(!('Notification' in window))return false;
-  if(Notification.permission==='granted')return true;
-  if(Notification.permission==='denied')return false;
-  const result=await Notification.requestPermission();
-  return result==='granted';
-}
-
-// ── FOOD SEARCH COMPONENT ─────────────────────────────────────────────────────
-function FoodTracker({st,setSt,C}){
-  const[query,setQuery]=useState('');
-  const[results,setResults]=useState([]);
-  const[selected,setSelected]=useState(null);
-  const[grams,setGrams]=useState('100');
-  const[apiStatus,setApiStatus]=useState('idle');
-
-  const foodLog=st.foodLog||[];
-  const totalCals=foodLog.reduce((s,f)=>s+f.calories,0);
-  const totalProt=foodLog.reduce((s,f)=>s+(f.protein||0),0);
-
-  function onSearch(q){
-    setQuery(q);setSelected(null);
-    if(q.length<2){setResults([]);return;}
-    // Try local first
-    const local=searchFood(q);
-    setResults(local);
-    // Try Open Food Facts API
-    if(q.length>=3){
-      setApiStatus('loading');
-      fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,nutriments&countries_tags=en:united-kingdom`)
-        .then(r=>r.json())
-        .then(data=>{
-          if(data.products&&data.products.length){
-            const apiResults=data.products
-              .filter(p=>p.product_name&&p.nutriments&&p.nutriments['energy-kcal_100g'])
-              .map(p=>({
-                n:p.product_name,
-                c:Math.round(p.nutriments['energy-kcal_100g']),
-                p:Math.round(p.nutriments['proteins_100g']||0),
-                api:true,
-              })).slice(0,6);
-            // Merge: local results first, then API
-            const merged=[...local,...apiResults.filter(a=>!local.some(l=>l.n.toLowerCase()===a.n.toLowerCase()))].slice(0,10);
-            setResults(merged);
-          }
-          setApiStatus('done');
-        }).catch(()=>{setApiStatus('error');});
-    }
-  }
-
-  function selectFood(food){setSelected(food);setGrams('100');setResults([]);setQuery(food.n);}
-
-  function addFood(){
-    if(!selected)return;
-    const g=parseFloat(grams);
-    if(!g||g<=0||g>5000)return;
-    const{calories,protein}=calcFoodCals(selected,g);
-    const entry={name:selected.n,grams:g,calories,protein,time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})};
-    setSt(p=>{
-      const newLog=[...(p.foodLog||[]),entry];
-      const newTotalCals=newLog.reduce((s,f)=>s+f.calories,0);
-      return{...p,foodLog:newLog,
-        // Also update the calLog entry for today so the existing graph stays in sync
-        calLog:[...p.calLog.filter(e2=>e2.date!==today()),{date:today(),cal:newTotalCals,prot:newLog.reduce((s,f)=>s+(f.protein||0),0)}].sort((a,b)=>a.date.localeCompare(b.date))
-      };
-    });
-    setQuery('');setSelected(null);setGrams('100');
-  }
-
-  function removeFood(idx){
-    setSt(p=>{
-      const newLog=(p.foodLog||[]).filter((_,i)=>i!==idx);
-      const newTotalCals=newLog.reduce((s,f)=>s+f.calories,0);
-      return{...p,foodLog:newLog,
-        calLog:[...p.calLog.filter(e=>e.date!==today()),..( newTotalCals>0?[{date:today(),cal:newTotalCals,prot:newLog.reduce((s,f)=>s+(f.protein||0),0)}]:[])].sort((a,b)=>a.date.localeCompare(b.date))
-      };
-    });
-  }
-
-  const calsLeft=st.calTarget-totalCals;
-
-  return h('div',null,
-    // Summary bar
-    h('div',{style:{...cs(C,{marginBottom:12,background:totalCals>=st.calTarget?`${C.grn}22`:`${C.amb}`,border:`1px solid ${totalCals>=st.calTarget?C.grn:C.gold+'33'}`})}},
-      h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:8}},
-        h('div',null,
-          h('div',{style:{fontSize:11,color:C.dim}},'CALORIES TODAY'),
-          h('div',{style:{fontSize:22,fontWeight:'bold',color:totalCals>=st.calTarget?C.grnT:C.gold}},totalCals),
-        ),
-        h('div',{style:{textAlign:'right'}},
-          h('div',{style:{fontSize:11,color:C.dim}},'REMAINING'),
-          h('div',{style:{fontSize:22,fontWeight:'bold',color:calsLeft>=0?C.blueT:C.redT}},calsLeft>=0?calsLeft:`+${Math.abs(calsLeft)} over`),
-        )
-      ),
-      h('div',{style:{height:8,background:C.bdr,borderRadius:4,overflow:'hidden',marginBottom:6}},
-        h('div',{style:{height:'100%',width:`${Math.min(100,(totalCals/st.calTarget)*100)}%`,background:totalCals>=st.calTarget?`linear-gradient(90deg,${C.grn},${C.grnT})`:`linear-gradient(90deg,${C.goldD},${C.gold})`,borderRadius:4,transition:'width 0.4s'}})
-      ),
-      h('div',{style:{fontSize:11,color:C.dim}},`Protein: ${totalProt}g · Target: ${st.calTarget} kcal`)
-    ),
-    // Search
-    h('div',{style:{...cs(C,{marginBottom:12})}},
-      h('div',{style:{fontSize:12,color:C.gold,marginBottom:8,fontWeight:'bold'}},'🔍 Search & Add Food'),
-      h('input',{value:query,onChange:e=>onSearch(e.target.value),placeholder:'Search food... (e.g. chicken breast, rice)',style:{...ins(C),marginBottom:7}}),
-      // Quick serving buttons when food selected
-      selected&&h('div',null,
-        h('div',{style:{fontSize:11,color:C.dim,marginBottom:5}},`Selected: ${selected.n} · ${selected.c} kcal/100g`),
-        h('div',{style:{display:'flex',gap:6,marginBottom:7}},
-          [100,150,200,250,300].map(g=>h('button',{key:g,onClick:()=>setGrams(String(g)),style:{...bs(C,grams===String(g),C.gold),padding:'5px 9px',fontSize:11,flex:1}},`${g}g`))
-        ),
-        h('div',{style:{display:'flex',gap:7}},
-          h('input',{type:'number',value:grams,onChange:e=>setGrams(e.target.value),placeholder:'grams',style:{...ins(C),flex:1,textAlign:'center'},min:'1',max:'5000'}),
-          h('div',{style:{...cs(C,{flex:1,textAlign:'center',padding:'8px',fontSize:11})}},
-            h('div',{style:{color:C.gold,fontWeight:'bold',fontSize:15}},`${calcFoodCals(selected,parseFloat(grams)||0).calories} kcal`),
-            h('div',{style:{color:C.dim,fontSize:10}},`${calcFoodCals(selected,parseFloat(grams)||0).protein}g protein`)
-          )
-        ),
-        h('button',{onClick:addFood,style:{...bs(C,true,C.gold),width:'100%',fontSize:13,padding:'10px',marginTop:7,fontWeight:'bold'}},'+ Add to Today')
-      ),
-      // Search results
-      results.length>0&&!selected&&h('div',{style:{border:`1px solid ${C.bdr}`,borderRadius:8,overflow:'hidden'}},
-        results.map((food,i)=>h('div',{key:i,onClick:()=>selectFood(food),style:{padding:'10px 14px',borderBottom:`1px solid ${C.bdr}`,cursor:'pointer',background:i%2===0?C.card:`${C.bdr}22`,display:'flex',justifyContent:'space-between',alignItems:'center'}},
-          h('div',null,
-            h('div',{style:{fontSize:13,color:C.txt}},food.n),
-            food.api&&h('div',{style:{fontSize:9,color:C.telT}},'Open Food Facts')
-          ),
-          h('div',{style:{textAlign:'right',flexShrink:0,marginLeft:8}},
-            h('div',{style:{fontSize:12,color:C.gold,fontWeight:'bold'}},`${food.c} kcal`),
-            h('div',{style:{fontSize:10,color:C.dim}},'per 100g')
-          )
-        ))
-      ),
-      apiStatus==='loading'&&h('div',{style:{fontSize:11,color:C.dim,textAlign:'center',padding:8}},'Searching online...')
-    ),
-    // Today's food log
-    foodLog.length>0&&h('div',null,
-      h('div',{style:{fontSize:11,color:C.dim,letterSpacing:'0.15em',textTransform:'uppercase',marginBottom:8}},"Today's Food Log"),
-      foodLog.map((entry,i)=>h('div',{key:i,style:{...cs(C,{marginBottom:6,padding:'10px 13px',display:'flex',alignItems:'center',gap:10})}},
-        h('div',{style:{flex:1}},
-          h('div',{style:{fontSize:13,color:C.txt,fontWeight:'bold'}},entry.name),
-          h('div',{style:{fontSize:11,color:C.dim}},`${entry.grams}g · ${entry.time||''}`)
-        ),
-        h('div',{style:{textAlign:'right',flexShrink:0}},
-          h('div',{style:{fontSize:13,color:C.gold,fontWeight:'bold'}},`${entry.calories} kcal`),
-          h('div',{style:{fontSize:10,color:C.blueT}},`${entry.protein||0}g protein`)
-        ),
-        h('button',{onClick:()=>removeFood(i),style:{background:'none',border:'none',color:C.fnt,fontSize:18,lineHeight:1,flexShrink:0}},'×')
-      ))
-    ),
-    foodLog.length===0&&h('div',{style:{textAlign:'center',color:C.fnt,padding:20,fontSize:12}},"No food logged yet. Search above to start tracking.")
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('app')).render(e(App));
 })();
 </script>
 
