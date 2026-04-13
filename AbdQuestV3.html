@@ -215,6 +215,7 @@ const toHijri=date=>{
 };
 
 // ─── INIT STATE ───────────────────────────────────────────────────────────────
+setStatus('Step 2: Levels loaded...');
 // ── STREAK MILESTONES ─────────────────────────────────────────────────────────
 const MILESTONES=[
   {days:3,xp:50,rarity:'common',title:null,msg:'3 days. Good start.'},
@@ -339,6 +340,7 @@ const FOOD_DB=[
   {n:'Kebab Meat (doner)',c:223,p:15},{n:'Fish and Chips (fish)',c:196,p:18},
 ];
 
+setStatus('Step 3: Helpers loaded...');
 // ── DUAL SAVE SYSTEM ──────────────────────────────────────────────────────────
 const SK_MAIN='abdquest_v2';
 const SK_BACKUP='abdquest_v2_backup';
@@ -384,9 +386,11 @@ function loadSafe(){
   return null;
 }
 
+setStatus('Step 4: Save system loaded...');
 // ── SVG LOGO (for PWA manifest) ───────────────────────────────────────────────
 const APP_LOGO_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="80" fill="#0a0a0f"/><rect width="512" height="512" rx="80" fill="url(#grad)" opacity="0.6"/><defs><radialGradient id="grad" cx="30%" cy="30%"><stop offset="0%" stop-color="#1a0a2e"/><stop offset="100%" stop-color="#0a1a0a"/></radialGradient></defs><line x1="256" y1="80" x2="256" y2="400" stroke="#ffd700" stroke-width="12" stroke-linecap="round"/><polygon points="256,60 240,100 256,90 272,100" fill="#ffd700"/><rect x="200" y="230" width="112" height="14" rx="7" fill="#ffd700"/><rect x="220" y="390" width="72" height="18" rx="9" fill="#8b6914"/><path d="M 340 120 A 80 80 0 0 1 340 240 A 60 60 0 0 0 340 120 Z" fill="#ffd700" opacity="0.9"/><circle cx="355" cy="155" r="18" fill="#0a0a0f"/><text x="256" y="470" text-anchor="middle" font-family="Georgia,serif" font-size="52" font-weight="bold" fill="#ffd700" opacity="0.9">AQ</text></svg>`;
 
+setStatus('Step 5: Food DB loaded...');
 // ── FOOD TRACKER STATE (integrated into main state) ───────────────────────────
 // foodLog: [{name, grams, calories, protein, time}]
 // stored inside main state as st.foodLog
@@ -404,6 +408,7 @@ function calcFoodCals(food,grams){
   };
 }
 
+setStatus('Step 6: Food tracker loaded...');
 // ── NOTIFICATION SCHEDULER ────────────────────────────────────────────────────
 function schedulePrayerNotifications(prayerTimes){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
@@ -614,6 +619,7 @@ function FoodTracker({st,setSt,C}){
 }
 
 
+setStatus('Step 7: About to run initState...');
 function initState(){
   const saved=loadSafe();const td=today();
   const base={
@@ -784,6 +790,7 @@ function usePT(){
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
+setStatus('Step 8: initState done, loading App...');
 function App(){
   const[st,setSt]=useState(initState);
   const[tab,setTab]=useState('today');
@@ -1288,11 +1295,14 @@ function App(){
 }
 
 
+setStatus('Step 9: Rendering app...');
 try{
   ReactDOM.createRoot(document.getElementById('app')).render(e(App));
 }catch(err){
-  document.getElementById('app').innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;color:#ff6666;font-family:Georgia,serif;padding:20px;text-align:center;"><div style="font-size:40px">⚠️</div><div style="font-size:16px;color:#ffd700">App Error</div><div style="font-size:12px;color:#aaa">'+err.message+'</div><button onclick="location.reload()" style="margin-top:16px;background:#ffd700;border:none;padding:12px 24px;border-radius:8px;font-size:14px;cursor:pointer;">Reload</button></div>';
-  console.error('App failed to render:',err);
+  var msg=err.message||String(err);
+  var stack=(err.stack||'').split('\n').slice(0,3).join(' | ');
+  document.getElementById('app').innerHTML='<div style="padding:20px;background:#0a0a0f;min-height:100vh;color:#e8dcc8;font-family:Georgia,serif;"><div style="font-size:16px;color:#ff6666;margin-bottom:12px;">⚠️ App crashed</div><div style="font-size:13px;color:#ffd700;margin-bottom:8px;">Error: '+msg+'</div><div style="font-size:11px;color:#888;word-break:break-all;margin-bottom:16px;">'+stack+'</div><button onclick="location.reload()" style="background:#ffd700;border:none;padding:10px 20px;border-radius:6px;font-size:13px;cursor:pointer;">Reload</button></div>';
+  console.error('App failed:',err);
 }
 })();
 </script>
