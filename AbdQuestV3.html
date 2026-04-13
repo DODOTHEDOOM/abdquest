@@ -25,7 +25,11 @@ button{-webkit-appearance:none;cursor:pointer;}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;background:#0a0a0f;color:#ffd700;font-family:Georgia,serif;">
+<div style="font-size:60px">⚔️</div>
+<div style="font-size:20px;font-weight:bold">Abd's Quest</div>
+<div style="font-size:13px;color:#6b5b3e" id="status">Loading scripts...</div>
+</div>
 <script>
 // Show loading indicator immediately
 document.addEventListener('DOMContentLoaded',function(){
@@ -33,10 +37,16 @@ document.addEventListener('DOMContentLoaded',function(){
   if(app)app.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:#ffd700;font-family:Georgia,serif;"><div style="font-size:60px">⚔️</div><div style="font-size:20px;font-weight:bold">Abd's Quest</div><div style="font-size:13px;color:#6b5b3e">Loading...</div></div>';
 });
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" 
-  onerror="document.getElementById('app').innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;color:#ff6666;font-family:Georgia,serif;padding:20px;text-align:center;\'><div style=\'font-size:40px\'>⚠️</div><div style=\'font-size:16px;color:#ffd700\'>Loading failed</div><div style=\'font-size:13px;color:#aaa\'>Check your internet connection and reload the page</div><button onclick=\'location.reload()\' style=\'margin-top:16px;background:#ffd700;border:none;padding:12px 24px;border-radius:8px;font-size:14px;cursor:pointer;\'>Reload</button></div>';">
+<script>
+// Update status as we go
+function setStatus(msg){var s=document.getElementById('status');if(s)s.textContent=msg;}
+setStatus('Loading React...');
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="setStatus('React failed to load - check internet connection')">
+</script>
+<script>setStatus('React loaded. Loading ReactDOM...');</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>setStatus('ReactDOM loaded. Starting app...');</script>
 <script>
 (function(){
 'use strict';
