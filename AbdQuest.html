@@ -10,7 +10,7 @@
 <title>Abd's Quest</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:#0a0a0f;font-family:Georgia,serif;color:#e8dcc8;overflow-x:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+body{background:#0a0a0f;font-family:Georgia,serif;color:#e8dcc8;overflow-x:hidden;padding-top:env(safe-area-inset-top);}
 input,textarea,button{font-family:Georgia,serif;}
 input,textarea{outline:none;-webkit-appearance:none;}
 button{-webkit-appearance:none;cursor:pointer;}
@@ -172,7 +172,7 @@ var DEF_HABITS=[
   {id:'workout',label:'Move Your Body',icon:'⚔️',xp:40,desc:'Walk, gym, anything active'},
   {id:'sleep',label:'Sleep Before 1AM',icon:'🌙',xp:25,desc:'Get to bed at a decent time'},
   {id:'calories',label:'Hit Calorie Target',icon:'🍗',xp:30,desc:'Stay within your calorie goal'},
-  {id:'water2l',label:'Drink 2L Water',icon:'💧',xp:20,desc:'Hit your daily water target'}
+  {id:'water2l',label:'Drink 3L Water',icon:'💧',xp:20,desc:'Hit your daily 3L water target'}
 ];
 var DEF_PRAYERS=[
   {id:'fajr',label:'Fajr',icon:'🌅',xp:30,desc:'Dawn prayer'},
@@ -242,7 +242,7 @@ var WEEKLY_CH=[
   {tier:1,label:'Hit calorie target 6 out of 7 days',icon:'🍗',xp:300,desc:'One day off allowed'},
   {tier:1,label:'Zero junk food 5 consecutive days',icon:'🚫',xp:400,desc:'5 days clean in a row'},
   {tier:1,label:'Log 4 full workout sessions',icon:'⚔️',xp:350,desc:'Any 4 sessions this week'},
-  {tier:1,label:'Drink 2L every single day',icon:'💧',xp:280,desc:'All 7 days, no exceptions'},
+  {tier:1,label:'Drink 3L every single day',icon:'💧',xp:280,desc:'All 7 days, no exceptions'},
   {tier:1,label:'Sleep before 1AM every night',icon:'🌙',xp:300,desc:'All 7 nights'},
   {tier:2,label:'Pray 20 extra prayers toward debt',icon:'🕌',xp:650,desc:'Real commitment to clearing debt'},
   {tier:2,label:'Read 3 Juz of Quran this week',icon:'📖',xp:700,desc:'Roughly half a Juz per day'},
@@ -314,7 +314,7 @@ function SH(ic,ti,col){return h('div',{style:{display:'flex',alignItems:'center'
 // INIT STATE
 function initState(){
   var saved=loadSafe(),fajrCache=null;try{var fc=sessionStorage.getItem('pt_'+today());if(fc){var pt=JSON.parse(fc);fajrCache=pt.Fajr||null;}}catch(e){}var td=getLogicalDay(fajrCache);
-  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
+  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
   if(saved.lastDay!==td){
@@ -498,7 +498,7 @@ function genRC(st,weekLog){
   var qd=weekLog.filter(function(d){return d.allDone;}).length;
   var pd=weekLog.filter(function(d){return PIDs.every(function(p){return d.done&&d.done[p];});}).length;
   var cd=weekLog.filter(function(d){var c=(st.calLog||[]).find(function(en){return en.date===d.date;});return c&&c.cal<=st.calTarget;}).length;
-  var wd=weekLog.filter(function(d){var w=(st.waterLog||[]).find(function(en){return en.date===d.date;});return w&&w.ml>=2000;}).length;
+  var wd=weekLog.filter(function(d){var w=(st.waterLog||[]).find(function(en){return en.date===d.date;});return w&&w.ml>=(st.waterTarget||3000);}).length;
   var sd=weekLog.filter(function(d){var s=(st.sleepLog||[]).find(function(en){return en.date===d.date;});return s&&s.hrs>=7;}).length;
   var wkd=(st.workouts||[]).filter(function(w){return weekLog.some(function(d){return d.date===w.date;});}).length;
   var qp=Math.round((qd/7)*100),pp=Math.round((pd/7)*100),cp=Math.round((cd/7)*100),wp=Math.round((wd/7)*100),sp=Math.round((sd/7)*100),wkp=Math.min(100,Math.round((wkd/4)*100));
@@ -586,7 +586,8 @@ function App(){
   }
   function doChore(ch){var done=!!st.doneChores[ch.id];setSt(function(p){return Object.assign({},p,{doneChores:Object.assign({},p.doneChores,Object.defineProperty({},[ch.id],{value:!done,enumerable:true})),xp:Math.max(0,p.xp+(done?-15:15))});});if(!done)popXp(ch.id,15);}
   function addChore(){if(!chore.trim())return;setSt(function(p){return Object.assign({},p,{chores:(p.chores||[]).concat([{id:'c'+Date.now(),label:chore.trim(),once:true}])});});setChore('');}
-  function addWater(n){setSt(function(p){var amt=(p.waterToday||0)+(n*250),td=today(),ex=(p.waterLog||[]).filter(function(en){return en.date!==td;});return Object.assign({},p,{waterToday:amt,waterLog:ex.concat([{date:td,ml:amt}])});});showT('+'+(n*250)+'ml 💧','info');}
+  function addWater(n){addWaterMl(n*250);}
+  function addWaterMl(ml){setSt(function(p){var amt=(p.waterToday||0)+ml,td=today(),ex=(p.waterLog||[]).filter(function(en){return en.date!==td;});return Object.assign({},p,{waterToday:amt,waterLog:ex.concat([{date:td,ml:amt}])});});showT('+'+ml+'ml 💧','info');}
   function payDebt(pr,amt){setSt(function(p){var d=Object.assign({},p.debt||DEF_DEBT);d[pr]=Math.max(0,(d[pr]||0)-amt);return Object.assign({},p,{debt:d,xp:p.xp+(amt*10)});});showT('+'+amt*10+' XP — '+amt+' extra '+pr+'!','gold');}
 
   function logCal(){var c=parseInt(calIn),pr=parseInt(protIn)||0;if(!c||c<0)return;var td=today();setSt(function(p){var ex=p.calLog.filter(function(en){return en.date!==td;});return Object.assign({},p,{calLog:ex.concat([{date:td,cal:c,prot:pr}]).sort(function(a,b){return a.date.localeCompare(b.date);})});});setCalIn('');setProtIn('');showT('Calories logged!','gold');}
@@ -614,6 +615,19 @@ function App(){
     setSt(function(p){
       var np=Object.assign({},p);
       np.log=p.log.filter(function(l){return l.date!==bfDate;}).concat([{date:bfDate,done:bfDone,allDone:false,backdated:true}]).sort(function(a,b){return a.date.localeCompare(b.date);});
+      // XP for ticked quests not previously done
+      var prevDone=(p.log.find(function(l){return l.date===bfDate;})||{}).done||{};
+      var bonusXp=0;var nd=Object.assign({},np.debt||DEF_DEBT);
+      var allQH=[].concat(np.habits||[],np.prayers||[],np.life||[],np.bonus||[]);
+      allQH.forEach(function(hab){
+        if(bfDone[hab.id]&&!prevDone[hab.id]){
+          bonusXp+=hab.xp;
+          // Reduce prayer debt
+          if(PIDs.indexOf(hab.id)>=0){nd[hab.id]=Math.max(0,(nd[hab.id]||0)-1);}
+        }
+      });
+      np.xp=(np.xp||0)+bonusXp;
+      np.debt=nd;
       if(bfCal){var c=parseInt(bfCal),pr=parseInt(bfProt)||0;if(c>0){np.calLog=p.calLog.filter(function(en){return en.date!==bfDate;}).concat([{date:bfDate,cal:c,prot:pr}]).sort(function(a,b){return a.date.localeCompare(b.date);});}}
       if(bfWt){var w=parseFloat(bfWt);if(w>30){np.wtLog=p.wtLog.filter(function(en){return en.date!==bfDate;}).concat([{date:bfDate,wt:w}]).sort(function(a,b){return a.date.localeCompare(b.date);});np.startWt=np.startWt||w;}}
       if(bfWater){var ml=parseInt(bfWater);if(ml>0){np.waterLog=(p.waterLog||[]).filter(function(en){return en.date!==bfDate;}).concat([{date:bfDate,ml:ml}]).sort(function(a,b){return a.date.localeCompare(b.date);});}}
@@ -685,11 +699,26 @@ function App(){
         h('div',{style:{fontSize:12,color:C.redT,fontWeight:'bold',marginBottom:8}},'⚠️ Active Penalties — Bleeding XP daily'),
         todayPens.map(function(pen,i){return h('div',{key:i,style:{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid '+C.redT+'22',fontSize:11}},h('span',{style:{color:C.txt}},pen.label),h('span',{style:{color:C.redT}},pen.days+'d missed · -'+pen.pen+' XP/day'));})
       ),
-      h('div',{style:{display:'flex',justifyContent:'flex-end',marginBottom:8}},h('button',{onClick:function(){setBfOpen(!bfOpen);},style:btn(bfOpen,C.ambT)},'📅 Fill Past Day')),
+      h('div',{style:{display:'flex',justifyContent:'flex-end',marginBottom:8}},h('button',{onClick:function(){
+        var open=!bfOpen;
+        if(open){
+          // Pre-tick from existing log entry
+          var existing=st.log.find(function(l){return l.date===bfDate;});
+          if(existing&&existing.done){setBfDone(Object.assign({},existing.done));}
+          else{setBfDone({});}
+        }
+        setBfOpen(open);
+      },style:btn(bfOpen,C.ambT)},'📅 Fill Past Day')),
       bfOpen&&h('div',{style:cs(C,{marginBottom:14,border:'1px solid '+C.ambT+'44'})},
         h('div',{style:{fontSize:12,color:C.ambT,marginBottom:8,fontWeight:'bold'}},'📅 Fill In / Edit a Past Day'),
         h('div',{style:{fontSize:11,color:C.dim,marginBottom:8}},'Fix forgotten data or correct something from a past day.'),
-        h('input',{type:'date',value:bfDate,onChange:function(ev){setBfDate(ev.target.value);setBfDone({});},max:today(),style:Object.assign({},ins(C),{marginBottom:9})}),
+        h('input',{type:'date',value:bfDate,onChange:function(ev){
+              var newDate=ev.target.value;
+              setBfDate(newDate);
+              var existing=st.log.find(function(l){return l.date===newDate;});
+              if(existing&&existing.done){setBfDone(Object.assign({},existing.done));}
+              else{setBfDone({});}
+            },max:today(),style:Object.assign({},ins(C),{marginBottom:9})}),
         h('div',{style:{fontSize:10,color:C.dim,marginBottom:5,letterSpacing:'0.1em'}},'QUESTS COMPLETED'),
         h('div',{style:{display:'flex',flexWrap:'wrap',gap:5,marginBottom:9}},allH.map(function(hh){return h('button',{key:hh.id,onClick:function(){setBfDone(function(p){var n=Object.assign({},p);n[hh.id]=!p[hh.id];return n;});},style:{padding:'4px 9px',borderRadius:20,border:'1px solid '+(bfDone[hh.id]?C.grn:C.bdr),background:bfDone[hh.id]?C.grn+'33':'transparent',fontSize:10,color:bfDone[hh.id]?C.grnT:C.dim,cursor:'pointer'}},hh.icon+' '+hh.label);})),
         h('div',{style:{display:'flex',gap:7,marginBottom:7}},
@@ -710,10 +739,33 @@ function App(){
         h('div',{style:{width:44,height:44,borderRadius:'50%',background:'conic-gradient('+C.gold+' '+(doneC/Math.max(allH.length,1)*360)+'deg,'+C.bdr+' 0deg)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}},h('div',{style:{width:32,height:32,borderRadius:'50%',background:C.card,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:'bold',color:C.gold}},doneC+'/'+allH.length)),
         h('div',null,h('div',{style:{fontSize:13,fontWeight:'bold',color:C.txt}},allDoneToday?'All quests done! 🏆':doneC===0?'No quests yet':(allH.length-doneC)+' remaining'),h('div',{style:{fontSize:11,color:C.dim}},'+'+allH.filter(function(hh){return st.done[hh.id];}).reduce(function(s,hh){return s+hh.xp;},0)+' XP today'))
       ),
+      h('div',{style:cs(C,{marginBottom:12,background:chDone?C.grn+'22':C.pur,border:'1px solid '+(chDone?C.grn:C.purT+'44')})},
+        h('div',{style:{display:'flex',alignItems:'center',gap:10}},
+          h('div',{style:{fontSize:22}},dailyCh.icon),
+          h('div',{style:{flex:1}},
+            h('div',{style:{fontSize:9,color:C.purT,letterSpacing:'0.12em',textTransform:'uppercase'}},"Today's Challenge"),
+            h('div',{style:{fontSize:13,color:chDone?C.grnT:C.txt,fontWeight:'bold',textDecoration:chDone?'line-through':'none'}},dailyCh.label),
+            h('div',{style:{fontSize:10,color:C.dim}},'+'+dailyCh.xp+' XP')
+          ),
+          !chDone?h('button',{onClick:doDailyCh,style:{background:C.purT+'22',border:'1px solid '+C.purT+'44',borderRadius:6,padding:'6px 11px',color:C.purT,fontSize:11,whiteSpace:'nowrap'}},'Done ✓'):h('span',{style:{fontSize:20}},'✅')
+        )
+      ),
       SH('💧','Water Intake',C.telT),
       h('div',{style:cs(C,{marginBottom:12})},
-        h('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:9}},h('div',{style:{flex:1,height:11,background:C.bdr,borderRadius:6,overflow:'hidden'}},h('div',{style:{height:'100%',width:Math.min(100,((st.waterToday||0)/2000)*100)+'%',background:'linear-gradient(90deg,'+C.telT+',#44ffee)',borderRadius:6,transition:'width 0.4s'}})),h('span',{style:{fontSize:12,color:C.telT,fontWeight:'bold',whiteSpace:'nowrap'}},Math.round((st.waterToday||0)/100)/10+'L/2L')),
-        h('div',{style:{display:'flex',gap:7}},[1,2,4].map(function(n){return h('button',{key:n,onClick:function(){addWater(n);},style:Object.assign({},btn(false,C.telT),{flex:1,fontSize:11})},'+'+n+' glass'+(n>1?'es':''));}))
+        h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}},
+          h('span',{style:{fontSize:12,color:C.telT,fontWeight:'bold'}},(Math.round((st.waterToday||0)/100)/10)+'L / '+(st.waterTarget||3000)/1000+'L target'),
+          h('span',{style:{fontSize:11,color:(st.waterToday||0)>=(st.waterTarget||3000)?C.grnT:C.dim}},Math.max(0,((st.waterTarget||3000)-(st.waterToday||0))/1000).toFixed(1)+'L remaining')
+        ),
+        h('div',{style:{height:11,background:C.bdr,borderRadius:6,overflow:'hidden',marginBottom:9}},
+          h('div',{style:{height:'100%',width:Math.min(100,((st.waterToday||0)/(st.waterTarget||3000))*100)+'%',background:'linear-gradient(90deg,'+C.telT+',#44ffee)',borderRadius:6,transition:'width 0.4s'}})
+        ),
+        h('div',{style:{display:'flex',gap:6,marginBottom:7}},
+          [250,500,750,1000].map(function(ml){return h('button',{key:ml,onClick:function(){addWaterMl(ml);},style:Object.assign({},btn(false,C.telT),{flex:1,fontSize:10})},'+'+ml+'ml');})
+        ),
+        h('div',{style:{display:'flex',gap:7}},
+          h('input',{type:'number',id:'waterCustomIn',placeholder:'Custom ml...',style:Object.assign({},ins(C),{flex:1}),min:'1',max:'5000'}),
+          h('button',{onClick:function(){var el=document.getElementById('waterCustomIn');var v=parseInt(el.value);if(v>0){addWaterMl(v);el.value='';}},style:Object.assign({},btn(true,C.telT),{fontSize:11,whiteSpace:'nowrap'})},'Add ml')
+        )
       ),
       SH('⚔️','Health Quests',C.gold),
       st.habits.map(function(hh){return h(HabitRow,{key:hh.id,hab:hh,done:!!st.done[hh.id],popping:pop&&pop.id===hh.id,onDo:doHabit,col:C.gold,C:C,missedDays:(st.habitMissed||{})[hh.id]||0,habStreak:(st.habitStreaks||{})[hh.id]||0});}),
@@ -839,7 +891,7 @@ function App(){
         h('div',{style:cs(C,{marginBottom:11,display:'flex',alignItems:'center',justifyContent:'space-between'})},h('span',{style:{fontSize:12,color:C.dim}},'Target Weight (kg)'),h('input',{type:'number',value:st.wtTarget,onChange:function(ev){setSt(function(p){return Object.assign({},p,{wtTarget:Number(ev.target.value)});});},style:{width:70,background:C.bg,border:'1px solid '+C.bdr,borderRadius:6,padding:'6px 8px',color:C.gold,fontSize:13,textAlign:'center'}})),
         h('div',{style:card()},h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Weight over time. Green dashed = target.'),h(MiniChart,{data:wtD,xKey:'d',lines:[{k:'w',col:C.bluT}],refY:st.wtTarget,refCol:C.grnT,C:C}))
       ),
-      tv==='water'&&h('div',null,SH('💧','Water History',C.telT),h('div',{style:card()},h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Daily intake in ml. Dashed = 2L target.'),h(MiniChart,{data:h2oD,xKey:'d',lines:[{k:'m',col:C.telT}],refY:2000,refCol:C.telT,C:C}))),
+      tv==='water'&&h('div',null,SH('💧','Water History',C.telT),h('div',{style:card()},h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Daily intake in ml. Dashed = 2L target.'),h(MiniChart,{data:h2oD,xKey:'d',lines:[{k:'m',col:C.telT}],refY:(st.waterTarget||3000),refCol:C.telT,C:C}))),
       tv==='sleep'&&h('div',null,
         SH('😴','Sleep Tracker',C.purT),
         h('div',{style:cs(C,{marginBottom:11})},
@@ -971,7 +1023,7 @@ function App(){
           )
         ),
         h('div',{style:{display:'flex',gap:9,marginTop:14}},h('button',{onClick:saveEdit,style:Object.assign({},btn(true),{flex:1})},'Save'),h('button',{onClick:function(){setEdit(null);},style:Object.assign({},btn(false),{flex:1})},'Cancel')))),
-    h('div',{style:{maxWidth:480,margin:'0 auto',padding:14,paddingTop:nudge?64:14,paddingBottom:'calc(84px + env(safe-area-inset-bottom))',position:'relative',zIndex:1}},
+    h('div',{style:{maxWidth:480,margin:'0 auto',padding:'14px max(14px, env(safe-area-inset-right)) calc(84px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left))',paddingTop:nudge?64:14,position:'relative',zIndex:1}},
       h('div',{style:{textAlign:'center',marginBottom:14}},
         h('div',{style:{fontSize:10,letterSpacing:'0.3em',color:C.dim,textTransform:'uppercase'}},'The Chronicles of'),
         h('h1',{style:{fontSize:26,fontWeight:'bold',margin:'2px 0',background:'linear-gradient(135deg,'+C.gold+',#ff8c00,'+C.gold+')',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',letterSpacing:'0.05em'}},'ABDELRAHMAN'),
@@ -999,7 +1051,7 @@ function App(){
       h('div',{className:'tabs'},TABS.map(function(t){return h('button',{key:t.id,onClick:function(){setTab(t.id);},style:Object.assign({},btn(tab===t.id),{padding:'7px 9px',whiteSpace:'nowrap',flexShrink:0,textTransform:'uppercase',letterSpacing:'0.05em'})},t.icon+' '+t.l);})),
       renderTab()
     ),
-    h('div',{style:{position:'fixed',bottom:0,left:0,right:0,background:st.theme==='dark'?'rgba(10,10,15,0.97)':'rgba(245,240,232,0.97)',borderTop:'1px solid '+C.bdr,padding:'8px 16px calc(8px + env(safe-area-inset-bottom))',zIndex:50,textAlign:'center'}},h('div',{style:{fontSize:10,color:C.fnt,letterSpacing:'0.07em'}},avail+' XP · Lv.'+lvl.level+'/50 '+lvl.name+' · '+st.streak+'🔥 · Debt: '+totDebt))
+    h('div',{style:{position:'fixed',bottom:0,left:0,right:0,background:st.theme==='dark'?'rgba(10,10,15,0.97)':'rgba(245,240,232,0.97)',borderTop:'1px solid '+C.bdr,padding:'8px max(16px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))',zIndex:50,textAlign:'center'}},h('div',{style:{fontSize:10,color:C.fnt,letterSpacing:'0.07em'}},avail+' XP · Lv.'+lvl.level+'/50 '+lvl.name+' · '+st.streak+'🔥 · Debt: '+totDebt))
   );
 }
 
