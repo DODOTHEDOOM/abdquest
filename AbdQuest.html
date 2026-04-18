@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=0.92, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Abd's Quest">
@@ -576,6 +576,41 @@ function App(){
   // Nudge timer
   useEffect(function(){nudgeRef.current=setInterval(function(){setNudge(NUDGES[Math.floor(Math.random()*NUDGES.length)]);},2*60*60*1000);return function(){clearInterval(nudgeRef.current);};},[]);
 
+
+  // Smart challenge auto-tracking
+  useEffect(function(){
+    var wkey_sleep='t1_'+getWeekMon();
+    var wkey_water='t1_water_'+getWeekMon();
+    var wkey_cal='t1_cal_'+getWeekMon();
+    // Check sleep challenge: sleep before 1AM 7 nights (from sleep log)
+    var sleepDaysGood=(st.sleepLog||[]).filter(function(s){
+      if(!s.slept)return false;
+      var h=parseInt(s.slept.split(':')[0]);
+      return h<1||(h>=22); // slept before 1am = hour < 1 or >= 22
+    }).length;
+    // Check water challenge: 3L every day this week
+    var monStr=getWeekMon();
+    var weekDates=[];
+    var md=new Date(monStr);
+    for(var i=0;i<7;i++){var dd=new Date(md);dd.setDate(md.getDate()+i);weekDates.push(dd.toISOString().split('T')[0]);}
+    var waterDaysGood=weekDates.filter(function(d){
+      var w=(st.waterLog||[]).find(function(wl){return wl.date===d;});
+      return w&&w.ml>=(st.waterTarget||3000);
+    }).length;
+    var calDaysGood=weekDates.filter(function(d){
+      var c=(st.calLog||[]).find(function(cl){return cl.date===d;});
+      return c&&c.cal<=st.calTarget;
+    }).length;
+    // Auto-complete weekly challenges based on data
+    var updates={};
+    if(sleepDaysGood>=7&&!(st.weeklyChDone||{})['sleep7_'+getWeekMon()]){updates['sleep7_'+getWeekMon()]=true;}
+    if(waterDaysGood>=7&&!(st.weeklyChDone||{})['water7_'+getWeekMon()]){updates['water7_'+getWeekMon()]=true;}
+    if(calDaysGood>=6&&!(st.weeklyChDone||{})['cal6_'+getWeekMon()]){updates['cal6_'+getWeekMon()]=true;}
+    if(Object.keys(updates).length>0){
+      setSt(function(p){return Object.assign({},p,{weeklyChDone:Object.assign({},p.weeklyChDone||{},updates)});});
+    }
+  },[st.sleepLog,st.waterLog,st.calLog]);
+
   function showT(msg,type){setToast({msg:msg,type:type||'info'});setTimeout(function(){setToast(null);},3000);}
   function popXp(id,xp){setPop({id:id,xp:xp});setTimeout(function(){setPop(null);},1500);}
 
@@ -702,10 +737,17 @@ function App(){
       h('div',{style:{display:'flex',justifyContent:'flex-end',marginBottom:8}},h('button',{onClick:function(){
         var open=!bfOpen;
         if(open){
-          // Pre-tick from existing log entry
-          var existing=st.log.find(function(l){return l.date===bfDate;});
-          if(existing&&existing.done){setBfDone(Object.assign({},existing.done));}
-          else{setBfDone({});}
+          var existingLog=st.log.find(function(l){return l.date===bfDate;});
+          setBfDone(existingLog&&existingLog.done?Object.assign({},existingLog.done):{});
+          var existingCal=(st.calLog||[]).find(function(e){return e.date===bfDate;});
+          setBfCal(existingCal?String(existingCal.cal):'');
+          setBfProt(existingCal?String(existingCal.prot||''):'');
+          var existingWt=(st.wtLog||[]).find(function(e){return e.date===bfDate;});
+          setBfWt(existingWt?String(existingWt.wt):'');
+          var existingWater=(st.waterLog||[]).find(function(e){return e.date===bfDate;});
+          setBfWater(existingWater?String(existingWater.ml):'');
+          var existingNote=(st.notes||{})[bfDate];
+          setBfNote(existingNote?existingNote.text:'');
         }
         setBfOpen(open);
       },style:btn(bfOpen,C.ambT)},'📅 Fill Past Day')),
@@ -715,9 +757,17 @@ function App(){
         h('input',{type:'date',value:bfDate,onChange:function(ev){
               var newDate=ev.target.value;
               setBfDate(newDate);
-              var existing=st.log.find(function(l){return l.date===newDate;});
-              if(existing&&existing.done){setBfDone(Object.assign({},existing.done));}
-              else{setBfDone({});}
+              var existingLog=st.log.find(function(l){return l.date===newDate;});
+              setBfDone(existingLog&&existingLog.done?Object.assign({},existingLog.done):{});
+              var existingCal=(st.calLog||[]).find(function(e){return e.date===newDate;});
+              setBfCal(existingCal?String(existingCal.cal):'');
+              setBfProt(existingCal?String(existingCal.prot||''):'');
+              var existingWt=(st.wtLog||[]).find(function(e){return e.date===newDate;});
+              setBfWt(existingWt?String(existingWt.wt):'');
+              var existingWater=(st.waterLog||[]).find(function(e){return e.date===newDate;});
+              setBfWater(existingWater?String(existingWater.ml):'');
+              var existingNote=(st.notes||{})[newDate];
+              setBfNote(existingNote?existingNote.text:'');
             },max:today(),style:Object.assign({},ins(C),{marginBottom:9})}),
         h('div',{style:{fontSize:10,color:C.dim,marginBottom:5,letterSpacing:'0.1em'}},'QUESTS COMPLETED'),
         h('div',{style:{display:'flex',flexWrap:'wrap',gap:5,marginBottom:9}},allH.map(function(hh){return h('button',{key:hh.id,onClick:function(){setBfDone(function(p){var n=Object.assign({},p);n[hh.id]=!p[hh.id];return n;});},style:{padding:'4px 9px',borderRadius:20,border:'1px solid '+(bfDone[hh.id]?C.grn:C.bdr),background:bfDone[hh.id]?C.grn+'33':'transparent',fontSize:10,color:bfDone[hh.id]?C.grnT:C.dim,cursor:'pointer'}},hh.icon+' '+hh.label);})),
@@ -749,6 +799,31 @@ function App(){
           ),
           !chDone?h('button',{onClick:doDailyCh,style:{background:C.purT+'22',border:'1px solid '+C.purT+'44',borderRadius:6,padding:'6px 11px',color:C.purT,fontSize:11,whiteSpace:'nowrap'}},'Done ✓'):h('span',{style:{fontSize:20}},'✅')
         )
+      ),
+      h('div',{style:cs(C,{marginBottom:12})},
+        (function(){
+          var unlockedTiers2=getUnlockedTiers();
+          var highestTier=unlockedTiers2[unlockedTiers2.length-1]||1;
+          var tierChs2=WEEKLY_CH.filter(function(c){return c.tier===highestTier;});
+          var hashKey2=getWeekMon()+highestTier;var hsh2=0;
+          for(var i2=0;i2<hashKey2.length;i2++)hsh2=((hsh2<<5)-hsh2)+hashKey2.charCodeAt(i2);
+          var wch=tierChs2[Math.abs(hsh2)%tierChs2.length];
+          var wkey='t'+highestTier+'_'+getWeekMon();
+          var wdone=!!(st.weeklyChDone||{})[wkey];
+          var tcolors2=['','#88dd88','#88aaff','#cc88ff','#ffd700'];
+          return h('div',{style:{display:'flex',alignItems:'center',gap:10}},
+            h('div',{style:{fontSize:22,flexShrink:0}},wch.icon),
+            h('div',{style:{flex:1}},
+              h('div',{style:{display:'flex',alignItems:'center',gap:6,marginBottom:2}},
+                h('span',{style:{fontSize:9,color:tcolors2[highestTier],fontWeight:'bold',letterSpacing:'0.1em'}},'TIER '+highestTier+' WEEKLY'),
+                h('span',{style:{fontSize:9,color:C.goldD}},'+'+wch.xp+' XP')
+              ),
+              h('div',{style:{fontSize:12,color:wdone?C.grnT:C.txt,fontWeight:'bold',textDecoration:wdone?'line-through':'none'}},wch.label),
+              h('div',{style:{fontSize:10,color:C.dim}},wch.desc)
+            ),
+            !wdone?h('button',{onClick:function(){doWeeklyCh(wch,wkey);},style:{background:C.gold+'22',border:'1px solid '+C.gold+'44',borderRadius:6,padding:'6px 10px',color:C.gold,fontSize:10,whiteSpace:'nowrap',flexShrink:0}},'Done ✓'):h('span',{style:{fontSize:18}},'✅')
+          );
+        })()
       ),
       SH('💧','Water Intake',C.telT),
       h('div',{style:cs(C,{marginBottom:12})},
