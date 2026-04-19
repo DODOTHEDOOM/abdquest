@@ -46,6 +46,40 @@ button{-webkit-appearance:none;cursor:pointer;}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script>
 document.getElementById('status').textContent='Starting...';
+// Generate home screen icon via canvas for iOS compatibility
+(function(){
+  try{
+    var c=document.createElement('canvas');c.width=512;c.height=512;
+    var ctx=c.getContext('2d');
+    // Background
+    ctx.fillStyle='#1a1020';
+    ctx.beginPath();ctx.roundRect(0,0,512,512,80);ctx.fill();
+    // Hat brim ellipse
+    ctx.strokeStyle='#ffd700';ctx.lineWidth=14;ctx.fillStyle='#2a1a4a';
+    ctx.beginPath();ctx.ellipse(256,160,140,65,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    // Hat tip
+    ctx.fillStyle='#ffd700';
+    ctx.beginPath();ctx.moveTo(256,36);ctx.lineTo(290,115);ctx.lineTo(256,100);ctx.lineTo(222,115);ctx.closePath();ctx.fill();
+    // Sword blade
+    ctx.fillStyle='#ffd700';
+    ctx.fillRect(232,160,48,200);
+    // Crossguard
+    ctx.fillRect(160,200,192,38);
+    // Pommel
+    ctx.fillStyle='#8b6914';ctx.fillRect(188,360,136,34);
+    // Crescent moon
+    ctx.strokeStyle='#ffd700';ctx.lineWidth=16;ctx.fillStyle='transparent';
+    ctx.beginPath();ctx.arc(390,120,70,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#1a1020';ctx.beginPath();ctx.arc(418,96,44,0,Math.PI*2);ctx.fill();
+    // AQ text
+    ctx.fillStyle='#ffd700';ctx.font='bold 58px monospace';ctx.textAlign='center';
+    ctx.fillText('AQ',256,488);
+    // Set as apple touch icon
+    var link=document.createElement('link');
+    link.rel='apple-touch-icon';link.href=c.toDataURL('image/png');
+    document.head.appendChild(link);
+  }catch(e){}
+})();
 </script>
 <script>
 (function(){
@@ -195,6 +229,16 @@ var DEF_BONUS=[
   {id:'callhome',label:'Call Family',icon:'📞',xp:15,desc:'Check in with home — no penalty if you miss',bonus:true},
   {id:'stretch',label:'Morning Stretch',icon:'🧘',xp:10,desc:'5-10 mins stretching — nice to have',bonus:true}
 ];
+var DEF_EXERCISES=[
+  {id:'ex_pushup',name:'Pushups',icon:'💪',xpPer:10,repsFor:10,unit:'reps',dailyReps:0},
+  {id:'ex_squat',name:'Squats',icon:'🏋️',xpPer:10,repsFor:10,unit:'reps',dailyReps:0},
+  {id:'ex_crunch',name:'Crunches',icon:'🔥',xpPer:10,repsFor:15,unit:'reps',dailyReps:0},
+  {id:'ex_plank',name:'Plank',icon:'⏱️',xpPer:15,repsFor:1,unit:'mins',dailyReps:0},
+  {id:'ex_jumpjack',name:'Jumping Jacks',icon:'⚡',xpPer:10,repsFor:20,unit:'reps',dailyReps:0},
+  {id:'ex_burpee',name:'Burpees',icon:'💀',xpPer:20,repsFor:5,unit:'reps',dailyReps:0},
+  {id:'ex_walk',name:'Walk',icon:'🚶',xpPer:15,repsFor:1,unit:'km',dailyReps:0},
+  {id:'ex_run',name:'Run / Jog',icon:'🏃',xpPer:30,repsFor:1,unit:'km',dailyReps:0},
+];
 var DEF_RECURRING=[
   {id:'jumua',label:"Jumu'ah Prayer",icon:'🕌',xp:60,desc:"Friday congregational prayer",day:5},
   {id:'wegovy',label:'Take Wegovy Injection',icon:'💉',xp:30,desc:'Weekly injection — every Saturday',day:6}
@@ -327,7 +371,7 @@ function SH(ic,ti,col){return h('div',{style:{display:'flex',alignItems:'center'
 // INIT STATE
 function initState(){
   var saved=loadSafe(),fajrCache=null;try{var fc=sessionStorage.getItem('pt_'+today());if(fc){var pt=JSON.parse(fc);fajrCache=pt.Fajr||null;}}catch(e){}var td=getLogicalDay(fajrCache);
-  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
+  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
   if(saved.lastDay!==td){
@@ -424,13 +468,13 @@ function MiniChart(props){
 }
 
 function Heatmap(props){
-  var log=props.log,C=props.C;
-  // Build a map of date -> completion percentage
+  var log=props.log,C=props.C,totalQ=props.totalQ||1;
+  // Build a map of date -> completion percentage using total quest count as denominator
   var logMap={};
   log.forEach(function(en){
     var done=Object.values(en.done||{}).filter(Boolean).length;
-    var total=Object.keys(en.done||{}).length;
-    logMap[en.date]=total>0?done/total:0;
+    // Use totalQ passed in (non-bonus quest count) as the denominator
+    logMap[en.date]=done/totalQ;
   });
   function heatCol(pct,hasDat){
     if(!hasDat)return '#1a1a2a';
@@ -550,6 +594,9 @@ function App(){
   var bfWaterS=useState(''),setBfWater=bfWaterS[1],bfWater=bfWaterS[0];
   var bfNoteS=useState(''),setBfNote=bfNoteS[1],bfNote=bfNoteS[0];
   var wkNS=useState(''),setWkN=wkNS[1],wkN=wkNS[0];
+  var exEditS=useState(null),setExEdit=exEditS[1],exEdit=exEditS[0];
+  var stepInS=useState(''),setStepIn=stepInS[1],stepIn=stepInS[0];
+  var newExNameS=useState(''),setNewExName=newExNameS[1],newExName=newExNameS[0];
   var wkSS=useState(''),setWkS=wkSS[1],wkS=wkSS[0];
   var wkRS=useState(''),setWkR=wkRS[1],wkR=wkRS[0];
   var wkKS=useState(''),setWkK=wkKS[1],wkK=wkKS[0];
@@ -673,6 +720,22 @@ function App(){
     }
   },[st.done,st.sleepLog,st.waterLog,st.calLog,st.waterToday]);
 
+  function doExercise(ex,amount){
+    var td=today();
+    setSt(function(p){
+      var logs=Object.assign({},p.exerciseLogs||{});
+      var dayLog=Object.assign({},logs[td]||{});
+      var prev=dayLog[ex.id]||0;
+      dayLog[ex.id]=prev+amount;
+      logs[td]=dayLog;
+      // Calculate XP — how many full targets completed this increment
+      var prevCompleted=Math.floor(prev/ex.repsFor);
+      var newCompleted=Math.floor(dayLog[ex.id]/ex.repsFor);
+      var xpGain=(newCompleted-prevCompleted)*ex.xpPer;
+      if(xpGain>0)showT('+'+xpGain+' XP — '+ex.name+'! Keep going 💪','gold');
+      return Object.assign({},p,{exerciseLogs:logs,xp:p.xp+xpGain});
+    });
+  }
   function showT(msg,type){setToast({msg:msg,type:type||'info'});setTimeout(function(){setToast(null);},3000);}
   function popXp(id,xp){setPop({id:id,xp:xp});setTimeout(function(){setPop(null);},1500);}
 
@@ -699,6 +762,25 @@ function App(){
     setSt(function(p){var ex=(p.sleepLog||[]).filter(function(en){return en.date!==td;});return Object.assign({},p,{sleepLog:ex.concat([{date:td,slept:sleepIn,woke:wakeIn,hrs:hrs,quality:q.label}]).sort(function(a,b){return a.date.localeCompare(b.date);})});});
     setSleepIn('');setWakeIn('');
     showT('Sleep: '+hrs+'hrs — '+q.label,'gold');
+  }
+  function logSteps(steps){
+    if(!steps||steps<0)return;
+    var td=today();
+    setSt(function(p){
+      var newLog=Object.assign({},p.stepLog||{});
+      newLog[td]=steps;
+      // XP: 10 XP per 1000 steps, bonus 50 XP for hitting target
+      var prevSteps=p.stepLog&&p.stepLog[td]?p.stepLog[td]:0;
+      var prevK=Math.floor(prevSteps/1000);
+      var newK=Math.floor(steps/1000);
+      var kXp=(newK-prevK)*10;
+      var targetXp=(steps>=(p.stepTarget||10000)&&prevSteps<(p.stepTarget||10000))?50:0;
+      var totalXp=Math.max(0,kXp)+targetXp;
+      if(targetXp>0)showT('🎯 Step target hit! +'+totalXp+' XP','gold');
+      else if(kXp>0)showT('+'+kXp+' XP — '+steps.toLocaleString()+' steps logged','gold');
+      return Object.assign({},p,{stepLog:newLog,xp:Math.max(0,p.xp+totalXp)});
+    });
+    setStepIn('');
   }
   function logWk(){if(!wkN.trim())return;var ent={date:today(),ex:wkN,sets:parseInt(wkS)||0,reps:parseInt(wkR)||0,kg:parseFloat(wkK)||0,id:Date.now()};setSt(function(p){return Object.assign({},p,{workouts:(p.workouts||[]).concat([ent]),xp:p.xp+20});});setWkN('');setWkS('');setWkR('');setWkK('');showT('+20 XP 💪','gold');}
   function doDailyCh(){var ch=getDailyCh(today());if((st.dailyChDone||{})[today()])return;var item=Math.random()<0.5?randItem(2):null;setSt(function(p){return Object.assign({},p,{dailyChDone:Object.assign({},p.dailyChDone||{},Object.defineProperty({},[today()],{value:true,enumerable:true})),xp:p.xp+ch.xp,inventory:item?(p.inventory||[]).concat([Object.assign({},item,{got:today()})]):(p.inventory||[])});});if(item){setLoot(item);setTimeout(function(){setLoot(null);},3500);}showT('+'+ch.xp+' XP — Challenge done!','gold');}
@@ -1075,6 +1157,99 @@ function App(){
     );
 
     if(tab==='workout') return h('div',null,
+      SH('👟','Step Counter',C.telT),
+      h('div',{style:cs(C,{marginBottom:14})},
+        (function(){
+          var td=today();
+          var todaySteps=(st.stepLog||{})[td]||0;
+          var pct=Math.min(100,(todaySteps/(st.stepTarget||10000))*100);
+          var remaining=Math.max(0,(st.stepTarget||10000)-todaySteps);
+          return h('div',null,
+            h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:6}},
+              h('div',{style:{fontSize:22,fontWeight:'bold',color:pct>=100?C.grnT:C.telT}},todaySteps.toLocaleString()),
+              h('div',{style:{fontSize:12,color:C.dim}},'/ '+(st.stepTarget||10000).toLocaleString()+' steps target')
+            ),
+            h('div',{style:{height:12,background:C.bdr,borderRadius:6,overflow:'hidden',marginBottom:8}},
+              h('div',{style:{height:'100%',width:pct+'%',background:pct>=100?'linear-gradient(90deg,'+C.grn+','+C.grnT+')':'linear-gradient(90deg,'+C.telT+',#44ffee)',borderRadius:6,transition:'width 0.5s'}})
+            ),
+            h('div',{style:{fontSize:11,color:pct>=100?C.grnT:C.dim,marginBottom:10}},
+              pct>=100?'Target hit! ✓ +50 XP bonus earned':remaining.toLocaleString()+' steps to go · +10 XP per 1,000 steps'
+            ),
+            h('div',{style:{display:'flex',gap:7,marginBottom:7}},
+              h('input',{type:'number',value:stepIn,onChange:function(ev){setStepIn(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter'&&stepIn){logSteps(parseInt(stepIn));}},placeholder:"Today's total steps...",style:Object.assign({},ins(C),{flex:1})}),
+              h('button',{onClick:function(){if(stepIn)logSteps(parseInt(stepIn));},style:Object.assign({},btn(true,C.telT),{fontSize:12,whiteSpace:'nowrap'})},'Log Steps')
+            ),
+            h('div',{style:{display:'flex',gap:6,marginBottom:4}},
+              [2000,5000,7500,10000].map(function(n){return h('button',{key:n,onClick:function(){logSteps(n);},style:Object.assign({},btn(todaySteps===n,C.telT),{flex:1,fontSize:10})},n.toLocaleString());})
+            ),
+            h('div',{style:{display:'flex',alignItems:'center',gap:8,marginTop:9,paddingTop:9,borderTop:'1px solid '+C.bdr}},
+              h('span',{style:{fontSize:11,color:C.dim,flex:1}},'Daily step target:'),
+              h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{stepTarget:Math.max(1000,(p.stepTarget||10000)-1000)});});},style:Object.assign({},btn(false),{padding:'5px 12px'})},'-'),
+              h('span',{style:{fontSize:13,color:C.gold,fontWeight:'bold',minWidth:60,textAlign:'center'}},(st.stepTarget||10000).toLocaleString()),
+              h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{stepTarget:(p.stepTarget||10000)+1000});});},style:Object.assign({},btn(false),{padding:'5px 12px'})},'+')
+            )
+          );
+        })()
+      ),
+      SH('🏅','Exercise Tracker',C.gold),
+      h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Tap the buttons to log reps/distance. XP is awarded every time you hit the target. No limit — keep going all day.'),
+      (st.exercises||[]).map(function(ex,ei){
+        var td=today();
+        var todayReps=((st.exerciseLogs||{})[td]||{})[ex.id]||0;
+        var completed=Math.floor(todayReps/ex.repsFor);
+        var progress=(todayReps%ex.repsFor)/ex.repsFor;
+        var quickAmounts=ex.unit==='mins'?[1,2,5]:ex.unit==='km'?[1,2,5]:[5,10,20];
+        return h('div',{key:ex.id,style:cs(C,{marginBottom:8})},
+          h('div',{style:{display:'flex',alignItems:'center',gap:9,marginBottom:8}},
+            h('div',{style:{fontSize:22,flexShrink:0}},ex.icon),
+            h('div',{style:{flex:1}},
+              h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline'}},
+                h('span',{style:{fontSize:13,fontWeight:'bold',color:C.txt}},ex.name),
+                h('span',{style:{fontSize:11,color:C.gold}},'+'+ex.xpPer+' XP per '+ex.repsFor+' '+ex.unit)
+              ),
+              h('div',{style:{height:5,background:C.bdr,borderRadius:3,overflow:'hidden',marginTop:4}},
+                h('div',{style:{height:'100%',width:(progress*100)+'%',background:'linear-gradient(90deg,'+C.purT+','+C.gold+')',borderRadius:3,transition:'width 0.3s'}})
+              ),
+              h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:2}},
+                h('span',{style:{fontSize:10,color:C.dim}},todayReps+' '+ex.unit+' today'),
+                h('span',{style:{fontSize:10,color:C.gold}},completed>0?completed+'× target hit ✓':'')
+              )
+            ),
+            h('button',{onClick:function(){setExEdit(ex);},style:{background:'none',border:'1px solid '+C.bdr,borderRadius:5,padding:'4px 7px',color:C.dim,fontSize:11}},'⚙')
+          ),
+          h('div',{style:{display:'flex',gap:5}},
+            quickAmounts.map(function(n){return h('button',{key:n,onClick:function(){doExercise(ex,n);},style:Object.assign({},btn(false,C.purT),{flex:1,fontSize:11})},'+'+n+' '+ex.unit);}),
+            h('button',{onClick:function(){doExercise(ex,-Math.min(quickAmounts[0],todayReps));},style:Object.assign({},btn(false,C.redT),{fontSize:11,padding:'7px 10px'}),disabled:todayReps<=0},'-')
+          )
+        );
+      }),
+      h('div',{style:cs(C,{marginBottom:14})},
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:8}},'Add a custom exercise:'),
+        h('div',{style:{display:'flex',gap:7,marginBottom:7}},
+          h('input',{value:newExName,onChange:function(ev){setNewExName(ev.target.value);},placeholder:'Exercise name...',style:Object.assign({},ins(C),{flex:1})}),
+          h('button',{onClick:function(){
+            if(!newExName.trim())return;
+            var icon=window.prompt('Icon (emoji):','💪')||'💪';
+            var repsFor=parseInt(window.prompt('Target amount (e.g. 10 reps):','10'))||10;
+            var unit=window.prompt('Unit (reps/mins/km):','reps')||'reps';
+            var xpPer=parseInt(window.prompt('XP per target:','10'))||10;
+            var nex={id:'ex_'+Date.now(),name:newExName.trim(),icon:icon,xpPer:xpPer,repsFor:repsFor,unit:unit,dailyReps:0};
+            setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).concat([nex])});});
+            setNewExName('');showT(newExName+' added!','gold');
+          },style:Object.assign({},btn(true,C.gold),{fontSize:11,whiteSpace:'nowrap'})},'+ Add')
+        )
+      ),
+      exEdit&&h('div',{style:{position:'fixed',inset:0,zIndex:260,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.88)',padding:20}},
+        h('div',{style:{background:C.card,border:'1px solid '+C.bdr,borderRadius:12,padding:22,width:'100%',maxWidth:360}},
+          h('div',{style:{fontSize:14,color:C.gold,marginBottom:14,fontWeight:'bold'}},'Edit: '+exEdit.name),
+          [{k:'name',l:'Name',t:'text'},{k:'icon',l:'Icon',t:'text'},{k:'repsFor',l:'Target amount',t:'number'},{k:'unit',l:'Unit (reps/mins/km)',t:'text'},{k:'xpPer',l:'XP per target',t:'number'}].map(function(f){return h('div',{key:f.k,style:{marginBottom:10}},h('div',{style:{fontSize:10,color:C.dim,marginBottom:3}},f.l.toUpperCase()),h('input',{type:f.t,value:exEdit[f.k]||'',onChange:function(ev){setExEdit(function(p){var n=Object.assign({},p);n[f.k]=f.t==='number'?Number(ev.target.value):ev.target.value;return n;});},style:ins(C)}));}),
+          h('div',{style:{display:'flex',gap:8,marginTop:12}},
+            h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).map(function(ex){return ex.id===exEdit.id?exEdit:ex;})});});setExEdit(null);showT('Saved!','gold');},style:Object.assign({},btn(true),{flex:1})},'Save'),
+            h('button',{onClick:function(){if(window.confirm('Delete '+exEdit.name+'?')){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).filter(function(ex){return ex.id!==exEdit.id;})});});}setExEdit(null);},style:Object.assign({},btn(false,C.redT),{flex:1,color:C.redT})},'Delete'),
+            h('button',{onClick:function(){setExEdit(null);},style:Object.assign({},btn(false),{flex:1})},'Cancel')
+          )
+        )
+      ),
       SH('💪','Workout Logger',C.purT),
       h('div',{style:cs(C,{marginBottom:13})},
         h('input',{value:wkN,onChange:function(ev){setWkN(ev.target.value);},placeholder:'Exercise (e.g. Bench Press, Walk, Run)...',style:Object.assign({},ins(C),{marginBottom:7})}),
@@ -1117,7 +1292,7 @@ function App(){
 
     if(tab==='history') return h('div',null,
       SH('🗓️','Habit Heatmap — 6 Months',C.grnT),
-      h('div',{style:cs(C,{marginBottom:14})},h(Heatmap,{log:st.log,C:C})),
+      h('div',{style:cs(C,{marginBottom:14})},h(Heatmap,{log:st.log,C:C,totalQ:([].concat(st.habits,st.prayers,st.life)).length||1})),
       SH('📊','Weekly Report Card',C.gold),
       h('div',{style:cs(C,{marginBottom:14})},
         h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Generate your weekly performance grade.'),
@@ -1146,6 +1321,7 @@ function App(){
             allH.filter(function(hh){return entry.done&&entry.done[hh.id];}).map(function(hh){return hh.icon;}).join(' ')||'Nothing logged',
             ce&&h('span',{style:{marginLeft:6,color:C.bluT}},'· '+ce.cal+'kcal'),
             we&&h('span',{style:{marginLeft:6,color:C.grnT}},'· '+we.wt+'kg'),
+            (st.stepLog||{})[entry.date]&&h('span',{style:{marginLeft:6,color:C.telT}},'· '+((st.stepLog||{})[entry.date]||0).toLocaleString()+'steps'),
             sl&&h('span',{style:{marginLeft:6,color:C.purT}},'· '+sl.hrs+'h sleep'),
             ne&&ne.mood&&h('span',{style:{marginLeft:6,color:C.ambT}},'· '+ne.mood)
           )
