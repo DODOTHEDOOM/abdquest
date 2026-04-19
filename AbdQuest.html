@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-title" content="Abd's Quest">
 <meta name="theme-color" content="#0a0a0f">
 <title>Abd's Quest</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%231a1020'/%3E%3Cellipse cx='256' cy='140' rx='130' ry='58' fill='%232a1a4a' stroke='%23ffd700' stroke-width='12'/%3E%3Cpolygon points='256,32 286,110 256,90 226,110' fill='%23ffd700'/%3E%3Crect x='232' y='140' width='48' height='200' rx='16' fill='%23ffd700'/%3E%3Crect x='160' y='196' width='192' height='40' rx='20' fill='%23ffd700'/%3E%3Crect x='186' y='340' width='140' height='32' rx='16' fill='%238b6914'/%3E%3Ccircle cx='390' cy='108' r='64' fill='none' stroke='%23ffd700' stroke-width='14'/%3E%3Ccircle cx='416' cy='82' r='32' fill='%231a1020'/%3E%3Ctext x='256' y='480' text-anchor='middle' font-family='monospace' font-size='56' fill='%23ffd700' font-weight='bold' letter-spacing='8'%3EAQ%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon-precomposed" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%231a1020'/%3E%3Cellipse cx='256' cy='140' rx='130' ry='58' fill='%232a1a4a' stroke='%23ffd700' stroke-width='12'/%3E%3Cpolygon points='256,32 286,110 256,90 226,110' fill='%23ffd700'/%3E%3Crect x='232' y='140' width='48' height='200' rx='16' fill='%23ffd700'/%3E%3Crect x='160' y='196' width='192' height='40' rx='20' fill='%23ffd700'/%3E%3Crect x='186' y='340' width='140' height='32' rx='16' fill='%238b6914'/%3E%3Ccircle cx='390' cy='108' r='64' fill='none' stroke='%23ffd700' stroke-width='14'/%3E%3Ccircle cx='416' cy='82' r='32' fill='%231a1020'/%3E%3Ctext x='256' y='480' text-anchor='middle' font-family='monospace' font-size='56' fill='%23ffd700' font-weight='bold' letter-spacing='8'%3EAQ%3C/text%3E%3C/svg%3E">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{background:#0a0a0f;font-family:Georgia,serif;color:#e8dcc8;overflow-x:hidden;padding-top:env(safe-area-inset-top);}
@@ -193,6 +195,17 @@ var DEF_BONUS=[
   {id:'callhome',label:'Call Family',icon:'📞',xp:15,desc:'Check in with home — no penalty if you miss',bonus:true},
   {id:'stretch',label:'Morning Stretch',icon:'🧘',xp:10,desc:'5-10 mins stretching — nice to have',bonus:true}
 ];
+var DEF_RECURRING=[
+  {id:'jumua',label:"Jumu'ah Prayer",icon:'🕌',xp:60,desc:"Friday congregational prayer",day:5},
+  {id:'wegovy',label:'Take Wegovy Injection',icon:'💉',xp:30,desc:'Weekly injection — every Saturday',day:6}
+];
+
+var DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function getRecurringDue(rec){
+  // Returns true if today is the day this quest is scheduled for
+  return new Date().getDay()===rec.day;
+}
 var DEF_SHOP=[
   {id:'s1',label:'Cheat Meal',icon:'🍕',cost:300,desc:'One meal, no guilt'},
   {id:'s2',label:'Rest Day',icon:'🛋️',cost:250,desc:'Full guilt-free day off'},
@@ -314,7 +327,7 @@ function SH(ic,ti,col){return h('div',{style:{display:'flex',alignItems:'center'
 // INIT STATE
 function initState(){
   var saved=loadSafe(),fajrCache=null;try{var fc=sessionStorage.getItem('pt_'+today());if(fc){var pt=JSON.parse(fc);fajrCache=pt.Fajr||null;}}catch(e){}var td=getLogicalDay(fajrCache);
-  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
+  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
   if(saved.lastDay!==td){
@@ -412,18 +425,48 @@ function MiniChart(props){
 
 function Heatmap(props){
   var log=props.log,C=props.C;
-  var logMap={};log.forEach(function(en){logMap[en.date]=en.allDone?1:Object.values(en.done||{}).some(Boolean)?0.5:0;});
+  // Build a map of date -> completion percentage
+  var logMap={};
+  log.forEach(function(en){
+    var done=Object.values(en.done||{}).filter(Boolean).length;
+    var total=Object.keys(en.done||{}).length;
+    logMap[en.date]=total>0?done/total:0;
+  });
+  function heatCol(pct,hasDat){
+    if(!hasDat)return '#1a1a2a';
+    if(pct===0)return '#6b1a1a';          // 0% — red
+    if(pct<=0.25)return '#8a4a00';        // 1-25% — orange
+    if(pct<=0.50)return '#8a8000';        // 26-50% — yellow
+    if(pct<=0.75)return '#2a6a2a';        // 51-75% — light green
+    if(pct<1)return '#1a8a3a';            // 76-99% — green
+    return '#00aa44';                      // 100% — dark green
+  }
   var weeks=[],cur=new Date(),td=today();cur.setDate(cur.getDate()-175);
   var week=[];
   while(cur<=new Date()){
-    var key=cur.toISOString().split('T')[0],val=logMap[key];
-    var col=val===1?'#2a8a2a':val===0.5?'#8a6a00':key<=td?'#1a1a2a':'transparent';
-    week.push(h('div',{key:key,title:key,style:{width:11,height:11,borderRadius:2,background:col,flexShrink:0}}));
+    var key=cur.toISOString().split('T')[0];
+    var hasDat=key in logMap;
+    var pct=logMap[key]||0;
+    var isFut=key>td;
+    var col=isFut?'transparent':hasDat?heatCol(pct,true):heatCol(0,key<=td?false:false);
+    if(!isFut&&!hasDat)col='#1a1a2a';
+    if(!isFut&&hasDat)col=heatCol(pct,true);
+    var pctStr=hasDat?Math.round(pct*100)+'%':'no data';
+    week.push(h('div',{key:key,title:key+' — '+pctStr,style:{width:11,height:11,borderRadius:2,background:col,flexShrink:0}}));
     if(week.length===7){weeks.push(h('div',{key:key+'w',style:{display:'flex',flexDirection:'column',gap:2}},week));week=[];}
     cur.setDate(cur.getDate()+1);
   }
   if(week.length)weeks.push(h('div',{key:'last',style:{display:'flex',flexDirection:'column',gap:2}},week));
-  return h('div',null,h('div',{style:{display:'flex',gap:2,overflowX:'auto',paddingBottom:4}},weeks),h('div',{style:{display:'flex',gap:12,marginTop:8,fontSize:10,color:C.dim}},h('span',null,'⬜ No data'),h('span',{style:{color:'#8a6a00'}},'🟨 Partial'),h('span',{style:{color:'#2a8a2a'}},'🟩 Perfect')));
+  return h('div',null,
+    h('div',{style:{display:'flex',gap:2,overflowX:'auto',paddingBottom:4}},weeks),
+    h('div',{style:{display:'flex',gap:8,marginTop:8,fontSize:9,flexWrap:'wrap'}},
+      h('span',{style:{color:'#6b1a1a'}},'🟥 0%'),
+      h('span',{style:{color:'#8a4a00'}},'🟧 ≤25%'),
+      h('span',{style:{color:'#8a8000'}},'🟨 ≤50%'),
+      h('span',{style:{color:'#2a6a2a'}},'🟩 ≤75%'),
+      h('span',{style:{color:'#00aa44'}},'🟢 100%')
+    )
+  );
 }
 
 function usePT(){
@@ -707,7 +750,7 @@ function App(){
   function saveEdit(){
     if(!edit)return;
     var sec=edit._s;
-    if(sec==='h')setSt(function(p){return Object.assign({},p,{habits:p.habits.map(function(hh){return hh.id===edit.id?edit:hh;})});});else if(sec==='b')setSt(function(p){return Object.assign({},p,{bonus:(p.bonus||[]).map(function(hh){return hh.id===edit.id?edit:hh;})});});
+    if(sec==='h')setSt(function(p){return Object.assign({},p,{habits:p.habits.map(function(hh){return hh.id===edit.id?edit:hh;})});});else if(sec==='b')setSt(function(p){return Object.assign({},p,{bonus:(p.bonus||[]).map(function(hh){return hh.id===edit.id?edit:hh;})});});else if(sec==='r')setSt(function(p){return Object.assign({},p,{recurring:(p.recurring||[]).map(function(hh){return hh.id===edit.id?edit:hh;})});});
     else if(sec==='p')setSt(function(p){return Object.assign({},p,{prayers:p.prayers.map(function(hh){return hh.id===edit.id?edit:hh;})});});
     else if(sec==='l')setSt(function(p){return Object.assign({},p,{life:p.life.map(function(hh){return hh.id===edit.id?edit:hh;})});});
     else setSt(function(p){return Object.assign({},p,{shop:p.shop.map(function(hh){return hh.id===edit.id?edit:hh;})});});
@@ -726,7 +769,8 @@ function App(){
   }
 
   // COMPUTED
-  var allH=[].concat(st.habits,st.prayers,st.life,st.bonus||[]);
+  var customAllQ=(st.customSections||[]).reduce(function(acc,sec){return acc.concat(sec.quests||[]);},[]); 
+  var allH=[].concat(st.habits,st.prayers,st.life,st.bonus||[],customAllQ);
   var doneC=allH.filter(function(hh){return st.done[hh.id];}).length;
   var allDoneToday=doneC===allH.length&&allH.length>0;
   var avail=st.xp-st.spent;
@@ -881,8 +925,22 @@ function App(){
       st.prayers.map(function(hh){return h(HabitRow,{key:hh.id,hab:hh,done:!!st.done[hh.id],popping:pop&&pop.id===hh.id,onDo:doHabit,col:C.bluT,C:C,missedDays:(st.habitMissed||{})[hh.id]||0,habStreak:(st.habitStreaks||{})[hh.id]||0});}),
       SH('📋','Life Quests — Siemens Placement',C.lifeT),
       st.life.map(function(hh){return h(HabitRow,{key:hh.id,hab:hh,done:!!st.done[hh.id],popping:pop&&pop.id===hh.id,onDo:doHabit,col:C.lifeT,C:C,missedDays:(st.habitMissed||{})[hh.id]||0,habStreak:(st.habitStreaks||{})[hh.id]||0});}),
+      (st.customSections||[]).map(function(sec,si){
+        return h('div',{key:sec.id},
+          SH(sec.icon||'📌',sec.name,C.purT),
+          (sec.quests||[]).map(function(hh){return h(HabitRow,{key:hh.id,hab:hh,done:!!st.done[hh.id],popping:pop&&pop.id===hh.id,onDo:doHabit,col:C.purT,C:C,missedDays:hh.bonus?0:(st.habitMissed||{})[hh.id]||0,habStreak:(st.habitStreaks||{})[hh.id]||0});})
+        );
+      }),
       SH('🎁','Bonus Quests — XP only, no penalty',C.grnT),
       (st.bonus||[]).map(function(hh){return h(HabitRow,{key:hh.id,hab:hh,done:!!st.done[hh.id],popping:pop&&pop.id===hh.id,onDo:doHabit,col:C.grnT,C:C,missedDays:0,habStreak:(st.habitStreaks||{})[hh.id]||0});}),
+      (function(){
+        var dueToday=(st.recurring||[]).filter(function(r){return getRecurringDue(r);});
+        if(!dueToday.length)return null;
+        return h('div',null,
+          SH('🔁','Weekly Recurring Quests',C.telT),
+          dueToday.map(function(hh){return h(HabitRow,{key:hh.id,hab:hh,done:!!st.done[hh.id],popping:pop&&pop.id===hh.id,onDo:doHabit,col:C.telT,C:C,missedDays:0,habStreak:(st.habitStreaks||{})[hh.id]||0});})
+        );
+      })(),
       SH('🧹','One-Time Chores',C.ambT),
       h('div',{style:cs(C,{marginBottom:10})},
         h('div',{style:{display:'flex',gap:7}},
@@ -1045,17 +1103,7 @@ function App(){
     );
 
     if(tab==='game') return h('div',null,
-      SH('🗓️','Habit Heatmap — 6 Months',C.grnT),
-      h('div',{style:cs(C,{marginBottom:14})},h(Heatmap,{log:st.log,C:C})),
-      SH('📊','Weekly Report Card',C.gold),
-      h('div',{style:cs(C,{marginBottom:14})},
-        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Generate your weekly performance grade.'),
-        h('button',{onClick:function(){var now=new Date(),wa=new Date(now);wa.setDate(wa.getDate()-7);var wl=st.log.filter(function(d){return d.date>=wa.toISOString().split('T')[0];});var rc=genRC(st,wl);setSt(function(p){return Object.assign({},p,{reportCards:(p.reportCards||[]).slice(-11).concat([rc])});});showT('Week graded: '+rc.grade+' ('+rc.ov+'%)','gold');},style:Object.assign({},btn(true),{width:'100%',fontSize:12,marginBottom:12})},"Generate This Week's Report"),
-        (st.reportCards||[]).slice(-1).map(function(rc,i){return h('div',{key:i},
-          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},h('div',null,h('div',{style:{fontSize:11,color:C.dim}},'Week ending '+rc.date),h('div',{style:{fontSize:13,color:C.txt,marginTop:2}},'Overall: '+rc.ov+'%')),h('div',{style:{fontSize:48,fontWeight:'bold',color:rc.grade==='S'?C.gold:rc.grade==='A'?C.grnT:rc.grade==='B'?C.bluT:rc.grade==='C'?C.ambT:rc.grade==='D'?C.redT:'#666'}},rc.grade)),
-          [{l:'Quests',v:rc.qp,c:C.gold},{l:'Prayers',v:rc.pp,c:C.bluT},{l:'Calories',v:rc.cp,c:C.ambT},{l:'Water',v:rc.wp,c:C.telT},{l:'Sleep',v:rc.sp,c:C.purT},{l:'Workouts',v:rc.wkp,c:C.purT}].map(function(s){return h('div',{key:s.l,style:{marginBottom:6}},h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:2}},h('span',{style:{fontSize:11,color:C.dim}},s.l),h('span',{style:{fontSize:11,color:s.c}},s.v+'%')),h('div',{style:{height:5,background:C.bdr,borderRadius:3,overflow:'hidden'}},h('div',{style:{height:'100%',width:s.v+'%',background:s.c,borderRadius:3,transition:'width 0.5s'}})));})
-        );})
-      ),
+
       SH('🎒','Inventory',C.purT),
       (st.inventory||[]).length===0&&h('div',{style:{textAlign:'center',color:C.fnt,padding:20,fontSize:12}},'No items yet. Complete habits for random drops.'),
       h('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7,marginBottom:14}},(st.inventory||[]).map(function(item,i){return h('div',{key:i,title:item.desc,style:{background:C.card,border:'1px solid '+RC[item.rarity]+'44',borderRadius:8,padding:'9px 5px',textAlign:'center'}},h('div',{style:{fontSize:22,marginBottom:3}},item.icon),h('div',{style:{fontSize:9,color:RC[item.rarity],textTransform:'uppercase'}},item.rarity),h('div',{style:{fontSize:9,color:C.dim,marginTop:1}},item.name));})),
@@ -1068,6 +1116,17 @@ function App(){
     );
 
     if(tab==='history') return h('div',null,
+      SH('🗓️','Habit Heatmap — 6 Months',C.grnT),
+      h('div',{style:cs(C,{marginBottom:14})},h(Heatmap,{log:st.log,C:C})),
+      SH('📊','Weekly Report Card',C.gold),
+      h('div',{style:cs(C,{marginBottom:14})},
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Generate your weekly performance grade.'),
+        h('button',{onClick:function(){var now=new Date(),wa=new Date(now);wa.setDate(wa.getDate()-7);var wl=st.log.filter(function(d){return d.date>=wa.toISOString().split('T')[0];});var rc=genRC(st,wl);setSt(function(p){return Object.assign({},p,{reportCards:(p.reportCards||[]).slice(-11).concat([rc])});});showT('Week graded: '+rc.grade+' ('+rc.ov+'%)','gold');},style:Object.assign({},btn(true),{width:'100%',fontSize:12,marginBottom:12})},"Generate This Week's Report"),
+        (st.reportCards||[]).slice(-1).map(function(rc,i){return h('div',{key:i},
+          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},h('div',null,h('div',{style:{fontSize:11,color:C.dim}},'Week ending '+rc.date),h('div',{style:{fontSize:13,color:C.txt,marginTop:2}},'Overall: '+rc.ov+'%')),h('div',{style:{fontSize:48,fontWeight:'bold',color:rc.grade==='S'?C.gold:rc.grade==='A'?C.grnT:rc.grade==='B'?C.bluT:rc.grade==='C'?C.ambT:rc.grade==='D'?C.redT:'#666'}},rc.grade)),
+          [{l:'Quests',v:rc.qp,c:C.gold},{l:'Prayers',v:rc.pp,c:C.bluT},{l:'Calories',v:rc.cp,c:C.ambT},{l:'Water',v:rc.wp,c:C.telT},{l:'Sleep',v:rc.sp,c:C.purT},{l:'Workouts',v:rc.wkp,c:C.purT}].map(function(s){return h('div',{key:s.l,style:{marginBottom:6}},h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:2}},h('span',{style:{fontSize:11,color:C.dim}},s.l),h('span',{style:{fontSize:11,color:s.c}},s.v+'%')),h('div',{style:{height:5,background:C.bdr,borderRadius:3,overflow:'hidden'}},h('div',{style:{height:'100%',width:s.v+'%',background:s.c,borderRadius:3,transition:'width 0.5s'}})));})
+        );})
+      ),
       SH('📜','Log History',C.dim),
       h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Tap × to remove an entry. Use "Fill Past Day" to add or correct data.'),
       st.log.length===0&&h('div',{style:{textAlign:'center',color:C.fnt,padding:40,fontSize:13}},'No history yet.'),
@@ -1120,11 +1179,43 @@ function App(){
         h('div',{style:{fontSize:11,color:C.dim,marginBottom:11}},'Export your data. Import to restore. Auto-saves to a backup slot every 30s. Always export before updating the app.'),
         h('div',{style:{display:'flex',gap:7}},h('button',{onClick:exportData,style:Object.assign({},btn(true,C.telT),{flex:1,fontSize:12})},'📥 Export Backup'),h('label',{style:Object.assign({},btn(false,C.telT),{flex:1,fontSize:12,textAlign:'center',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'})},'📤 Import',h('input',{type:'file',accept:'.json',onChange:importData,style:{display:'none'}})))
       ),
-      [{key:'h',label:'⚔️ Health Quests',items:st.habits,sec:'h'},{key:'p',label:'🕌 Spiritual Quests',items:st.prayers,sec:'p'},{key:'l',label:'📋 Life Quests',items:st.life,sec:'l'},{key:'b',label:'🎁 Bonus Quests',items:st.bonus||[],sec:'b'},{key:'s',label:'🏪 Shop Items',items:st.shop,sec:'s'}].map(function(group){return h('div',{key:group.key,style:{marginBottom:18}},
-        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:7}},h('div',{style:{fontSize:10,color:C.goldD,letterSpacing:'0.2em',textTransform:'uppercase'}},group.label),group.key!=='s'&&h('button',{onClick:function(){var id='cu'+Date.now();var nh={id:id,label:'New Quest',icon:'⭐',xp:20,desc:'Edit me'};if(group.sec==='h')setSt(function(p){return Object.assign({},p,{habits:p.habits.concat([nh])});});else if(group.sec==='p')setSt(function(p){return Object.assign({},p,{prayers:p.prayers.concat([nh])});});else if(group.sec==='b')setSt(function(p){return Object.assign({},p,{bonus:(p.bonus||[]).concat([Object.assign({},nh,{bonus:true})])});});else setSt(function(p){return Object.assign({},p,{life:p.life.concat([nh])});});setEdit(Object.assign({},nh,{_s:group.sec}));},style:Object.assign({},btn(true),{padding:'4px 10px',fontSize:11})},'+ Add')),
-        h('div',{style:{display:'flex',flexDirection:'column',gap:5}},group.items.map(function(item){return h('div',{key:item.id,style:cs(C,{padding:'10px 13px',display:'flex',alignItems:'center',justifyContent:'space-between'})},h('div',{style:{display:'flex',alignItems:'center',gap:9,flex:1}},h('span',{style:{fontSize:17}},item.icon),h('div',null,h('div',{style:{fontSize:12,color:C.txt}},item.label),h('div',{style:{fontSize:10,color:C.dim}},item.xp?item.xp+' XP':item.cost?item.cost+' XP cost':''))),h('div',{style:{display:'flex',gap:5}},h('button',{onClick:function(){setEdit(Object.assign({},item,{_s:group.sec}));},style:Object.assign({},btn(false),{padding:'4px 9px',fontSize:10})},'Edit'),group.key!=='s'&&h('button',{onClick:function(){if(group.sec==='h')setSt(function(p){return Object.assign({},p,{habits:p.habits.filter(function(hh){return hh.id!==item.id;})});});else if(group.sec==='p')setSt(function(p){return Object.assign({},p,{prayers:p.prayers.filter(function(hh){return hh.id!==item.id;})});});else if(group.sec==='b')setSt(function(p){return Object.assign({},p,{bonus:(p.bonus||[]).filter(function(hh){return hh.id!==item.id;})});});else setSt(function(p){return Object.assign({},p,{life:p.life.filter(function(hh){return hh.id!==item.id;})});});},style:Object.assign({},btn(false,C.redT),{padding:'4px 9px',fontSize:10,color:C.redT})},'Del')));
+      [{key:'h',label:'⚔️ Health Quests',items:st.habits,sec:'h'},{key:'p',label:'🕌 Spiritual Quests',items:st.prayers,sec:'p'},{key:'l',label:'📋 Life Quests',items:st.life,sec:'l'},{key:'b',label:'🎁 Bonus Quests',items:st.bonus||[],sec:'b'},{key:'r',label:'🔁 Recurring Quests',items:st.recurring||[],sec:'r'},{key:'s',label:'🏪 Shop Items',items:st.shop,sec:'s'}].map(function(group){return h('div',{key:group.key,style:{marginBottom:18}},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:7}},h('div',{style:{fontSize:10,color:C.goldD,letterSpacing:'0.2em',textTransform:'uppercase'}},group.label),group.key!=='s'&&h('button',{onClick:function(){var id='cu'+Date.now();var nh={id:id,label:'New Quest',icon:'⭐',xp:20,desc:'Edit me'};if(group.sec==='h')setSt(function(p){return Object.assign({},p,{habits:p.habits.concat([nh])});});else if(group.sec==='p')setSt(function(p){return Object.assign({},p,{prayers:p.prayers.concat([nh])});});else if(group.sec==='b')setSt(function(p){return Object.assign({},p,{bonus:(p.bonus||[]).concat([Object.assign({},nh,{bonus:true})])});});else if(group.sec==='r')setSt(function(p){return Object.assign({},p,{recurring:(p.recurring||[]).concat([Object.assign({},nh,{day:5})])});});else setSt(function(p){return Object.assign({},p,{life:p.life.concat([nh])});});setEdit(Object.assign({},nh,{_s:group.sec}));},style:Object.assign({},btn(true),{padding:'4px 10px',fontSize:11})},'+ Add')),
+        h('div',{style:{display:'flex',flexDirection:'column',gap:5}},group.items.map(function(item){return h('div',{key:item.id,style:cs(C,{padding:'10px 13px',display:'flex',alignItems:'center',justifyContent:'space-between'})},h('div',{style:{display:'flex',alignItems:'center',gap:9,flex:1}},h('span',{style:{fontSize:17}},item.icon),h('div',null,h('div',{style:{fontSize:12,color:C.txt}},item.label),h('div',{style:{fontSize:10,color:C.dim}},item.xp?item.xp+' XP':item.cost?item.cost+' XP cost':''))),h('div',{style:{display:'flex',gap:5}},h('button',{onClick:function(){setEdit(Object.assign({},item,{_s:group.sec}));},style:Object.assign({},btn(false),{padding:'4px 9px',fontSize:10})},'Edit'),group.key!=='s'&&h('button',{onClick:function(){if(group.sec==='h')setSt(function(p){return Object.assign({},p,{habits:p.habits.filter(function(hh){return hh.id!==item.id;})});});else if(group.sec==='p')setSt(function(p){return Object.assign({},p,{prayers:p.prayers.filter(function(hh){return hh.id!==item.id;})});});else if(group.sec==='b')setSt(function(p){return Object.assign({},p,{bonus:(p.bonus||[]).filter(function(hh){return hh.id!==item.id;})});});else if(group.sec==='r')setSt(function(p){return Object.assign({},p,{recurring:(p.recurring||[]).filter(function(hh){return hh.id!==item.id;})});});else setSt(function(p){return Object.assign({},p,{life:p.life.filter(function(hh){return hh.id!==item.id;})});});},style:Object.assign({},btn(false,C.redT),{padding:'4px 9px',fontSize:10,color:C.redT})},'Del')));
         }))
       );}),
+      h('div',{style:{marginBottom:18}},
+        SH('📌','Custom Quest Sections',C.purT),
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Create your own quest sections with a custom name. They survive all future app updates.'),
+        (st.customSections||[]).map(function(sec,si){return h('div',{key:sec.id,style:cs(C,{marginBottom:8,padding:'10px 13px'})},
+          h('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:8}},
+            h('span',{style:{fontSize:18}},(sec.icon||'📌')),
+            h('span',{style:{fontSize:13,color:C.txt,fontWeight:'bold',flex:1}},sec.name),
+            h('span',{style:{fontSize:11,color:C.dim}},(sec.quests||[]).length+' quests'),
+            h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).filter(function(_,j){return j!==si;})});});},style:{background:'none',border:'none',color:C.redT,fontSize:16,cursor:'pointer'}},'×')
+          ),
+          h('button',{onClick:function(){
+            var qname=window.prompt('Quest name:');if(!qname)return;
+            var qicon=window.prompt('Icon (emoji):','⭐');
+            var qxp=parseInt(window.prompt('XP value:','20'))||20;
+            var qbonus=window.confirm('Bonus quest? (OK=bonus/no penalty, Cancel=standard)');
+            var nq={id:'cq'+Date.now(),label:qname,icon:qicon||'⭐',xp:qxp,desc:'Custom quest',bonus:qbonus};
+            setSt(function(p){var secs=(p.customSections||[]).map(function(s,j){if(j!==si)return s;return Object.assign({},s,{quests:(s.quests||[]).concat([nq])});});return Object.assign({},p,{customSections:secs});});
+          },style:Object.assign({},btn(true,C.purT),{width:'100%',fontSize:11})},'+ Add Quest to '+sec.name)
+        );}),
+        h('div',{style:{display:'flex',gap:7,marginTop:8}},
+          h('input',{id:'newSecName',placeholder:'New section name...',style:Object.assign({},ins(C),{flex:1})}),
+          h('button',{onClick:function(){
+            var el=document.getElementById('newSecName');
+            var name=el.value.trim();if(!name)return;
+            var icon=window.prompt('Section icon (emoji):','📌')||'📌';
+            var ns={id:'cs'+Date.now(),name:name,icon:icon,quests:[]};
+            setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).concat([ns])});});
+            el.value='';
+            showT('Section "'+name+'" created!','gold');
+          },style:Object.assign({},btn(true,C.purT),{fontSize:11,whiteSpace:'nowrap'})},'+ Create Section')
+        )
+      ),
       h('div',{style:{borderTop:'1px solid '+C.bdr,paddingTop:14}},h('button',{onClick:function(){if(window.confirm('Reset ALL progress? Cannot be undone.')){localStorage.removeItem(MAIN_KEY);localStorage.removeItem(BAK_KEY);window.location.reload();}},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'⚠ Reset All Progress'))
     );
   }
@@ -1140,6 +1231,12 @@ function App(){
           h('div',{style:{display:'flex',gap:7}},
             h('button',{onClick:function(){setEdit(function(p){var n=Object.assign({},p);n.bonus=false;return n;});},style:Object.assign({},bs(C,!edit.bonus,C.redT),{flex:1,fontSize:11})},'⚠ Standard (penalty)'),
             h('button',{onClick:function(){setEdit(function(p){var n=Object.assign({},p);n.bonus=true;return n;});},style:Object.assign({},bs(C,!!edit.bonus,C.grnT),{flex:1,fontSize:11})},'🎁 Bonus (no penalty)')
+          )
+        ),
+        edit._s==='r'&&h('div',{style:{marginBottom:11}},
+          h('div',{style:{fontSize:10,color:C.dim,letterSpacing:'0.1em',marginBottom:3}},'REPEATS ON DAY'),
+          h('div',{style:{display:'flex',gap:4,flexWrap:'wrap'}},
+            DAYS.map(function(d,i){return h('button',{key:i,onClick:function(){setEdit(function(p){var n=Object.assign({},p);n.day=i;return n;});},style:Object.assign({},bs(C,edit.day===i,C.telT),{fontSize:10,padding:'5px 8px'})},d.slice(0,3));})
           )
         ),
         h('div',{style:{display:'flex',gap:9,marginTop:14}},h('button',{onClick:saveEdit,style:Object.assign({},btn(true),{flex:1})},'Save'),h('button',{onClick:function(){setEdit(null);},style:Object.assign({},btn(false),{flex:1})},'Cancel')))),
