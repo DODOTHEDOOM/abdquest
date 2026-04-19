@@ -334,7 +334,10 @@ function initState(){
       }
     });
     var allIds=allH.map(function(hh){return hh.id;});
-    var allDone=allIds.length>0&&allIds.every(function(id){return !!(saved.done||{})[id];});
+    var nonBonusH=allH.filter(function(hh){return !hh.bonus;});
+    var doneCnt=nonBonusH.filter(function(hh){return !!(saved.done||{})[hh.id];}).length;
+    var streakThresh=(saved.streakMin||0)>0?saved.streakMin:nonBonusH.length;
+    var allDone=nonBonusH.length>0&&doneCnt>=streakThresh;
     var newStreak=allDone?(saved.streak||0)+1:0;
     var curWeek=getWeekMon();
     var weekChanged=(saved.currentWeek||'')!==curWeek;
@@ -421,38 +424,6 @@ function Heatmap(props){
   }
   if(week.length)weeks.push(h('div',{key:'last',style:{display:'flex',flexDirection:'column',gap:2}},week));
   return h('div',null,h('div',{style:{display:'flex',gap:2,overflowX:'auto',paddingBottom:4}},weeks),h('div',{style:{display:'flex',gap:12,marginTop:8,fontSize:10,color:C.dim}},h('span',null,'⬜ No data'),h('span',{style:{color:'#8a6a00'}},'🟨 Partial'),h('span',{style:{color:'#2a8a2a'}},'🟩 Perfect')));
-}
-
-function NotesBot(props){
-  var C=props.C,st=props.st;
-  var msgs=useState([{from:'bot',txt:"Salaam Dodo. I'm your reflection companion. Tap a prompt or type anything."}]);
-  var setMsgs=msgs[1];msgs=msgs[0];
-  var inp=useState('');var setInp=inp[1];inp=inp[0];
-  var ref=useRef(null);
-  useEffect(function(){if(ref.current)ref.current.scrollIntoView({behavior:'smooth'});},[msgs]);
-  function reply(msg){
-    var l=msg.toLowerCase();
-    if(l.indexOf('pray')>=0||l.indexOf('fajr')>=0||l.indexOf('salah')>=0)return BOT_R.pray[Math.floor(Math.random()*BOT_R.pray.length)];
-    if(l.indexOf('water')>=0||l.indexOf('drink')>=0)return BOT_R.wat[Math.floor(Math.random()*BOT_R.wat.length)];
-    if(l.indexOf('eat')>=0||l.indexOf('food')>=0||l.indexOf('calorie')>=0)return BOT_R.food[Math.floor(Math.random()*BOT_R.food.length)];
-    if(l.indexOf('study')>=0||l.indexOf('uni')>=0||l.indexOf('siemens')>=0)return BOT_R.study[Math.floor(Math.random()*BOT_R.study.length)];
-    if(l.indexOf('sleep')>=0||l.indexOf('tired')>=0)return BOT_R.sleep[Math.floor(Math.random()*BOT_R.sleep.length)];
-    if(l.indexOf('weight')>=0||l.indexOf('kg')>=0)return BOT_R.wt[Math.floor(Math.random()*BOT_R.wt.length)];
-    if(l.indexOf('good')>=0||l.indexOf('great')>=0||l.indexOf('proud')>=0)return BOT_R.pos[Math.floor(Math.random()*BOT_R.pos.length)];
-    return BOT_R.def[Math.floor(Math.random()*BOT_R.def.length)];
-  }
-  function send(txt){if(!txt.trim())return;setMsgs(function(p){return p.concat([{from:'user',txt:txt}]);});setInp('');setTimeout(function(){setMsgs(function(p){return p.concat([{from:'bot',txt:reply(txt)}]);});},600);}
-  return h('div',null,
-    h('div',{style:{display:'flex',gap:5,flexWrap:'wrap',marginBottom:8}},BOT_PROMPTS.map(function(p){return h('button',{key:p.l,onClick:function(){send(p.q);},style:{background:C.tel,border:'1px solid '+C.telT+'44',borderRadius:20,padding:'4px 9px',fontSize:10,color:C.telT}},p.l);})),
-    h('div',{style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:8,height:200,overflowY:'auto',padding:12,display:'flex',flexDirection:'column',gap:8}},
-      msgs.map(function(m,i){return h('div',{key:i,style:{display:'flex',justifyContent:m.from==='user'?'flex-end':'flex-start'}},h('div',{style:{maxWidth:'82%',padding:'8px 11px',borderRadius:m.from==='user'?'12px 12px 2px 12px':'12px 12px 12px 2px',background:m.from==='user'?C.tel:C.card,border:'1px solid '+(m.from==='user'?C.telT+'44':C.bdr),fontSize:12,color:m.from==='user'?C.telT:C.txt,lineHeight:1.5}},m.txt));}),
-      h('div',{ref:ref})
-    ),
-    h('div',{style:{display:'flex',gap:7,marginTop:7}},
-      h('input',{value:inp,onChange:function(ev){setInp(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')send(inp);},placeholder:'Type anything...',style:Object.assign({},ins(C),{flex:1})}),
-      h('button',{onClick:function(){send(inp);},style:{background:C.tel,border:'1px solid '+C.telT+'44',borderRadius:6,padding:'8px 13px',color:C.telT,fontSize:13}},'→')
-    )
-  );
 }
 
 function usePT(){
@@ -577,39 +548,87 @@ function App(){
   useEffect(function(){nudgeRef.current=setInterval(function(){setNudge(NUDGES[Math.floor(Math.random()*NUDGES.length)]);},2*60*60*1000);return function(){clearInterval(nudgeRef.current);};},[]);
 
 
-  // Smart challenge auto-tracking
+  // Smart challenge auto-tracking — daily + weekly
   useEffect(function(){
-    var wkey_sleep='t1_'+getWeekMon();
-    var wkey_water='t1_water_'+getWeekMon();
-    var wkey_cal='t1_cal_'+getWeekMon();
-    // Check sleep challenge: sleep before 1AM 7 nights (from sleep log)
-    var sleepDaysGood=(st.sleepLog||[]).filter(function(s){
-      if(!s.slept)return false;
-      var h=parseInt(s.slept.split(':')[0]);
-      return h<1||(h>=22); // slept before 1am = hour < 1 or >= 22
-    }).length;
-    // Check water challenge: 3L every day this week
-    var monStr=getWeekMon();
+    var td=today();
+    var mon=getWeekMon();
     var weekDates=[];
-    var md=new Date(monStr);
-    for(var i=0;i<7;i++){var dd=new Date(md);dd.setDate(md.getDate()+i);weekDates.push(dd.toISOString().split('T')[0]);}
-    var waterDaysGood=weekDates.filter(function(d){
+    var md=new Date(mon);
+    for(var wi=0;wi<7;wi++){var dd=new Date(md);dd.setDate(md.getDate()+wi);weekDates.push(dd.toISOString().split('T')[0]);}
+    var updates={};
+    var xpGain=0;
+
+    // ── Daily challenge auto-check ──
+    var dch=getDailyCh(td);
+    if(!(st.dailyChDone||{})[td]){
+      var autoComplete=false;
+      var dl=dch.label.toLowerCase();
+      // All 5 prayers ticked today
+      if(dl.indexOf('prayer')>=0||dl.indexOf('prayers')>=0){
+        if(PIDs.every(function(p){return !!st.done[p];}))autoComplete=true;
+      }
+      // No junk food
+      if(dl.indexOf('junk')>=0&&st.done['nojunk'])autoComplete=true;
+      // Drink 3L / 2L water
+      if(dl.indexOf('water')>=0||dl.indexOf('3l')>=0||dl.indexOf('2l')>=0){
+        if((st.waterToday||0)>=(st.waterTarget||3000))autoComplete=true;
+      }
+      // Log weight
+      if(dl.indexOf('weight')>=0||(dl.indexOf('log')>=0&&dl.indexOf('weigh')>=0)){
+        if((st.wtLog||[]).find(function(w){return w.date===td;}))autoComplete=true;
+      }
+      // Read Quran 20 mins
+      if(dl.indexOf('quran')>=0&&st.done['quran'])autoComplete=true;
+      // Sleep before midnight (checked from sleep log)
+      if(dl.indexOf('midnight')>=0||dl.indexOf('sleep before')>=0){
+        var todSl=(st.sleepLog||[]).find(function(s){return s.date===td;});
+        if(todSl&&todSl.slept){var sh=parseInt(todSl.slept.split(':')[0]);if(sh>=22||sh<1)autoComplete=true;}
+      }
+      if(autoComplete){
+        updates['__daily_'+td]=true;
+        xpGain+=dch.xp;
+        showT('⚡ Daily challenge auto-completed! +'+dch.xp+' XP','gold');
+      }
+    }
+
+    // ── Weekly challenge auto-check ──
+    // Sleep 7 nights before 1AM
+    var sleepGood=(st.sleepLog||[]).filter(function(s){
+      if(!s.slept)return false;
+      var sh=parseInt(s.slept.split(':')[0]);
+      return sh>=22||sh<1;
+    }).length;
+    // Water 7 days at target
+    var waterGood=weekDates.filter(function(d){
       var w=(st.waterLog||[]).find(function(wl){return wl.date===d;});
       return w&&w.ml>=(st.waterTarget||3000);
     }).length;
-    var calDaysGood=weekDates.filter(function(d){
+    // Calories 6/7 days
+    var calGood=weekDates.filter(function(d){
       var c=(st.calLog||[]).find(function(cl){return cl.date===d;});
-      return c&&c.cal<=st.calTarget;
+      return c&&c.cal>0&&c.cal<=st.calTarget;
     }).length;
-    // Auto-complete weekly challenges based on data
-    var updates={};
-    if(sleepDaysGood>=7&&!(st.weeklyChDone||{})['sleep7_'+getWeekMon()]){updates['sleep7_'+getWeekMon()]=true;}
-    if(waterDaysGood>=7&&!(st.weeklyChDone||{})['water7_'+getWeekMon()]){updates['water7_'+getWeekMon()]=true;}
-    if(calDaysGood>=6&&!(st.weeklyChDone||{})['cal6_'+getWeekMon()]){updates['cal6_'+getWeekMon()]=true;}
-    if(Object.keys(updates).length>0){
-      setSt(function(p){return Object.assign({},p,{weeklyChDone:Object.assign({},p.weeklyChDone||{},updates)});});
+    // Prayers — all 5 every day this week
+    var prayerGood=weekDates.filter(function(d){
+      var logEntry=st.log.find(function(l){return l.date===d;});
+      return logEntry&&PIDs.every(function(p){return logEntry.done&&logEntry.done[p];});
+    }).length;
+
+    if(sleepGood>=7&&!(st.weeklyChDone||{})['auto_sleep7_'+mon]){updates['auto_sleep7_'+mon]=true;xpGain+=300;showT('🌙 Auto: Sleep challenge complete! +300 XP','gold');}
+    if(waterGood>=7&&!(st.weeklyChDone||{})['auto_water7_'+mon]){updates['auto_water7_'+mon]=true;xpGain+=280;showT('💧 Auto: Water challenge complete! +280 XP','gold');}
+    if(calGood>=6&&!(st.weeklyChDone||{})['auto_cal6_'+mon]){updates['auto_cal6_'+mon]=true;xpGain+=300;showT('🍗 Auto: Calorie challenge complete! +300 XP','gold');}
+    if(prayerGood>=7&&!(st.weeklyChDone||{})['auto_prayer7_'+mon]){updates['auto_prayer7_'+mon]=true;xpGain+=700;showT('🕌 Auto: All prayers every day this week! +700 XP','gold');}
+
+    if(Object.keys(updates).length>0||xpGain>0){
+      setSt(function(p){
+        var newChDone=Object.assign({},p.dailyChDone||{});
+        if(updates['__daily_'+td])newChDone[td]=true;
+        var newWkDone=Object.assign({},p.weeklyChDone||{});
+        Object.keys(updates).forEach(function(k){if(k!=='__daily_'+td)newWkDone[k]=true;});
+        return Object.assign({},p,{xp:p.xp+xpGain,dailyChDone:newChDone,weeklyChDone:newWkDone});
+      });
     }
-  },[st.sleepLog,st.waterLog,st.calLog]);
+  },[st.done,st.sleepLog,st.waterLog,st.calLog,st.waterToday]);
 
   function showT(msg,type){setToast({msg:msg,type:type||'info'});setTimeout(function(){setToast(null);},3000);}
   function popXp(id,xp){setPop({id:id,xp:xp});setTimeout(function(){setPop(null);},1500);}
@@ -669,11 +688,16 @@ function App(){
       if(bfNote.trim()){np.notes=Object.assign({},p.notes||{},Object.defineProperty({},[bfDate],{value:{text:bfNote,mood:''},enumerable:true}));}
       return np;
     });
-    // Reset missed counters for habits ticked in backfill
+    // Reset missed counters + update prayer history
     setSt(function(p2){
       var newHM=Object.assign({},p2.habitMissed||{});
       Object.keys(bfDone).forEach(function(id){if(bfDone[id]){newHM[id]=0;}});
-      return Object.assign({},p2,{habitMissed:newHM});
+      // Update prayer history for backfilled date
+      var pRec={};
+      PIDs.forEach(function(pid){pRec[pid]=!!bfDone[pid];});
+      var newPH=Object.assign({},p2.prayerHist||{});
+      newPH[bfDate]=pRec;
+      return Object.assign({},p2,{habitMissed:newHM,prayerHist:newPH});
     });
     setBfDone({});setBfCal('');setBfProt('');setBfWt('');setBfWater('');setBfNote('');setBfOpen(false);
     showT('Past day saved ✓','gold');
@@ -787,7 +811,16 @@ function App(){
       ),
       h('div',{style:cs(C,{display:'flex',alignItems:'center',gap:12,marginBottom:12})},
         h('div',{style:{width:44,height:44,borderRadius:'50%',background:'conic-gradient('+C.gold+' '+(doneC/Math.max(allH.length,1)*360)+'deg,'+C.bdr+' 0deg)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}},h('div',{style:{width:32,height:32,borderRadius:'50%',background:C.card,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:'bold',color:C.gold}},doneC+'/'+allH.length)),
-        h('div',null,h('div',{style:{fontSize:13,fontWeight:'bold',color:C.txt}},allDoneToday?'All quests done! 🏆':doneC===0?'No quests yet':(allH.length-doneC)+' remaining'),h('div',{style:{fontSize:11,color:C.dim}},'+'+allH.filter(function(hh){return st.done[hh.id];}).reduce(function(s,hh){return s+hh.xp;},0)+' XP today'))
+        h('div',null,h('div',{style:{fontSize:13,fontWeight:'bold',color:C.txt}},
+              (function(){
+                var nonB=[].concat(st.habits,st.prayers,st.life);
+                var thresh=st.streakMin>0?st.streakMin:nonB.length;
+                var nonBDone=nonB.filter(function(hh){return st.done[hh.id];}).length;
+                if(nonBDone>=thresh)return 'Streak threshold hit! 🔥';
+                if(doneC===0)return 'No quests yet';
+                return (thresh-nonBDone)+' more for streak';
+              })()
+            ),h('div',{style:{fontSize:11,color:C.dim}},'+'+allH.filter(function(hh){return st.done[hh.id];}).reduce(function(s,hh){return s+hh.xp;},0)+' XP today'))
       ),
       h('div',{style:cs(C,{marginBottom:12,background:chDone?C.grn+'22':C.pur,border:'1px solid '+(chDone?C.grn:C.purT+'44')})},
         h('div',{style:{display:'flex',alignItems:'center',gap:10}},
@@ -1008,8 +1041,7 @@ function App(){
       h('textarea',{value:nText,onChange:function(ev){setNText(ev.target.value);},placeholder:'Write anything. How was the day? Prayers? Food? Sleep? What to do better tomorrow? Ezayak ya Dodo?',style:{width:'100%',background:C.card,border:'1px solid '+C.bdr,borderRadius:8,padding:12,color:C.txt,fontSize:13,lineHeight:1.6,resize:'vertical',minHeight:130,boxSizing:'border-box',display:'block'}}),
       h('button',{onClick:saveNote,style:Object.assign({},btn(true,C.ambT),{width:'100%',fontSize:12,marginTop:7})},'Save Note ✓'),
       Object.entries(st.notes||{}).filter(function(e){return e[0]!==nDate;}).sort(function(a,b){return b[0].localeCompare(a[0]);}).slice(0,5).map(function(e){var date=e[0],note=e[1];return h('div',{key:date,onClick:function(){setNDate(date);},style:cs(C,{marginBottom:6,cursor:'pointer',padding:'10px 13px',marginTop:6})},h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:3}},h('span',{style:{fontSize:12,color:C.txt}},date),note.mood&&h('span',{style:{fontSize:10,color:C.ambT}},note.mood)),h('div',{style:{fontSize:11,color:C.dim,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},note.text||'No text'));}),
-      SH('🤖','Reflection Companion',C.telT),
-      h('div',{style:card()},h(NotesBot,{st:st,C:C}))
+
     );
 
     if(tab==='game') return h('div',null,
@@ -1065,6 +1097,19 @@ function App(){
     if(tab==='settings') return h('div',null,
       SH('🌓','Appearance',C.dim),
       h('div',{style:cs(C,{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12})},h('span',{style:{fontSize:13,color:C.txt}},'Theme'),h('div',{style:{display:'flex',gap:7}},['dark','light'].map(function(t){return h('button',{key:t,onClick:function(){setSt(function(p){return Object.assign({},p,{theme:t});});},style:Object.assign({},btn(st.theme===t),{fontSize:12,padding:'6px 13px'})},t==='dark'?'🌙 Dark':'☀️ Light');}))),
+      SH('🎯','Streak Threshold',C.gold),
+      h('div',{style:cs(C,{marginBottom:12})},
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'How many standard quests must you complete to count a day toward your streak? Set 0 for all quests required. Bonus quests never count.'),
+        h('div',{style:{display:'flex',alignItems:'center',gap:12}}),
+        h('div',{style:{display:'flex',alignItems:'center',gap:10}},
+          h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{streakMin:Math.max(0,(p.streakMin||0)-1)});});},style:Object.assign({},btn(false),{padding:'8px 14px',fontSize:16})},'-'),
+          h('div',{style:{flex:1,textAlign:'center'}},
+            h('div',{style:{fontSize:24,fontWeight:'bold',color:C.gold}},st.streakMin===0?'ALL':st.streakMin),
+            h('div',{style:{fontSize:10,color:C.dim}},st.streakMin===0?'all standard quests required':st.streakMin+' / '+(([].concat(st.habits,st.prayers,st.life)).length)+' quests needed')
+          ),
+          h('button',{onClick:function(){setSt(function(p){var max=[].concat(p.habits,p.prayers,p.life).length;return Object.assign({},p,{streakMin:Math.min(max,(p.streakMin||0)+1)});});},style:Object.assign({},btn(false),{padding:'8px 14px',fontSize:16})},'+')
+        )
+      ),
       SH('🔔','Notifications',C.telT),
       h('div',{style:cs(C,{marginBottom:12})},
         h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'For iPhone: add to Home Screen first (iOS 16.4+). For Android: use Chrome. Grant permission when prompted.'),
