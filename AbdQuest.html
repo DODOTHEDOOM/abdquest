@@ -68,58 +68,43 @@ button{-webkit-appearance:none;cursor:pointer;}
 <div style="font-size:20px;font-weight:bold;letter-spacing:0.1em">ABD'S QUEST</div>
 <div style="font-size:13px;color:#6b5b3e" id="status">Loading...</div>
 </div>
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<!-- Firebase via REST API — no SDK needed -->
 <script>
-// Firebase — fully wrapped, never crashes the app
-window.fbReady=false;
+// Firebase REST API — no SDK, no external scripts, no crashes
+// Uses Firebase Realtime Database REST API directly via fetch
+var FB_URL='https://abdquest-a58e8-default-rtdb.europe-west1.firebasedatabase.app/users/dodo/state.json';
+var FB_KEY='AIzaSyBF6pPB-gmYPsOkqpdDO9G31lHY8i1YuKw';
+window.fbReady=true;
 window.fbSaveTimer=null;
 
 function fbSave(state){
-  if(!window.fbReady)return;
   if(window.fbSaveTimer)clearTimeout(window.fbSaveTimer);
   window.fbSaveTimer=setTimeout(function(){
     try{
       var clean=JSON.parse(JSON.stringify(state));
-      firebase.database().ref('users/dodo/state').set(clean)
-        .then(function(){console.log('[FB] Saved');})
+      fetch(FB_URL+'?auth='+FB_KEY,{
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(clean)
+      }).then(function(){console.log('[FB] Saved to cloud');})
         .catch(function(e){console.warn('[FB] Save failed:',e);});
-    }catch(e){console.warn('[FB] Save error:',e);}
-  },4000);
+    }catch(e){console.warn('[FB] fbSave error:',e);}
+  },5000);
 }
 
 function fbLoad(){
-  if(!window.fbReady)return Promise.resolve(null);
-  return firebase.database().ref('users/dodo/state').once('value')
-    .then(function(snap){
-      var d=snap.val();
-      return(d&&typeof d==='object')?d:null;
+  return fetch(FB_URL+'?auth='+FB_KEY)
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&typeof d==='object'&&!d.error)return d;
+      return null;
     })
     .catch(function(e){
       console.warn('[FB] Load failed:',e);
       return null;
     });
 }
-
-// Init Firebase safely — if it fails, app still works
-try{
-  var firebaseConfig={
-    apiKey:"AIzaSyBF6pPB-gmYPsOkqpdDO9G31lHY8i1YuKw",
-    authDomain:"abdquest-a58e8.firebaseapp.com",
-    databaseURL:"https://abdquest-a58e8-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId:"abdquest-a58e8",
-    storageBucket:"abdquest-a58e8.firebasestorage.app",
-    messagingSenderId:"416326581348",
-    appId:"1:416326581348:web:a33f7b933c862be62ab371"
-  };
-  if(!firebase.apps.length){firebase.initializeApp(firebaseConfig);}
-  window.fbReady=true;
-  console.log('[FB] Firebase ready');
-}catch(e){
-  console.warn('[FB] Firebase init failed — app will run offline only:',e);
-  window.fbReady=false;
-}
+console.log('[FB] Firebase REST ready');
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="document.getElementById('status').textContent='Failed to load — check internet'"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -717,27 +702,9 @@ function App(){
   useEffect(function(){var iv=setInterval(function(){savBak(st);},30000);return function(){clearInterval(iv);};},[st]);
   useEffect(function(){var fn=function(){savMain(st);savBak(st);};window.addEventListener('beforeunload',fn);return function(){window.removeEventListener('beforeunload',fn);};},[st]);
 
-  // Load from Firebase on first mount — fully safe, never blocks render
-  useEffect(function(){
-    if(!window.fbReady)return;
-    // Delay 2 seconds after render so app is stable first
-    var t=setTimeout(function(){
-      try{
-        fbLoad().then(function(cloudData){
-          try{
-            if(!cloudData)return;
-            var localXp=st.xp||0;
-            var cloudXp=cloudData.xp||0;
-            if(cloudXp>localXp||localXp===0){
-              setSt(function(){return Object.assign({},cloudData);});
-              showT('☁️ Data restored from cloud!','gold');
-            }
-          }catch(e){console.warn('[FB] Merge failed:',e);}
-        }).catch(function(e){console.warn('[FB] Load failed:',e);});
-      }catch(e){console.warn('[FB] Load call failed:',e);}
-    },2000);
-    return function(){clearTimeout(t);};
-  },[]);
+  // Firebase cloud restore is MANUAL only (button in Settings)
+  // This avoids any async fetch on mount that could cause black screen on iOS
+  // Auto-save still works silently in the background via savMain
 
   // Notification setup
   useEffect(function(){
