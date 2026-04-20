@@ -1453,21 +1453,38 @@ function App(){
             h('div',{style:{fontSize:11,color:C.dim}},'Your data syncs to Google cloud automatically every 3 seconds after a change.')
           )
         ),
-        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Your data is stored at: Firebase → Realtime Database → users/dodo/state. It survives phone changes, reinstalls, and everything.'),
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Auto-saves to cloud every 5 seconds after a change. To restore on iPhone: open in Safari (not home screen) then tap Restore.'),
+        window.navigator&&window.navigator.standalone&&h('div',{style:{fontSize:11,color:C.ambT,marginBottom:10,padding:'7px 10px',borderRadius:6,background:C.amb+'33',border:'1px solid '+C.ambT+'44'}},'⚠ You are in home screen mode. To restore from cloud, open this URL in Safari first: dodothedoom.github.io/abdquest/AbdQuest.html'),
         h('button',{onClick:function(){
+          // On iOS standalone (home screen app), fetch can crash
+          // Detect standalone mode and redirect to Safari instead
+          var isStandalone=window.navigator.standalone===true;
+          if(isStandalone){
+            // Can't safely fetch in standalone — open in Safari to restore
+            showT('Open in Safari to restore from cloud (tap ··· → Open in Safari)','info');
+            return;
+          }
           if(!window.fbReady){showT('Firebase not available','red');return;}
-          fbLoad().then(function(d){
-            if(d){setSt(d);showT('☁️ Restored from cloud!','gold');}
-            else{showT('No cloud data found yet','info');}
-          });
-        },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬇️ Restore from Cloud Now'),
+          try{
+            fbLoad().then(function(d){
+              if(d){setSt(d);showT('☁️ Restored from cloud!','gold');}
+              else{showT('No cloud data found yet','info');}
+            }).catch(function(e){showT('Restore failed — check internet','red');console.warn(e);});
+          }catch(e){showT('Restore failed','red');console.warn(e);}
+        },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬇️ Restore from Cloud'),
         h('button',{onClick:function(){
           if(!window.fbReady){showT('Firebase not available','red');return;}
           if(window.fbSaveTimer)clearTimeout(window.fbSaveTimer);
-          db.ref(FB_PATH).set(JSON.parse(JSON.stringify(st)))
-            .then(function(){showT('☁️ Saved to cloud!','gold');})
-            .catch(function(){showT('Cloud save failed — check internet','red');});
-        },style:Object.assign({},btn(false,C.grnT),{width:'100%',fontSize:12})},'⬆️ Force Save to Cloud Now')
+          try{
+            var clean=JSON.parse(JSON.stringify(st));
+            fetch(FB_URL+'?auth='+FB_KEY,{
+              method:'PUT',
+              headers:{'Content-Type':'application/json'},
+              body:JSON.stringify(clean)
+            }).then(function(){showT('☁️ Saved to cloud!','gold');})
+              .catch(function(){showT('Save failed — check internet','red');});
+          }catch(e){showT('Save failed','red');console.warn(e);}
+        },style:Object.assign({},btn(false,C.grnT),{width:'100%',fontSize:12})},'⬆️ Force Save to Cloud')
       ),
       SH('💾','Backup & Restore',C.telT),
       h('div',{style:cs(C,{marginBottom:12})},
