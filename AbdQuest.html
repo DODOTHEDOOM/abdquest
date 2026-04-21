@@ -1374,13 +1374,16 @@ function App(){
           h('input',{value:newExName,onChange:function(ev){setNewExName(ev.target.value);},placeholder:'Exercise name...',style:Object.assign({},ins(C),{flex:1})}),
           h('button',{onClick:function(){
             if(!newExName.trim())return;
-            var icon=window.prompt('Icon (emoji):','💪')||'💪';
-            var repsFor=parseInt(window.prompt('Target amount (e.g. 10 reps):','10'))||10;
-            var unit=window.prompt('Unit (reps/mins/km):','reps')||'reps';
-            var xpPer=parseInt(window.prompt('XP per target:','10'))||10;
-            var nex={id:'ex_'+Date.now(),name:newExName.trim(),icon:icon,xpPer:xpPer,repsFor:repsFor,unit:unit,dailyReps:0};
-            setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).concat([nex])});});
-            setNewExName('');showT(newExName+' added!','gold');
+            try{
+              var icon='💪';var repsFor=10;var unit='reps';var xpPer=10;
+              try{icon=window.prompt('Icon (emoji):','💪')||'💪';}catch(e){}
+              try{repsFor=parseInt(window.prompt('Target amount (e.g. 10 reps):','10'))||10;}catch(e){}
+              try{unit=window.prompt('Unit (reps/mins/km):','reps')||'reps';}catch(e){}
+              try{xpPer=parseInt(window.prompt('XP per target:','10'))||10;}catch(e){}
+              var nex={id:'ex_'+Date.now(),name:newExName.trim(),icon:icon,xpPer:xpPer,repsFor:repsFor,unit:unit,dailyReps:0};
+              setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).concat([nex])});});
+              setNewExName('');showT(newExName+' added!','gold');
+            }catch(e){showT('Error adding exercise','red');}
           },style:Object.assign({},btn(true,C.gold),{fontSize:11,whiteSpace:'nowrap'})},'+ Add')
         )
       ),
@@ -1390,7 +1393,7 @@ function App(){
           [{k:'name',l:'Name',t:'text'},{k:'icon',l:'Icon',t:'text'},{k:'repsFor',l:'Target amount',t:'number'},{k:'unit',l:'Unit (reps/mins/km)',t:'text'},{k:'xpPer',l:'XP per target',t:'number'}].map(function(f){return h('div',{key:f.k,style:{marginBottom:10}},h('div',{style:{fontSize:10,color:C.dim,marginBottom:3}},f.l.toUpperCase()),h('input',{type:f.t,value:exEdit[f.k]||'',onChange:function(ev){setExEdit(function(p){var n=Object.assign({},p);n[f.k]=f.t==='number'?Number(ev.target.value):ev.target.value;return n;});},style:ins(C)}));}),
           h('div',{style:{display:'flex',gap:8,marginTop:12}},
             h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).map(function(ex){return ex.id===exEdit.id?exEdit:ex;})});});setExEdit(null);showT('Saved!','gold');},style:Object.assign({},btn(true),{flex:1})},'Save'),
-            h('button',{onClick:function(){if(window.confirm('Delete '+exEdit.name+'?')){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).filter(function(ex){return ex.id!==exEdit.id;})});});}setExEdit(null);},style:Object.assign({},btn(false,C.redT),{flex:1,color:C.redT})},'Delete'),
+            h('button',{onClick:function(){try{if(window.confirm('Delete '+exEdit.name+'?')){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).filter(function(ex){return ex.id!==exEdit.id;})});});}}catch(e){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).filter(function(ex){return ex.id!==exEdit.id;})});});}setExEdit(null);},style:Object.assign({},btn(false,C.redT),{flex:1,color:C.redT})},'Delete'),
             h('button',{onClick:function(){setExEdit(null);},style:Object.assign({},btn(false),{flex:1})},'Cancel')
           )
         )
@@ -1550,7 +1553,7 @@ function App(){
                 }catch(e){showT('Restore failed','red');}
               },style:Object.assign({},btn(false,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬇️ Restore from GitHub'),
               h('button',{onClick:function(){
-                if(window.confirm('Remove token? Cloud sync will stop.')){
+                var doRemove=false;try{doRemove=window.confirm('Remove token? Cloud sync will stop.');}catch(e){doRemove=true;}if(doRemove){
                   ghSetToken('');
                   showT('Token removed','info');
                   setSt(function(p){return Object.assign({},p,{_ghSync:0});});
@@ -1581,28 +1584,34 @@ function App(){
             h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).filter(function(_,j){return j!==si;})});});},style:{background:'none',border:'none',color:C.redT,fontSize:16,cursor:'pointer'}},'×')
           ),
           h('button',{onClick:function(){
-            var qname=window.prompt('Quest name:');if(!qname)return;
-            var qicon=window.prompt('Icon (emoji):','⭐');
-            var qxp=parseInt(window.prompt('XP value:','20'))||20;
-            var qbonus=window.confirm('Bonus quest? (OK=bonus/no penalty, Cancel=standard)');
-            var nq={id:'cq'+Date.now(),label:qname,icon:qicon||'⭐',xp:qxp,desc:'Custom quest',bonus:qbonus};
-            setSt(function(p){var secs=(p.customSections||[]).map(function(s,j){if(j!==si)return s;return Object.assign({},s,{quests:(s.quests||[]).concat([nq])});});return Object.assign({},p,{customSections:secs});});
+            try{
+              var qname=window.prompt('Quest name:');if(!qname)return;
+              var qicon=window.prompt('Icon (emoji):','⭐')||'⭐';
+              var qxp=parseInt(window.prompt('XP value:','20'))||20;
+              var qbonus=window.confirm('Bonus quest? OK=no penalty, Cancel=standard with penalty');
+              var nq={id:'cq'+Date.now(),label:qname,icon:qicon,xp:qxp,desc:'Custom quest',bonus:qbonus};
+              setSt(function(p){var secs=(p.customSections||[]).map(function(s,j){if(j!==si)return s;return Object.assign({},s,{quests:(s.quests||[]).concat([nq])});});return Object.assign({},p,{customSections:secs});});
+            }catch(e){showT('Use Safari to add quests — prompts blocked in home screen mode','info');}
           },style:Object.assign({},btn(true,C.purT),{width:'100%',fontSize:11})},'+ Add Quest to '+sec.name)
         );}),
         h('div',{style:{display:'flex',gap:7,marginTop:8}},
           h('input',{id:'newSecName',placeholder:'New section name...',style:Object.assign({},ins(C),{flex:1})}),
           h('button',{onClick:function(){
-            var el=document.getElementById('newSecName');
-            var name=el.value.trim();if(!name)return;
-            var icon=window.prompt('Section icon (emoji):','📌')||'📌';
-            var ns={id:'cs'+Date.now(),name:name,icon:icon,quests:[]};
-            setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).concat([ns])});});
-            el.value='';
-            showT('Section "'+name+'" created!','gold');
+            try{
+              var el=document.getElementById('newSecName');
+              if(!el)return;
+              var name=el.value.trim();if(!name)return;
+              var icon='📌';
+              try{icon=window.prompt('Section icon (emoji):','📌')||'📌';}catch(pe){icon='📌';}
+              var ns={id:'cs'+Date.now(),name:name,icon:icon,quests:[]};
+              setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).concat([ns])});});
+              el.value='';
+              showT('Section "'+name+'" created!','gold');
+            }catch(e){showT('Could not create section','red');}
           },style:Object.assign({},btn(true,C.purT),{fontSize:11,whiteSpace:'nowrap'})},'+ Create Section')
         )
       ),
-      h('div',{style:{borderTop:'1px solid '+C.bdr,paddingTop:14}},h('button',{onClick:function(){if(window.confirm('Reset ALL progress? Cannot be undone.')){localStorage.removeItem(MAIN_KEY);localStorage.removeItem(BAK_KEY);window.location.reload();}},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'⚠ Reset All Progress'))
+      h('div',{style:{borderTop:'1px solid '+C.bdr,paddingTop:14}},h('button',{onClick:function(){try{if(window.confirm('Reset ALL progress? Cannot be undone.')){localStorage.removeItem(MAIN_KEY);localStorage.removeItem(BAK_KEY);window.location.reload();}}catch(e){localStorage.removeItem(MAIN_KEY);localStorage.removeItem(BAK_KEY);window.location.reload();}},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'⚠ Reset All Progress'))
     );
   }
 
