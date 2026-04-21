@@ -70,41 +70,92 @@ button{-webkit-appearance:none;cursor:pointer;}
 </div>
 <!-- Firebase via REST API — no SDK needed -->
 <script>
-// Firebase REST API — no SDK, no external scripts, no crashes
-// Uses Firebase Realtime Database REST API directly via fetch
-var FB_URL='https://abdquest-a58e8-default-rtdb.europe-west1.firebasedatabase.app/users/dodo/state.json';
-var FB_KEY='AIzaSyBF6pPB-gmYPsOkqpdDO9G31lHY8i1YuKw';
-window.fbReady=true;
-window.fbSaveTimer=null;
+// GitHub API sync — user provides their own token, stored in localStorage only
+// Token never leaves the device except to go directly to GitHub API
+var GH_OWNER='dodothedoom';
+var GH_REPO='abdquest';
+var GH_FILE='abdquest_data.json';
+var GH_API='https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+GH_FILE;
+window.ghSaveTimer=null;
 
-function fbSave(state){
-  if(window.fbSaveTimer)clearTimeout(window.fbSaveTimer);
-  window.fbSaveTimer=setTimeout(function(){
+function ghGetToken(){
+  try{return localStorage.getItem('abdquest_gh_token')||'';}catch(e){return '';}
+}
+function ghSetToken(t){
+  try{localStorage.setItem('abdquest_gh_token',t);}catch(e){}
+}
+
+// Get current file SHA (needed for updates)
+function ghGetSHA(token){
+  return fetch(GH_API,{
+    headers:{
+      'Authorization':'token '+token,
+      'Accept':'application/vnd.github.v3+json'
+    }
+  }).then(function(r){
+    if(r.status===404)return null;
+    return r.json().then(function(d){return d.sha||null;});
+  }).catch(function(){return null;});
+}
+
+// Save to GitHub
+function ghSave(state){
+  var token=ghGetToken();
+  if(!token)return;
+  if(window.ghSaveTimer)clearTimeout(window.ghSaveTimer);
+  window.ghSaveTimer=setTimeout(function(){
     try{
-      var clean=JSON.parse(JSON.stringify(state));
-      fetch(FB_URL+'?auth='+FB_KEY,{
-        method:'PUT',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(clean)
-      }).then(function(){console.log('[FB] Saved to cloud');})
-        .catch(function(e){console.warn('[FB] Save failed:',e);});
-    }catch(e){console.warn('[FB] fbSave error:',e);}
-  },5000);
+      var clean=JSON.stringify(state);
+      var encoded=btoa(unescape(encodeURIComponent(clean)));
+      ghGetSHA(token).then(function(sha){
+        var body={
+          message:'Abd Quest auto-save '+new Date().toISOString(),
+          content:encoded
+        };
+        if(sha)body.sha=sha;
+        return fetch(GH_API,{
+          method:'PUT',
+          headers:{
+            'Authorization':'token '+token,
+            'Accept':'application/vnd.github.v3+json',
+            'Content-Type':'application/json'
+          },
+          body:JSON.stringify(body)
+        });
+      }).then(function(r){
+        if(r&&r.ok)console.log('[GH] Saved to GitHub');
+        else console.warn('[GH] Save failed');
+      }).catch(function(e){console.warn('[GH] Save error:',e);});
+    }catch(e){console.warn('[GH] Save error:',e);}
+  },8000);
 }
 
-function fbLoad(){
-  return fetch(FB_URL+'?auth='+FB_KEY)
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(d&&typeof d==='object'&&!d.error)return d;
-      return null;
-    })
-    .catch(function(e){
-      console.warn('[FB] Load failed:',e);
-      return null;
-    });
+// Load from GitHub
+function ghLoad(){
+  var token=ghGetToken();
+  if(!token)return Promise.resolve(null);
+  return fetch(GH_API,{
+    headers:{
+      'Authorization':'token '+token,
+      'Accept':'application/vnd.github.v3+json'
+    }
+  }).then(function(r){
+    if(!r.ok)return null;
+    return r.json();
+  }).then(function(d){
+    if(!d||!d.content)return null;
+    var decoded=decodeURIComponent(escape(atob(d.content.replace(/
+/g,''))));
+    var parsed=JSON.parse(decoded);
+    if(parsed&&typeof parsed==='object')return parsed;
+    return null;
+  }).catch(function(e){
+    console.warn('[GH] Load failed:',e);
+    return null;
+  });
 }
-console.log('[FB] Firebase REST ready');
+window.fbReady=true;
+console.log('[GH] GitHub sync ready');
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="document.getElementById('status').textContent='Failed to load — check internet'"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -178,7 +229,7 @@ var MAIN_KEY='abdquest_v2',BAK_KEY='abdquest_v2_backup';
 function vState(s){return s&&typeof s==='object'&&['xp','streak','done','habits','prayers'].every(function(k){return k in s;});}
 function savMain(s){
   try{localStorage.setItem(MAIN_KEY,JSON.stringify(s));}catch(e){}
-  try{if(window.fbReady)fbSave(s);}catch(e){console.warn('[FB] savMain fb error:',e);}
+  try{if(ghGetToken())ghSave(s);}catch(e){console.warn('[GH] savMain error:',e);}
 }
 function savBak(s){try{localStorage.setItem(BAK_KEY,JSON.stringify(s));}catch(e){}}
 function loadSafe(){
@@ -1444,47 +1495,70 @@ function App(){
         h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'For iPhone: add to Home Screen first (iOS 16.4+). For Android: use Chrome. Grant permission when prompted.'),
         h('button',{onClick:function(){if(typeof Notification==='undefined'){showT('Not supported on this browser','red');return;}Notification.requestPermission().then(function(r){if(r==='granted'){schedNudge();showT('Notifications enabled ✓','gold');}else{showT('Denied — check Settings → Abd\'s Quest → Notifications','red');}});},style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:12})},'Enable Notifications')
       ),
-      SH('☁️','Cloud Sync — Firebase',C.grnT),
-      h('div',{style:cs(C,{marginBottom:12,background:C.grn+'11',border:'1px solid '+C.grn+'44'})},
-        h('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:10}},
-          h('div',{style:{fontSize:22}},'☁️'),
-          h('div',null,
-            h('div',{style:{fontSize:13,color:C.grnT,fontWeight:'bold'}},'Firebase Active'),
-            h('div',{style:{fontSize:11,color:C.dim}},'Your data syncs to Google cloud automatically every 3 seconds after a change.')
-          )
-        ),
-        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Auto-saves to cloud every 5 seconds after a change. To restore on iPhone: open in Safari (not home screen) then tap Restore.'),
-        window.navigator&&window.navigator.standalone&&h('div',{style:{fontSize:11,color:C.ambT,marginBottom:10,padding:'7px 10px',borderRadius:6,background:C.amb+'33',border:'1px solid '+C.ambT+'44'}},'⚠ You are in home screen mode. To restore from cloud, open this URL in Safari first: dodothedoom.github.io/abdquest/AbdQuest.html'),
-        h('button',{onClick:function(){
-          // On iOS standalone (home screen app), fetch can crash
-          // Detect standalone mode and redirect to Safari instead
-          var isStandalone=window.navigator.standalone===true;
-          if(isStandalone){
-            // Can't safely fetch in standalone — open in Safari to restore
-            showT('Open in Safari to restore from cloud (tap ··· → Open in Safari)','info');
-            return;
-          }
-          if(!window.fbReady){showT('Firebase not available','red');return;}
-          try{
-            fbLoad().then(function(d){
-              if(d){setSt(d);showT('☁️ Restored from cloud!','gold');}
-              else{showT('No cloud data found yet','info');}
-            }).catch(function(e){showT('Restore failed — check internet','red');console.warn(e);});
-          }catch(e){showT('Restore failed','red');console.warn(e);}
-        },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬇️ Restore from Cloud'),
-        h('button',{onClick:function(){
-          if(!window.fbReady){showT('Firebase not available','red');return;}
-          if(window.fbSaveTimer)clearTimeout(window.fbSaveTimer);
-          try{
-            var clean=JSON.parse(JSON.stringify(st));
-            fetch(FB_URL+'?auth='+FB_KEY,{
-              method:'PUT',
-              headers:{'Content-Type':'application/json'},
-              body:JSON.stringify(clean)
-            }).then(function(){showT('☁️ Saved to cloud!','gold');})
-              .catch(function(){showT('Save failed — check internet','red');});
-          }catch(e){showT('Save failed','red');console.warn(e);}
-        },style:Object.assign({},btn(false,C.grnT),{width:'100%',fontSize:12})},'⬆️ Force Save to Cloud')
+      SH('☁️','GitHub Cloud Sync',C.grnT),
+      h('div',{style:cs(C,{marginBottom:12})},
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Your data saves automatically to your GitHub repo. Enter your Personal Access Token once — it stays on your device only and never goes anywhere except directly to GitHub.'),
+        (function(){
+          var tok=ghGetToken();
+          var hasToken=tok&&tok.length>10;
+          return h('div',null,
+            !hasToken&&h('div',null,
+              h('div',{style:{fontSize:12,color:C.ambT,marginBottom:8,fontWeight:'bold'}},'⚠ No token set — cloud sync not active'),
+              h('div',{style:{fontSize:11,color:C.dim,marginBottom:8}},'Paste your GitHub Personal Access Token below. Get it from github.com → Settings → Developer Settings → Personal Access Tokens → Tokens (classic).'),
+              h('input',{id:'ghTokenIn',type:'password',placeholder:'ghp_xxxxxxxxxxxx...',style:Object.assign({},ins(C),{marginBottom:7,fontFamily:'monospace'})}),
+              h('button',{onClick:function(){
+                var el=document.getElementById('ghTokenIn');
+                var t=(el&&el.value)||'';
+                if(!t||t.length<10){showT('Invalid token','red');return;}
+                ghSetToken(t);
+                el.value='';
+                showT('✓ Token saved! Cloud sync now active.','gold');
+                setSt(function(p){return Object.assign({},p,{_ghSync:Date.now()});});
+              },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12})},'Save Token & Activate Sync')
+            ),
+            hasToken&&h('div',null,
+              h('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:10}},
+                h('div',{style:{fontSize:20}},'✅'),
+                h('div',null,
+                  h('div',{style:{fontSize:13,color:C.grnT,fontWeight:'bold'}},'Cloud sync active'),
+                  h('div',{style:{fontSize:11,color:C.dim}},'Auto-saves to github.com/dodothedoom/abdquest every 8 seconds after a change')
+                )
+              ),
+              h('button',{onClick:function(){
+                try{
+                  showT('Saving to GitHub...','info');
+                  var clean=JSON.parse(JSON.stringify(st));
+                  var encoded=btoa(unescape(encodeURIComponent(JSON.stringify(clean))));
+                  var token=ghGetToken();
+                  ghGetSHA(token).then(function(sha){
+                    var body={message:'Abd Quest manual save',content:encoded};
+                    if(sha)body.sha=sha;
+                    return fetch(GH_API,{method:'PUT',headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});
+                  }).then(function(r){
+                    if(r&&r.ok)showT('☁️ Saved to GitHub!','gold');
+                    else showT('Save failed — check token','red');
+                  }).catch(function(){showT('Save failed — check internet','red');});
+                }catch(e){showT('Save failed','red');}
+              },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬆️ Save to GitHub Now'),
+              h('button',{onClick:function(){
+                try{
+                  showT('Loading from GitHub...','info');
+                  ghLoad().then(function(d){
+                    if(d){setSt(d);showT('☁️ Restored from GitHub!','gold');}
+                    else showT('No data found on GitHub yet','info');
+                  }).catch(function(){showT('Restore failed — check internet','red');});
+                }catch(e){showT('Restore failed','red');}
+              },style:Object.assign({},btn(false,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬇️ Restore from GitHub'),
+              h('button',{onClick:function(){
+                if(window.confirm('Remove token? Cloud sync will stop.')){
+                  ghSetToken('');
+                  showT('Token removed','info');
+                  setSt(function(p){return Object.assign({},p,{_ghSync:0});});
+                }
+              },style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:11,color:C.redT})},'Remove Token')
+            )
+          );
+        })()
       ),
       SH('💾','Backup & Restore',C.telT),
       h('div',{style:cs(C,{marginBottom:12})},
