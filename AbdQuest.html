@@ -783,87 +783,9 @@ function App(){
   useEffect(function(){nudgeRef.current=setInterval(function(){setNudge(NUDGES[Math.floor(Math.random()*NUDGES.length)]);},2*60*60*1000);return function(){clearInterval(nudgeRef.current);};},[]);
 
 
-  // Smart challenge auto-tracking — daily + weekly
-  useEffect(function(){
-    var td=today();
-    var mon=getWeekMon();
-    var weekDates=[];
-    var md=new Date(mon);
-    for(var wi=0;wi<7;wi++){var dd=new Date(md);dd.setDate(md.getDate()+wi);weekDates.push(dd.toISOString().split('T')[0]);}
-    var updates={};
-    var xpGain=0;
 
-    // ── Daily challenge auto-check ──
-    var dch=getDailyCh(td);
-    if(!(st.dailyChDone||{})[td]){
-      var autoComplete=false;
-      var dl=dch.label.toLowerCase();
-      // All 5 prayers ticked today
-      if(dl.indexOf('prayer')>=0||dl.indexOf('prayers')>=0){
-        if(PIDs.every(function(p){return !!st.done[p];}))autoComplete=true;
-      }
-      // No junk food
-      if(dl.indexOf('junk')>=0&&st.done['nojunk'])autoComplete=true;
-      // Drink 3L / 2L water
-      if(dl.indexOf('water')>=0||dl.indexOf('3l')>=0||dl.indexOf('2l')>=0){
-        if((st.waterToday||0)>=(st.waterTarget||3000))autoComplete=true;
-      }
-      // Log weight
-      if(dl.indexOf('weight')>=0||(dl.indexOf('log')>=0&&dl.indexOf('weigh')>=0)){
-        if((st.wtLog||[]).find(function(w){return w.date===td;}))autoComplete=true;
-      }
-      // Read Quran 20 mins
-      if(dl.indexOf('quran')>=0&&st.done['quran'])autoComplete=true;
-      // Sleep before midnight (checked from sleep log)
-      if(dl.indexOf('midnight')>=0||dl.indexOf('sleep before')>=0){
-        var todSl=(st.sleepLog||[]).find(function(s){return s.date===td;});
-        if(todSl&&todSl.slept){var sh=parseInt(todSl.slept.split(':')[0]);if(sh>=22||sh<1)autoComplete=true;}
-      }
-      if(autoComplete){
-        updates['__daily_'+td]=true;
-        xpGain+=dch.xp;
-        showT('⚡ Daily challenge auto-completed! +'+dch.xp+' XP','gold');
-      }
-    }
-
-    // ── Weekly challenge auto-check ──
-    // Sleep 7 nights before 1AM
-    var sleepGood=(st.sleepLog||[]).filter(function(s){
-      if(!s.slept)return false;
-      var sh=parseInt(s.slept.split(':')[0]);
-      return sh>=22||sh<1;
-    }).length;
-    // Water 7 days at target
-    var waterGood=weekDates.filter(function(d){
-      var w=(st.waterLog||[]).find(function(wl){return wl.date===d;});
-      return w&&w.ml>=(st.waterTarget||3000);
-    }).length;
-    // Calories 6/7 days
-    var calGood=weekDates.filter(function(d){
-      var c=(st.calLog||[]).find(function(cl){return cl.date===d;});
-      return c&&c.cal>0&&c.cal<=st.calTarget;
-    }).length;
-    // Prayers — all 5 every day this week
-    var prayerGood=weekDates.filter(function(d){
-      var logEntry=st.log.find(function(l){return l.date===d;});
-      return logEntry&&PIDs.every(function(p){return logEntry.done&&logEntry.done[p];});
-    }).length;
-
-    if(sleepGood>=7&&!(st.weeklyChDone||{})['auto_sleep7_'+mon]){updates['auto_sleep7_'+mon]=true;xpGain+=300;showT('🌙 Auto: Sleep challenge complete! +300 XP','gold');}
-    if(waterGood>=7&&!(st.weeklyChDone||{})['auto_water7_'+mon]){updates['auto_water7_'+mon]=true;xpGain+=280;showT('💧 Auto: Water challenge complete! +280 XP','gold');}
-    if(calGood>=6&&!(st.weeklyChDone||{})['auto_cal6_'+mon]){updates['auto_cal6_'+mon]=true;xpGain+=300;showT('🍗 Auto: Calorie challenge complete! +300 XP','gold');}
-    if(prayerGood>=7&&!(st.weeklyChDone||{})['auto_prayer7_'+mon]){updates['auto_prayer7_'+mon]=true;xpGain+=700;showT('🕌 Auto: All prayers every day this week! +700 XP','gold');}
-
-    if(Object.keys(updates).length>0||xpGain>0){
-      setSt(function(p){
-        var newChDone=Object.assign({},p.dailyChDone||{});
-        if(updates['__daily_'+td])newChDone[td]=true;
-        var newWkDone=Object.assign({},p.weeklyChDone||{});
-        Object.keys(updates).forEach(function(k){if(k!=='__daily_'+td)newWkDone[k]=true;});
-        return Object.assign({},p,{xp:p.xp+xpGain,dailyChDone:newChDone,weeklyChDone:newWkDone});
-      });
-    }
-  },[st.done,st.sleepLog,st.waterLog,st.calLog,st.waterToday]);
+  // Smart auto-tracking removed — manual challenge completion only
+  
 
   function doExercise(ex,amount){
     var td=today();
