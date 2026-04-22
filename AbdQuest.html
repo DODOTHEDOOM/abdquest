@@ -1315,7 +1315,7 @@ function App(){
           [{k:'name',l:'Name',t:'text'},{k:'icon',l:'Icon',t:'text'},{k:'repsFor',l:'Target amount',t:'number'},{k:'unit',l:'Unit (reps/mins/km)',t:'text'},{k:'xpPer',l:'XP per target',t:'number'}].map(function(f){return h('div',{key:f.k,style:{marginBottom:10}},h('div',{style:{fontSize:10,color:C.dim,marginBottom:3}},f.l.toUpperCase()),h('input',{type:f.t,value:exEdit[f.k]||'',onChange:function(ev){setExEdit(function(p){var n=Object.assign({},p);n[f.k]=f.t==='number'?Number(ev.target.value):ev.target.value;return n;});},style:ins(C)}));}),
           h('div',{style:{display:'flex',gap:8,marginTop:12}},
             h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).map(function(ex){return ex.id===exEdit.id?exEdit:ex;})});});setExEdit(null);showT('Saved!','gold');},style:Object.assign({},btn(true),{flex:1})},'Save'),
-            h('button',{onClick:function(){try{if(window.confirm('Delete '+exEdit.name+'?')){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).filter(function(ex){return ex.id!==exEdit.id;})});});}}catch(e){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).filter(function(ex){return ex.id!==exEdit.id;})});});}setExEdit(null);},style:Object.assign({},btn(false,C.redT),{flex:1,color:C.redT})},'Delete'),
+            h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{exercises:(p.exercises||[]).filter(function(ex){return ex.id!==exEdit.id;})});});setExEdit(null);showT('Exercise deleted','info');},style:Object.assign({},btn(false,C.redT),{flex:1,color:C.redT})},'Delete'),
             h('button',{onClick:function(){setExEdit(null);},style:Object.assign({},btn(false),{flex:1})},'Cancel')
           )
         )
@@ -1420,71 +1420,6 @@ function App(){
         h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'For iPhone: add to Home Screen first (iOS 16.4+). For Android: use Chrome. Grant permission when prompted.'),
         h('button',{onClick:function(){if(typeof Notification==='undefined'){showT('Not supported on this browser','red');return;}Notification.requestPermission().then(function(r){if(r==='granted'){schedNudge();showT('Notifications enabled ✓','gold');}else{showT('Denied — check Settings → Abd\'s Quest → Notifications','red');}});},style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:12})},'Enable Notifications')
       ),
-      SH('☁️','GitHub Cloud Sync',C.grnT),
-      h('div',{style:cs(C,{marginBottom:12})},
-        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Your data saves automatically to your GitHub repo. Enter your Personal Access Token once — it stays on your device only and never goes anywhere except directly to GitHub.'),
-        (function(){
-          var tok=ghGetToken();
-          var hasToken=tok&&tok.length>10;
-          return h('div',null,
-            !hasToken&&h('div',null,
-              h('div',{style:{fontSize:12,color:C.ambT,marginBottom:8,fontWeight:'bold'}},'⚠ No token set — cloud sync not active'),
-              h('div',{style:{fontSize:11,color:C.dim,marginBottom:8}},'Paste your GitHub Personal Access Token below. Get it from github.com → Settings → Developer Settings → Personal Access Tokens → Tokens (classic).'),
-              h('input',{id:'ghTokenIn',type:'password',placeholder:'ghp_xxxxxxxxxxxx...',style:Object.assign({},ins(C),{marginBottom:7,fontFamily:'monospace'})}),
-              h('button',{onClick:function(){
-                var el=document.getElementById('ghTokenIn');
-                var t=(el&&el.value)||'';
-                if(!t||t.length<10){showT('Invalid token','red');return;}
-                ghSetToken(t);
-                el.value='';
-                showT('✓ Token saved! Cloud sync now active.','gold');
-                setSt(function(p){return Object.assign({},p,{_ghSync:Date.now()});});
-              },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12})},'Save Token & Activate Sync')
-            ),
-            hasToken&&h('div',null,
-              h('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:10}},
-                h('div',{style:{fontSize:20}},'✅'),
-                h('div',null,
-                  h('div',{style:{fontSize:13,color:C.grnT,fontWeight:'bold'}},'Cloud sync active'),
-                  h('div',{style:{fontSize:11,color:C.dim}},'Auto-saves to github.com/dodothedoom/abdquest every 8 seconds after a change')
-                )
-              ),
-              h('button',{onClick:function(){
-                try{
-                  showT('Saving to GitHub...','info');
-                  var clean=JSON.parse(JSON.stringify(st));
-                  var encoded=btoa(unescape(encodeURIComponent(JSON.stringify(clean))));
-                  var token=ghGetToken();
-                  ghGetSHA(token).then(function(sha){
-                    var body={message:'Abd Quest manual save',content:encoded};
-                    if(sha)body.sha=sha;
-                    return fetch(GH_API,{method:'PUT',headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},body:JSON.stringify(body)});
-                  }).then(function(r){
-                    if(r&&r.ok)showT('☁️ Saved to GitHub!','gold');
-                    else showT('Save failed — check token','red');
-                  }).catch(function(){showT('Save failed — check internet','red');});
-                }catch(e){showT('Save failed','red');}
-              },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬆️ Save to GitHub Now'),
-              h('button',{onClick:function(){
-                try{
-                  showT('Loading from GitHub...','info');
-                  ghLoad().then(function(d){
-                    if(d){setSt(d);showT('☁️ Restored from GitHub!','gold');}
-                    else showT('No data found on GitHub yet','info');
-                  }).catch(function(){showT('Restore failed — check internet','red');});
-                }catch(e){showT('Restore failed','red');}
-              },style:Object.assign({},btn(false,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬇️ Restore from GitHub'),
-              h('button',{onClick:function(){
-                var doRemove=false;try{doRemove=window.confirm('Remove token? Cloud sync will stop.');}catch(e){doRemove=true;}if(doRemove){
-                  ghSetToken('');
-                  showT('Token removed','info');
-                  setSt(function(p){return Object.assign({},p,{_ghSync:0});});
-                }
-              },style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:11,color:C.redT})},'Remove Token')
-            )
-          );
-        })()
-      ),
       SH('💾','Backup & Restore',C.telT),
       h('div',{style:cs(C,{marginBottom:12})},
         h('div',{style:{fontSize:11,color:C.dim,marginBottom:11}},'Export your data. Import to restore. Auto-saves to a backup slot every 30s. Always export before updating the app.'),
@@ -1506,34 +1441,26 @@ function App(){
             h('button',{onClick:function(){setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).filter(function(_,j){return j!==si;})});});},style:{background:'none',border:'none',color:C.redT,fontSize:16,cursor:'pointer'}},'×')
           ),
           h('button',{onClick:function(){
-            try{
-              var qname=window.prompt('Quest name:');if(!qname)return;
-              var qicon=window.prompt('Icon (emoji):','⭐')||'⭐';
-              var qxp=parseInt(window.prompt('XP value:','20'))||20;
-              var qbonus=window.confirm('Bonus quest? OK=no penalty, Cancel=standard with penalty');
-              var nq={id:'cq'+Date.now(),label:qname,icon:qicon,xp:qxp,desc:'Custom quest',bonus:qbonus};
-              setSt(function(p){var secs=(p.customSections||[]).map(function(s,j){if(j!==si)return s;return Object.assign({},s,{quests:(s.quests||[]).concat([nq])});});return Object.assign({},p,{customSections:secs});});
-            }catch(e){showT('Use Safari to add quests — prompts blocked in home screen mode','info');}
-          },style:Object.assign({},btn(true,C.purT),{width:'100%',fontSize:11})},'+ Add Quest to '+sec.name)
+            var qname=sec.name+' quest '+((sec.quests||[]).length+1);
+            var nq={id:'cq'+Date.now(),label:qname,icon:'⭐',xp:20,desc:'Custom quest',bonus:false};
+            setSt(function(p){var secs=(p.customSections||[]).map(function(s,j){if(j!==si)return s;return Object.assign({},s,{quests:(s.quests||[]).concat([nq])});});return Object.assign({},p,{customSections:secs});});
+            showT('Quest added — tap Edit to rename it','gold');
+          },style:Object.assign({},btn(true,C.purT),{width:'100%',fontSize:11})},'+ Add Quest (tap Edit to rename)')
         );}),
         h('div',{style:{display:'flex',gap:7,marginTop:8}},
           h('input',{id:'newSecName',placeholder:'New section name...',style:Object.assign({},ins(C),{flex:1})}),
           h('button',{onClick:function(){
-            try{
-              var el=document.getElementById('newSecName');
-              if(!el)return;
-              var name=el.value.trim();if(!name)return;
-              var icon='📌';
-              try{icon=window.prompt('Section icon (emoji):','📌')||'📌';}catch(pe){icon='📌';}
-              var ns={id:'cs'+Date.now(),name:name,icon:icon,quests:[]};
-              setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).concat([ns])});});
-              el.value='';
-              showT('Section "'+name+'" created!','gold');
-            }catch(e){showT('Could not create section','red');}
+            var nameEl=document.getElementById('newSecName');
+            var name=nameEl&&nameEl.value?nameEl.value.trim():'';
+            if(!name){showT('Enter a section name first','info');return;}
+            var ns={id:'cs'+Date.now(),name:name,icon:'📌',quests:[]};
+            setSt(function(p){return Object.assign({},p,{customSections:(p.customSections||[]).concat([ns])});});
+            if(nameEl)nameEl.value='';
+            showT('Section "'+name+'" created!','gold');
           },style:Object.assign({},btn(true,C.purT),{fontSize:11,whiteSpace:'nowrap'})},'+ Create Section')
         )
       ),
-      h('div',{style:{borderTop:'1px solid '+C.bdr,paddingTop:14}},h('button',{onClick:function(){try{if(window.confirm('Reset ALL progress? Cannot be undone.')){localStorage.removeItem(MAIN_KEY);localStorage.removeItem(BAK_KEY);window.location.reload();}}catch(e){localStorage.removeItem(MAIN_KEY);localStorage.removeItem(BAK_KEY);window.location.reload();}},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'⚠ Reset All Progress'))
+      h('div',{style:{borderTop:'1px solid '+C.bdr,paddingTop:14}},h('button',{onClick:function(){localStorage.removeItem(MAIN_KEY);localStorage.removeItem(BAK_KEY);window.location.reload();},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'⚠ Reset All Progress'))
     );
   }
 
