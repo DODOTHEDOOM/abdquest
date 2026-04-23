@@ -26,25 +26,6 @@ button{-webkit-appearance:none;cursor:pointer;}
 </style>
 </head>
 <body>
-<!-- JSONBin setup panel - plain HTML, loads before React, no crashes -->
-<div id="jb-setup" style="display:none;position:fixed;inset:0;background:#0a0a0f;z-index:9999;padding:30px;font-family:Georgia,serif;color:#e8dcc8;overflow-y:auto;">
-  <div style="max-width:440px;margin:0 auto;">
-    <div style="font-size:24px;color:#ffd700;font-weight:bold;margin-bottom:8px;">☁️ Cloud Sync Setup</div>
-    <div style="font-size:13px;color:#6b5b3e;margin-bottom:24px;">Enter your JSONBin details to enable automatic cloud backup. Your keys stay on your device only.</div>
-    <div style="margin-bottom:14px;">
-      <div style="font-size:11px;color:#6b5b3e;letter-spacing:0.1em;margin-bottom:5px;">ACCESS KEY (starts with $2b$)</div>
-      <input id="jb-key" type="password" placeholder="$2b$10$..." style="width:100%;background:#12121a;border:1px solid #2a2a3a;border-radius:6px;padding:10px 12px;color:#e8dcc8;font-size:13px;font-family:monospace;box-sizing:border-box;outline:none;">
-    </div>
-    <div style="margin-bottom:20px;">
-      <div style="font-size:11px;color:#6b5b3e;letter-spacing:0.1em;margin-bottom:5px;">BIN ID (from jsonbin.io)</div>
-      <input id="jb-id" type="text" placeholder="683abc123def456..." style="width:100%;background:#12121a;border:1px solid #2a2a3a;border-radius:6px;padding:10px 12px;color:#e8dcc8;font-size:13px;font-family:monospace;box-sizing:border-box;outline:none;">
-    </div>
-    <button onclick="saveJBConfig()" style="width:100%;background:#ffd70022;border:1px solid #ffd700;border-radius:6px;padding:12px;color:#ffd700;font-size:14px;cursor:pointer;font-family:Georgia,serif;margin-bottom:10px;">Activate Cloud Sync</button>
-    <button onclick="skipJBSetup()" style="width:100%;background:transparent;border:1px solid #2a2a3a;border-radius:6px;padding:10px;color:#6b5b3e;font-size:12px;cursor:pointer;font-family:Georgia,serif;">Skip — use local storage only</button>
-    <div id="jb-msg" style="margin-top:12px;font-size:12px;color:#88dd88;min-height:20px;"></div>
-  </div>
-</div>
-
 <div id="app" style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;background:#0a0a0f;color:#ffd700;font-family:Georgia,serif;">
 <svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
 <rect width="80" height="80" rx="14" fill="#0d0a1e"/>
@@ -181,10 +162,10 @@ console.log('[GH] GitHub sync ready');
 var JB_URL='https://api.jsonbin.io/v3/b/';
 var jbSaveTimer=null;
 
-function jbGetKey(){try{return localStorage.getItem('abdquest_jb_key')||'';}catch(e){return '';}}
-function jbGetId(){try{return localStorage.getItem('abdquest_jb_id')||'';}catch(e){return '';}}
-function jbSetKey(k){try{localStorage.setItem('abdquest_jb_key',k);}catch(e){}}
-function jbSetId(i){try{localStorage.setItem('abdquest_jb_id',i);}catch(e){}}
+function jbGetKey(){return '$2a$10$Nyz0C5w6ic5eCPXxSctGQ.ZpmB/U62xdyu4BFffuvbpa1s7SPmr6O';}
+function jbGetId(){return '69e95e2036566621a8e00033';}
+function jbSetKey(k){}
+function jbSetId(i){}
 
 function jbSave(state){
   var key=jbGetKey(),id=jbGetId();
@@ -215,43 +196,9 @@ function jbLoad(){
     .catch(function(e){console.warn('[JB] Load error',e);return null;});
 }
 
-function saveJBConfig(){
-  var key=document.getElementById('jb-key').value.trim();
-  var id=document.getElementById('jb-id').value.trim();
-  var msg=document.getElementById('jb-msg');
-  if(!key||!id){if(msg)msg.textContent='Please enter both fields.';return;}
-  // Test the connection first
-  if(msg)msg.textContent='Testing connection...';
-  fetch(JB_URL+id+'/latest',{headers:{'X-Access-Key':key}})
-    .then(function(r){
-      if(r.ok||r.status===200){
-        jbSetKey(key);jbSetId(id);
-        if(msg){msg.textContent='Connected! Cloud sync active.';msg.style.color='#88dd88';}
-        setTimeout(function(){
-          document.getElementById('jb-setup').style.display='none';
-        },1500);
-      } else {
-        if(msg){msg.textContent='Connection failed — check your Bin ID and Key.';msg.style.color='#ff6666';}
-      }
-    }).catch(function(){
-      if(msg){msg.textContent='Network error — check internet connection.';msg.style.color='#ff6666';}
-    });
-}
 
-function skipJBSetup(){
-  localStorage.setItem('abdquest_jb_skipped','1');
-  document.getElementById('jb-setup').style.display='none';
-}
 
-// Show setup panel if not configured and not skipped
-window.addEventListener('load',function(){
-  var key=jbGetKey(),id=jbGetId(),skipped=localStorage.getItem('abdquest_jb_skipped');
-  if(!key||!id){
-    if(!skipped){
-      document.getElementById('jb-setup').style.display='block';
-    }
-  }
-});
+
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" onerror="document.getElementById('status').textContent='Failed to load — check internet'"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -1518,34 +1465,32 @@ function App(){
       ),
       SH('☁️','Cloud Sync',C.grnT),
       h('div',{style:cs(C,{marginBottom:12})},
-        (function(){
-          var hasConfig=!!(jbGetKey()&&jbGetId());
-          if(hasConfig){
-            return h('div',null,
-              h('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:10}},
-                h('div',{style:{fontSize:20}},'✅'),
-                h('div',null,
-                  h('div',{style:{fontSize:13,color:C.grnT,fontWeight:'bold'}},'JSONBin cloud sync active'),
-                  h('div',{style:{fontSize:11,color:C.dim}},'Auto-saves every 8 seconds after any change')
-                )
-              ),
-              h('button',{onClick:function(){
-                localStorage.removeItem('abdquest_jb_key');
-                localStorage.removeItem('abdquest_jb_id');
-                localStorage.removeItem('abdquest_jb_skipped');
-                showT('Cloud sync removed — reload app to set up again','info');
-              },style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:11,color:C.redT})},'Disconnect Cloud Sync')
-            );
-          }
-          return h('div',null,
-            h('div',{style:{fontSize:12,color:C.ambT,marginBottom:8}},'⚠ Cloud sync not configured'),
-            h('div',{style:{fontSize:11,color:C.dim,marginBottom:8}},'Reload the app to set up JSONBin cloud sync.'),
-            h('button',{onClick:function(){
-              localStorage.removeItem('abdquest_jb_skipped');
-              window.location.reload();
-            },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12})},'Set Up Cloud Sync')
-          );
-        })()
+        h('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:10}},
+          h('div',{style:{fontSize:20}},'✅'),
+          h('div',null,
+            h('div',{style:{fontSize:13,color:C.grnT,fontWeight:'bold'}},'JSONBin cloud sync active'),
+            h('div',{style:{fontSize:11,color:C.dim}},'Auto-saves to cloud 8 seconds after any change. Data survives reinstalls and phone changes.')
+          )
+        ),
+        h('button',{onClick:function(){
+          showT('Saving to cloud...','info');
+          var state=JSON.parse(JSON.stringify(st));
+          fetch('https://api.jsonbin.io/v3/b/'+jbGetId(),{
+            method:'PUT',
+            headers:{'Content-Type':'application/json','X-Access-Key':jbGetKey(),'X-Bin-Versioning':'false'},
+            body:JSON.stringify(state)
+          }).then(function(r){
+            if(r.ok)showT('☁️ Saved to cloud!','gold');
+            else showT('Save failed — check internet','red');
+          }).catch(function(){showT('Save failed — check internet','red');});
+        },style:Object.assign({},btn(true,C.grnT),{width:'100%',fontSize:12,marginBottom:7})},'⬆️ Force Save to Cloud Now'),
+        h('button',{onClick:function(){
+          showT('Loading from cloud...','info');
+          jbLoad().then(function(d){
+            if(d&&d.xp>=0){setSt(d);showT('☁️ Restored from cloud!','gold');}
+            else showT('No cloud data found','info');
+          }).catch(function(){showT('Restore failed — check internet','red');});
+        },style:Object.assign({},btn(false,C.grnT),{width:'100%',fontSize:12})},'⬇️ Restore from Cloud')
       ),
       SH('💾','Backup & Restore',C.telT),
       h('div',{style:cs(C,{marginBottom:12})},
