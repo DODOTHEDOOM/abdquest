@@ -272,7 +272,6 @@ var MAIN_KEY='abdquest_v2',BAK_KEY='abdquest_v2_backup';
 function vState(s){return s&&typeof s==='object'&&['xp','streak','done','habits','prayers'].every(function(k){return k in s;});}
 function savMain(s){
   try{localStorage.setItem(MAIN_KEY,JSON.stringify(s));}catch(e){}
-  try{jbSave(s);}catch(e){console.warn('[JB] savMain error:',e);}
 }
 function savBak(s){try{localStorage.setItem(BAK_KEY,JSON.stringify(s));}catch(e){}}
 function loadSafe(){
@@ -1218,7 +1217,7 @@ function App(){
 
     if(tab==='track') return h('div',null,
       h('div',{style:{display:'flex',gap:5,marginBottom:11}},
-        [{id:'calories',l:'🍗 Cal'},{id:'weight',l:'⚖️ Wt'},{id:'water',l:'💧 H2O'},{id:'sleep',l:'😴 Sleep'}].map(function(t){return h('button',{key:t.id,onClick:function(){setTv(t.id);},style:Object.assign({},btn(tv===t.id),{flex:1,fontSize:10})},t.l);})
+        [{id:'calories',l:'🍗 Cal'},{id:'weight',l:'⚖️ Wt'},{id:'water',l:'💧 H2O'},{id:'sleep',l:'😴 Sleep'},{id:'steps',l:'👟 Steps'}].map(function(t){return h('button',{key:t.id,onClick:function(){setTv(t.id);},style:Object.assign({},btn(tv===t.id),{flex:1,fontSize:10})},t.l);})
       ),
       h('div',{style:{display:'flex',gap:6,marginBottom:12}},
         [{id:'week',l:'7d'},{id:'month',l:'30d'},{id:'all',l:'All'}].map(function(r){return h('button',{key:r.id,onClick:function(){setGr(r.id);},style:Object.assign({},btn(gr===r.id,C.bluT),{flex:1,fontSize:11})},r.l);})
@@ -1250,6 +1249,50 @@ function App(){
         h('div',{style:card()},h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Weight over time. Green dashed = target.'),h(MiniChart,{data:wtD,xKey:'d',lines:[{k:'w',col:C.bluT}],refY:st.wtTarget,refCol:C.grnT,C:C}))
       ),
       tv==='water'&&h('div',null,SH('💧','Water History',C.telT),h('div',{style:card()},h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Daily intake in ml. Dashed = 2L target.'),h(MiniChart,{data:h2oD,xKey:'d',lines:[{k:'m',col:C.telT}],refY:(st.waterTarget||3000),refCol:C.telT,C:C}))),
+      tv==='steps'&&h('div',null,
+        SH('👟','Step History',C.telT),
+        h('div',{style:cs(C,{marginBottom:11})},
+          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
+            h('div',null,
+              h('div',{style:{fontSize:22,fontWeight:'bold',color:C.telT}},(((st.stepLog||{})[today()])||0).toLocaleString()),
+              h('div',{style:{fontSize:11,color:C.dim}},'steps today')
+            ),
+            h('div',{style:{textAlign:'right'}},
+              h('div',{style:{fontSize:13,color:C.gold,fontWeight:'bold'}},(st.stepTarget||10000).toLocaleString()),
+              h('div',{style:{fontSize:11,color:C.dim}},'daily target')
+            )
+          ),
+          h('div',{style:{height:8,background:C.bdr,borderRadius:4,overflow:'hidden',marginBottom:6}},
+            h('div',{style:{height:'100%',width:Math.min(100,((((st.stepLog||{})[today()])||0)/(st.stepTarget||10000))*100)+'%',background:'linear-gradient(90deg,'+C.telT+',#44ffee)',borderRadius:4,transition:'width 0.4s'}})
+          )
+        ),
+        (function(){
+          var stepEntries=Object.entries(st.stepLog||{}).sort(function(a,b){return a[0].localeCompare(b[0]);});
+          var filtered=filterLog(stepEntries.map(function(e){return{date:e[0],steps:e[1]};}));
+          if(!filtered.length)return h('div',{style:{textAlign:'center',color:C.fnt,padding:30,fontSize:12}},'No step data yet. Log steps in the Workout tab.');
+          var chartData=filtered.map(function(e){return{d:fmtD(e.date),s:e.steps};});
+          return h('div',null,
+            h('div',{style:cs(C,{marginBottom:11})},
+              h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Steps per day. Dashed line = daily target.'),
+              h(MiniChart,{data:chartData,xKey:'d',lines:[{k:'s',col:C.telT}],refY:(st.stepTarget||10000),refCol:C.gold,C:C})
+            ),
+            h('div',{style:cs(C,{})},
+              h('div',{style:{fontSize:11,color:C.dim,marginBottom:8}},'Step history:'),
+              filtered.slice(-7).reverse().map(function(e,i){
+                var pct=Math.min(100,Math.round((e.steps/(st.stepTarget||10000))*100));
+                return h('div',{key:i,style:{display:'flex',alignItems:'center',gap:10,marginBottom:6}},
+                  h('div',{style:{fontSize:11,color:C.dim,width:40,flexShrink:0}},fmtD(e.date)),
+                  h('div',{style:{flex:1,height:6,background:C.bdr,borderRadius:3,overflow:'hidden'}},
+                    h('div',{style:{height:'100%',width:pct+'%',background:pct>=100?C.grnT:C.telT,borderRadius:3}})
+                  ),
+                  h('div',{style:{fontSize:11,color:pct>=100?C.grnT:C.telT,fontWeight:'bold',width:55,textAlign:'right',flexShrink:0}},e.steps.toLocaleString()),
+                  h('div',{style:{fontSize:10,color:C.dim,width:30,textAlign:'right',flexShrink:0}},pct+'%')
+                );
+              })
+            )
+          );
+        })()
+      ),
       tv==='sleep'&&h('div',null,
         SH('😴','Sleep Tracker',C.purT),
         h('div',{style:cs(C,{marginBottom:11})},
