@@ -434,6 +434,7 @@ function getRecurringDue(rec){
   return new Date().getDay()===rec.day;
 }
 var DEF_SHOP=[
+  {id:'s0',label:'Streak Freeze',icon:'🧊',cost:200,desc:'Protect your streak for one missed day',freeze:true},
   {id:'s1',label:'Cheat Meal',icon:'🍕',cost:300,desc:'One meal, no guilt'},
   {id:'s2',label:'Rest Day',icon:'🛋️',cost:250,desc:'Full guilt-free day off'},
   {id:'s3',label:'Takeaway Night',icon:'🥡',cost:400,desc:'One proper takeaway, earned it'},
@@ -546,15 +547,15 @@ var BOT_R={
 var DK={bg:'#0a0a0f',card:'#12121a',bdr:'#2a2a3a',gold:'#ffd700',goldD:'#8b6914',grn:'#2a6a2a',grnT:'#88dd88',red:'#8b0000',redT:'#ff6666',txt:'#e8dcc8',dim:'#6b5b3e',fnt:'#2a2a3a',blu:'#1a3a5a',bluT:'#88aaff',pur:'#2a1a4a',purT:'#cc88ff',tel:'#0a3a3a',telT:'#44ddcc',amb:'#2a1a00',ambT:'#ffaa44',lifeT:'#88ff88'};
 var LT={bg:'#f5f0e8',card:'#fffdf7',bdr:'#d4c9a8',gold:'#b8860b',goldD:'#8b6914',grn:'#2d6a2d',grnT:'#1a5c1a',red:'#8b2a2a',redT:'#cc2222',txt:'#2a1a0a',dim:'#8b7355',fnt:'#d4c9a8',blu:'#c8d8f0',bluT:'#1a4a8a',pur:'#d8c8f0',purT:'#6a3a9a',tel:'#c8f0e8',telT:'#1a6a5a',amb:'#f0e8c8',ambT:'#8b5500',lifeT:'#2a8a2a'};
 
-function bs(C,on,col){return{background:on?(col||C.gold)+'22':'transparent',border:'1px solid '+(on?(col||C.gold):C.bdr),borderRadius:6,color:on?(col||C.gold):C.dim,padding:'7px 10px',fontSize:11,cursor:'pointer',transition:'all 0.2s'};}
-function cs(C,ex){return Object.assign({background:C.card,border:'1px solid '+C.bdr,borderRadius:10,padding:14},ex||{});}
-function ins(C){return{background:C.bg,border:'1px solid '+C.bdr,borderRadius:6,padding:'8px 11px',color:C.txt,fontSize:13,width:'100%',boxSizing:'border-box'};}
+function bs(C,on,col){return{background:on?(col||C.gold)+'25':'transparent',border:'1px solid '+(on?(col||C.gold):C.bdr+'88'),borderRadius:10,color:on?(col||C.gold):C.dim,padding:'7px 11px',fontSize:11,cursor:'pointer',transition:'all 0.25s cubic-bezier(0.4,0,0.2,1)',fontWeight:on?'600':'400'};}
+function cs(C,ex){return Object.assign({background:C.card,border:'1px solid '+C.bdr,borderRadius:14,padding:14,boxShadow:'0 2px 12px rgba(0,0,0,0.15)'},ex||{});}
+function ins(C){return{background:C.bg,border:'1px solid '+C.bdr,borderRadius:10,padding:'10px 13px',color:C.txt,fontSize:13,width:'100%',boxSizing:'border-box',transition:'border-color 0.2s'};}
 function SH(ic,ti,col){return h('div',{style:{display:'flex',alignItems:'center',gap:10,margin:'18px 0 10px',padding:'9px 14px',background:col+'18',border:'1px solid '+col+'33',borderRadius:8,borderLeft:'3px solid '+col}},h('span',{style:{fontSize:17}},ic),h('span',{style:{fontSize:12,fontWeight:'bold',color:col,letterSpacing:'0.1em',textTransform:'uppercase'}},ti));}
 
 // INIT STATE
 function initState(){
   var saved=loadSafe(),fajrCache=null;try{var fc=sessionStorage.getItem('pt_'+today());if(fc){var pt=JSON.parse(fc);fajrCache=pt.Fajr||null;}}catch(e){}var td=getLogicalDay(fajrCache);
-  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
+  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},streakFreezes:0,badHabits:[{id:'bh1',label:'Junk Food',icon:'🍟',penXp:15,log:{}},{id:'bh2',label:'Missed Sleep',icon:'😴',penXp:10,log:{}},{id:'bh3',label:'Phone Before Bed',icon:'📱',penXp:10,log:{}}],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
   if(saved.lastDay!==td){
@@ -578,7 +579,19 @@ function initState(){
     var doneCnt=nonBonusH.filter(function(hh){return !!(saved.done||{})[hh.id];}).length;
     var streakThresh=(saved.streakMin||0)>0?saved.streakMin:nonBonusH.length;
     var allDone=nonBonusH.length>0&&doneCnt>=streakThresh;
-    var newStreak=allDone?(saved.streak||0)+1:0;
+    var newStreak;
+    if(allDone){
+      newStreak=(saved.streak||0)+1;
+    } else if((saved.streakFreezes||0)>0){
+      // Use a freeze to protect streak
+      newStreak=saved.streak||0;
+      penXp=0;// No penalty on a frozen day
+      // Reduce freeze count
+      s.streakFreezes=(saved.streakFreezes||0)-1;
+      console.log('[Streak] Freeze used! '+s.streakFreezes+' remaining');
+    } else {
+      newStreak=0;
+    }
     var curWeek=getWeekMon();
     var weekChanged=(saved.currentWeek||'')!==curWeek;
     return Object.assign({},s,{done:{},doneChores:{},chores:(saved.chores||[]).filter(function(c){return !c.once||!(saved.doneChores||{})[c.id];}),lastDay:td,streak:newStreak,habitStreaks:newHS,habitMissed:newHM,xp:Math.max(0,(saved.xp||0)-penXp),debt:nd,waterToday:0,prayerHist:Object.assign({},saved.prayerHist||{},Object.defineProperty({},[saved.lastDay],{value:yp,enumerable:true})),log:[].concat(saved.log||[],[{date:saved.lastDay,done:saved.done||{},allDone:allDone,penXp:penXp}]),weeklyChDone:weekChanged?{}:(saved.weeklyChDone||{}),currentWeek:curWeek});
@@ -652,46 +665,60 @@ function MiniChart(props){
 
 function Heatmap(props){
   var log=props.log,C=props.C,totalQ=props.totalQ||1;
-  // Build a map of date -> completion percentage using total quest count as denominator
   var logMap={};
   log.forEach(function(en){
     var done=Object.values(en.done||{}).filter(Boolean).length;
-    // Use totalQ passed in (non-bonus quest count) as the denominator
     logMap[en.date]=done/totalQ;
   });
   function heatCol(pct,hasDat){
-    if(!hasDat)return '#1a1a2a';
-    if(pct===0)return '#6b1a1a';          // 0% — red
-    if(pct<=0.25)return '#8a4a00';        // 1-25% — orange
-    if(pct<=0.50)return '#8a8000';        // 26-50% — yellow
-    if(pct<=0.75)return '#2a6a2a';        // 51-75% — light green
-    if(pct<1)return '#1a8a3a';            // 76-99% — green
-    return '#00aa44';                      // 100% — dark green
+    if(!hasDat)return C.bdr;
+    if(pct===0)return '#5a1a1a';
+    if(pct<=0.25)return '#7a3a00';
+    if(pct<=0.50)return '#7a6a00';
+    if(pct<=0.75)return '#1a5a1a';
+    if(pct<1)return '#1a7a2a';
+    return '#00cc44';
   }
-  var weeks=[],cur=new Date(),td=today();cur.setDate(cur.getDate()-175);
-  var week=[];
-  while(cur<=new Date()){
-    var key=cur.toISOString().split('T')[0];
-    var hasDat=key in logMap;
-    var pct=logMap[key]||0;
-    var isFut=key>td;
-    var col=isFut?'transparent':hasDat?heatCol(pct,true):heatCol(0,key<=td?false:false);
-    if(!isFut&&!hasDat)col='#1a1a2a';
-    if(!isFut&&hasDat)col=heatCol(pct,true);
-    var pctStr=hasDat?Math.round(pct*100)+'%':'no data';
-    week.push(h('div',{key:key,title:key+' — '+pctStr,style:{width:11,height:11,borderRadius:2,background:col,flexShrink:0}}));
-    if(week.length===7){weeks.push(h('div',{key:key+'w',style:{display:'flex',flexDirection:'column',gap:2}},week));week=[];}
-    cur.setDate(cur.getDate()+1);
+  // Calendar format — show by month
+  var now=new Date();
+  var td=today();
+  var months=[];
+  for(var mi=5;mi>=0;mi--){
+    var mDate=new Date(now.getFullYear(),now.getMonth()-mi,1);
+    var mName=mDate.toLocaleString('default',{month:'short'});
+    var mYear=mDate.getFullYear();
+    var mKey=mDate.getFullYear()+'-'+String(mDate.getMonth()+1).padStart(2,'0');
+    var daysInMonth=new Date(mDate.getFullYear(),mDate.getMonth()+1,0).getDate();
+    var firstDay=mDate.getDay();// 0=Sun
+    var days=[];
+    // Empty cells for days before month starts
+    for(var di=0;di<firstDay;di++){days.push(h('div',{key:'e'+di,style:{width:'13%',aspectRatio:'1',borderRadius:4}}));}
+    for(var d=1;d<=daysInMonth;d++){
+      var dateStr=mDate.getFullYear()+'-'+String(mDate.getMonth()+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      var isFut=dateStr>td;
+      var hasDat=dateStr in logMap;
+      var pct=logMap[dateStr]||0;
+      var bg=isFut?C.bdr+'33':hasDat?heatCol(pct,true):'#1a1a2a';
+      var pctStr=hasDat?Math.round(pct*100)+'%':isFut?'':'-';
+      days.push(h('div',{key:d,title:dateStr+(pctStr?' — '+pctStr:''),style:{width:'13%',aspectRatio:'1',borderRadius:4,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:pct>=1?'#fff':C.dim,fontWeight:pct>=1?'bold':'normal',opacity:isFut?0.3:1}},d));
+    }
+    months.push(h('div',{key:mKey,style:{marginBottom:14}},
+      h('div',{style:{fontSize:11,fontWeight:'700',color:C.gold,marginBottom:6,letterSpacing:'0.05em'}},mName+' '+mYear),
+      h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:3}},
+        ['S','M','T','W','T','F','S'].map(function(d,i){return h('div',{key:i,style:{textAlign:'center',fontSize:8,color:C.dim,paddingBottom:2}},d);}),
+        days
+      )
+    ));
   }
-  if(week.length)weeks.push(h('div',{key:'last',style:{display:'flex',flexDirection:'column',gap:2}},week));
   return h('div',null,
-    h('div',{style:{display:'flex',gap:2,overflowX:'auto',paddingBottom:4}},weeks),
-    h('div',{style:{display:'flex',gap:8,marginTop:8,fontSize:9,flexWrap:'wrap'}},
-      h('span',{style:{color:'#6b1a1a'}},'🟥 0%'),
-      h('span',{style:{color:'#8a4a00'}},'🟧 ≤25%'),
-      h('span',{style:{color:'#8a8000'}},'🟨 ≤50%'),
-      h('span',{style:{color:'#2a6a2a'}},'🟩 ≤75%'),
-      h('span',{style:{color:'#00aa44'}},'🟢 100%')
+    months,
+    h('div',{style:{display:'flex',gap:10,marginTop:4,fontSize:9,flexWrap:'wrap'}},
+      [{c:'#5a1a1a',l:'0%'},{c:'#7a3a00',l:'≤25%'},{c:'#7a6a00',l:'≤50%'},{c:'#1a7a2a',l:'≤75%'},{c:'#00cc44',l:'100%'}].map(function(s,i){
+        return h('div',{key:i,style:{display:'flex',alignItems:'center',gap:4}},
+          h('div',{style:{width:10,height:10,borderRadius:2,background:s.c}}),
+          h('span',{style:{color:C.dim}},s.l)
+        );
+      })
     )
   );
 }
@@ -766,6 +793,7 @@ function App(){
   var tvS=useState('calories'),setTv=tvS[1],tv=tvS[0];
   var grS=useState('week'),setGr=grS[1],gr=grS[0];
   var nDateS=useState(today()),setNDate=nDateS[1],nDate=nDateS[0];
+  var newBadLabelS=useState(''),setNewBadLabel=newBadLabelS[1],newBadLabel=newBadLabelS[0];
   var nTextS=useState(''),setNText=nTextS[1],nText=nTextS[0];
   var nMoodS=useState(''),setNMood=nMoodS[1],nMood=nMoodS[0];
   var bfOpenS=useState(false),setBfOpen=bfOpenS[1],bfOpen=bfOpenS[0];
@@ -777,6 +805,10 @@ function App(){
   var bfWaterS=useState(''),setBfWater=bfWaterS[1],bfWater=bfWaterS[0];
   var bfNoteS=useState(''),setBfNote=bfNoteS[1],bfNote=bfNoteS[0];
   var wkNS=useState(''),setWkN=wkNS[1],wkN=wkNS[0];
+  var focusActiveS=useState(false),setFocusActive=focusActiveS[1],focusActive=focusActiveS[0];
+  var focusSecsS=useState(25*60),setFocusSecs=focusSecsS[1],focusSecs=focusSecsS[0];
+  var focusLabelS=useState('Focus Session'),setFocusLabel=focusLabelS[1],focusLabel=focusLabelS[0];
+  var focusDurS=useState(25),setFocusDur=focusDurS[1],focusDur=focusDurS[0];
   var exEditS=useState(null),setExEdit=exEditS[1],exEdit=exEditS[0];
   var stepInS=useState(''),setStepIn=stepInS[1],stepIn=stepInS[0];
   var newExNameS=useState(''),setNewExName=newExNameS[1],newExName=newExNameS[0];
@@ -823,6 +855,25 @@ function App(){
 
   // Nudge timer
   useEffect(function(){nudgeRef.current=setInterval(function(){setNudge(NUDGES[Math.floor(Math.random()*NUDGES.length)]);},2*60*60*1000);return function(){clearInterval(nudgeRef.current);};},[]);
+
+  // Focus timer tick
+  useEffect(function(){
+    if(!focusActive)return;
+    var iv=setInterval(function(){
+      setFocusSecs(function(s){
+        if(s<=1){
+          setFocusActive(false);
+          var xpEarned=Math.round(focusDur*1.5);
+          setSt(function(p){return Object.assign({},p,{xp:p.xp+xpEarned});});
+          showT('🎯 Focus session complete! +'+xpEarned+' XP','gold');
+          try{if(typeof Notification!=='undefined'&&Notification.permission==='granted'){new Notification("Focus Complete!",{body:"🎯 "+focusLabel+" done! +"+xpEarned+" XP earned",tag:'focus'});}}catch(e){}
+          return focusDur*60;
+        }
+        return s-1;
+      });
+    },1000);
+    return function(){clearInterval(iv);};
+  },[focusActive,focusDur,focusLabel]);
 
 
 
@@ -1132,6 +1183,56 @@ function App(){
           dueToday.map(function(hh){return h(HabitRow,{key:hh.id,hab:hh,done:!!st.done[hh.id],popping:pop&&pop.id===hh.id,onDo:doHabit,col:C.telT,C:C,missedDays:0,habStreak:(st.habitStreaks||{})[hh.id]||0});})
         );
       })(),
+      SH('🚫','Bad Habit Tracker',C.redT),
+      h('div',{style:cs(C,{marginBottom:12,border:'1px solid '+C.redT+'33'})},
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Tap to log a slip. Each one costs XP. Track honestly — awareness is step one.'),
+        (st.badHabits||[]).map(function(bh,bi){
+          var td=today();
+          var todayCount=(bh.log&&bh.log[td])||0;
+          return h('div',{key:bh.id,style:{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid '+C.bdr+(bi===(st.badHabits||[]).length-1?'00':'')}},
+            h('div',{style:{fontSize:20,flexShrink:0}},bh.icon),
+            h('div',{style:{flex:1}},
+              h('div',{style:{fontSize:13,color:C.txt,fontWeight:'600'}},bh.label),
+              h('div',{style:{fontSize:10,color:C.redT}},'-'+bh.penXp+' XP each · today: '+todayCount+'x')
+            ),
+            h('div',{style:{display:'flex',alignItems:'center',gap:8}},
+              todayCount>0&&h('button',{onClick:function(){
+                setSt(function(p){
+                  var bhs=(p.badHabits||[]).map(function(b){
+                    if(b.id!==bh.id)return b;
+                    var lg=Object.assign({},b.log||{});
+                    lg[td]=Math.max(0,(lg[td]||0)-1);
+                    return Object.assign({},b,{log:lg});
+                  });
+                  return Object.assign({},p,{badHabits:bhs,xp:Math.min(p.xp+bh.penXp,p.xp+bh.penXp)});
+                });
+              },style:{background:'transparent',border:'1px solid '+C.bdr,borderRadius:8,padding:'4px 8px',color:C.dim,fontSize:11}},'-'),
+              h('button',{onClick:function(){
+                setSt(function(p){
+                  var bhs=(p.badHabits||[]).map(function(b){
+                    if(b.id!==bh.id)return b;
+                    var lg=Object.assign({},b.log||{});
+                    lg[td]=(lg[td]||0)+1;
+                    return Object.assign({},b,{log:lg});
+                  });
+                  return Object.assign({},p,{badHabits:bhs,xp:Math.max(0,p.xp-bh.penXp)});
+                });
+                showT('-'+bh.penXp+' XP — log it, fix it tomorrow','red');
+              },style:{background:C.red+'33',border:'1px solid '+C.redT+'44',borderRadius:8,padding:'6px 14px',color:C.redT,fontSize:12,fontWeight:'bold'}},'+ Log slip')
+            )
+          );
+        }),
+        h('div',{style:{display:'flex',gap:7,marginTop:10}},
+          h('input',{value:newBadLabel,onChange:function(ev){setNewBadLabel(ev.target.value);},placeholder:'Add bad habit to track...',style:Object.assign({},ins(C),{flex:1})}),
+          h('button',{onClick:function(){
+            if(!newBadLabel.trim())return;
+            var nb={id:'bh'+Date.now(),label:newBadLabel.trim(),icon:'⚠️',penXp:10,log:{}};
+            setSt(function(p){return Object.assign({},p,{badHabits:(p.badHabits||[]).concat([nb])});});
+            setNewBadLabel('');
+            showT('Bad habit added','info');
+          },style:Object.assign({},bs(C,false,C.redT),{fontSize:12,color:C.redT})},'Add')
+        )
+      ),
       SH('🧹','One-Time Chores',C.ambT),
       h('div',{style:cs(C,{marginBottom:10})},
         h('div',{style:{display:'flex',gap:7}},
@@ -1343,6 +1444,24 @@ function App(){
             )
           );
         })()
+      ),
+      SH('🎯','Focus Timer',C.purT),
+      h('div',{style:cs(C,{marginBottom:14})},
+        h('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',padding:'8px 0 12px'}},
+          h('div',{style:{fontSize:13,color:C.dim,marginBottom:4}},'Session'),
+          h('input',{value:focusLabel,onChange:function(ev){setFocusLabel(ev.target.value);},style:{...ins(C),textAlign:'center',marginBottom:12,fontSize:14,fontWeight:'bold'}}),
+          h('div',{style:{fontSize:56,fontWeight:'bold',color:focusActive?C.purT:C.txt,fontFamily:'monospace',letterSpacing:2,marginBottom:12,transition:'color 0.3s'}},
+            Math.floor(focusSecs/60)+':'+(focusSecs%60<10?'0':'')+focusSecs%60
+          ),
+          h('div',{style:{display:'flex',gap:8,marginBottom:12}},
+            [15,25,45,60].map(function(m){return h('button',{key:m,onClick:function(){if(!focusActive){setFocusDur(m);setFocusSecs(m*60);}},style:Object.assign({},bs(C,focusDur===m&&!focusActive,C.purT),{fontSize:11})},m+'m');})
+          ),
+          h('div',{style:{display:'flex',gap:10}},
+            h('button',{onClick:function(){setFocusActive(!focusActive);},style:{background:focusActive?C.red+'33':C.purT+'33',border:'1px solid '+(focusActive?C.redT:C.purT),borderRadius:12,padding:'12px 28px',color:focusActive?C.redT:C.purT,fontSize:14,fontWeight:'bold'}},focusActive?'⏸ Pause':'▶ Start'),
+            h('button',{onClick:function(){setFocusActive(false);setFocusSecs(focusDur*60);},style:{background:'transparent',border:'1px solid '+C.bdr,borderRadius:12,padding:'12px 20px',color:C.dim,fontSize:13}},'↺ Reset')
+          ),
+          h('div',{style:{fontSize:11,color:C.dim,marginTop:10}},'+'+Math.round(focusDur*1.5)+' XP on completion')
+        )
       ),
       SH('🏅','Exercise Tracker',C.gold),
       h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Tap the buttons to log reps/distance. XP is awarded every time you hit the target. No limit — keep going all day.'),
