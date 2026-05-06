@@ -265,6 +265,23 @@ document.getElementById('status').textContent='Starting...';
 <script>
 (function(){
 'use strict';
+// ── URL PARAMETER HANDLER ─────────────────────────────────────────────────────
+// Reads health data passed via URL from iOS Shortcuts
+// e.g. AbdQuest.html?steps=8500&sleep=7.2&water=2500&weight=149.5
+function getUrlParams(){
+  try{
+    var params={};
+    var search=window.location.search.substring(1);
+    if(!search)return params;
+    search.split('&').forEach(function(pair){
+      var parts=pair.split('=');
+      if(parts.length===2)params[decodeURIComponent(parts[0])]=decodeURIComponent(parts[1]);
+    });
+    return params;
+  }catch(e){return {};}
+}
+var URL_PARAMS=getUrlParams();
+// ─────────────────────────────────────────────────────────────────────────────
 var h=React.createElement,useState=React.useState,useEffect=React.useEffect,useRef=React.useRef;
 
 // STORAGE
@@ -442,18 +459,34 @@ var DEF_SHOP=[
   {id:'s5',label:'Game Night',icon:'🎮',cost:200,desc:'Guilt-free gaming session'}
 ];
 var ITEMS=[
-  {id:'i1',name:'Rusty Sword',icon:'🗡️',rarity:'common',desc:'A battered blade.'},
-  {id:'i2',name:'Iron Shield',icon:'🛡️',rarity:'common',desc:'Basic protection.'},
-  {id:'i3',name:'Health Potion',icon:'🧪',rarity:'common',desc:'Glows faintly.'},
-  {id:'i4',name:'Speed Boots',icon:'👟',rarity:'rare',desc:'You feel faster.'},
-  {id:'i5',name:'Prayer Beads',icon:'📿',rarity:'rare',desc:'Each bead a prayer.'},
-  {id:'i6',name:'Scholar Tome',icon:'📚',rarity:'rare',desc:'Knowledge is the weapon.'},
-  {id:'i7',name:'Dragon Scale',icon:'🐉',rarity:'epic',desc:'From a beast you cannot imagine.'},
-  {id:'i8',name:'Holy Scroll',icon:'📜',rarity:'epic',desc:'Ancient wisdom.'},
-  {id:'i9',name:'Void Crystal',icon:'💎',rarity:'epic',desc:'Pure determination.'},
-  {id:'i10',name:'Crown of Will',icon:'👑',rarity:'legendary',desc:'Only the disciplined wear this.'},
-  {id:'i11',name:'Blade of Dawn',icon:'⚔️',rarity:'legendary',desc:'Forged at Fajr. Unbreakable.'},
-  {id:'i12',name:'Star Fragment',icon:'⭐',rarity:'legendary',desc:'A piece of something greater.'}
+  // Common — frequent drops, small effects
+  {id:'i1',name:'Rusty Sword',icon:'🗡️',rarity:'common',desc:'A battered blade. Feels heavier than it looks.',use:'xp',useVal:25,useDesc:'+25 XP'},
+  {id:'i2',name:'Iron Shield',icon:'🛡️',rarity:'common',desc:'Basic protection. Better than nothing.',use:'xp',useVal:25,useDesc:'+25 XP'},
+  {id:'i3',name:'Health Potion',icon:'🧪',rarity:'common',desc:'Glows faintly. Smells weird.',use:'xp',useVal:50,useDesc:'+50 XP'},
+  {id:'i4',name:'Bread Loaf',icon:'🍞',rarity:'common',desc:'Simple sustenance for the journey.',use:'xp',useVal:30,useDesc:'+30 XP'},
+  {id:'i5',name:'Wooden Staff',icon:'🪄',rarity:'common',desc:'A wizards first weapon.',use:'xp',useVal:35,useDesc:'+35 XP'},
+  {id:'i6',name:'Copper Coin',icon:'🪙',rarity:'common',desc:'Worth less than your effort. Use it.',use:'xp',useVal:40,useDesc:'+40 XP'},
+  // Rare — uncommon drops, useful effects
+  {id:'i7',name:'Speed Boots',icon:'👟',rarity:'rare',desc:'You feel faster just holding them.',use:'xp',useVal:100,useDesc:'+100 XP'},
+  {id:'i8',name:'Prayer Beads',icon:'📿',rarity:'rare',desc:'Each bead a prayer remembered.',use:'debt',useVal:5,useDesc:'Clear 5 prayer debt'},
+  {id:'i9',name:'Scholar Tome',icon:'📚',rarity:'rare',desc:'Knowledge is the real weapon.',use:'xp2x',useVal:1,useDesc:'2x XP from Life Quests today'},
+  {id:'i10',name:'Silver Arrow',icon:'🏹',rarity:'rare',desc:'Precise. Purposeful. Deadly.',use:'xp',useVal:120,useDesc:'+120 XP'},
+  {id:'i11',name:'Mana Crystal',icon:'🔷',rarity:'rare',desc:'Pulsing with stored energy.',use:'xp',useVal:150,useDesc:'+150 XP'},
+  {id:'i12',name:'Night Cloak',icon:'🌑',rarity:'rare',desc:'Invisible to failure.',use:'freeze',useVal:1,useDesc:'Protect streak 1 day'},
+  // Epic — rare drops, strong effects
+  {id:'i13',name:'Dragon Scale',icon:'🐉',rarity:'epic',desc:'Shed from a beast you cannot imagine.',use:'freeze',useVal:1,useDesc:'Protect streak 1 day'},
+  {id:'i14',name:'Holy Scroll',icon:'📜',rarity:'epic',desc:'Ancient wisdom carved in light.',use:'debt',useVal:10,useDesc:'Clear 10 prayer debt'},
+  {id:'i15',name:'Void Crystal',icon:'💎',rarity:'epic',desc:'Forged in pure determination.',use:'xp',useVal:300,useDesc:'+300 XP'},
+  {id:'i16',name:'Phoenix Feather',icon:'🪶',rarity:'epic',desc:'Burns cold. Grants rebirth.',use:'freeze',useVal:2,useDesc:'Protect streak 2 days'},
+  {id:'i17',name:'Elixir of Focus',icon:'⚗️',rarity:'epic',desc:'One sip and distraction fades.',use:'xp2x',useVal:1,useDesc:'2x XP all quests today'},
+  {id:'i18',name:'War Banner',icon:'🚩',rarity:'epic',desc:'Plant it. Rally yourself.',use:'xp',useVal:400,useDesc:'+400 XP'},
+  // Legendary — very rare, powerful effects
+  {id:'i19',name:'Crown of Will',icon:'👑',rarity:'legendary',desc:'Only the truly disciplined may wear this.',use:'xp2x',useVal:1,useDesc:'2x XP all quests today'},
+  {id:'i20',name:'Blade of Dawn',icon:'⚔️',rarity:'legendary',desc:'Forged at Fajr. Unbreakable.',use:'fajr',useVal:1,useDesc:'Auto-complete Fajr today'},
+  {id:'i21',name:'Star Fragment',icon:'⭐',rarity:'legendary',desc:'A piece of something greater than yourself.',use:'xp',useVal:750,useDesc:'+750 XP'},
+  {id:'i22',name:'Eternal Flame',icon:'🔥',rarity:'legendary',desc:'Never goes out. Neither do you.',use:'freeze',useVal:3,useDesc:'Protect streak 3 days'},
+  {id:'i23',name:'Tome of Ages',icon:'📕',rarity:'legendary',desc:'Every answer you need is in here.',use:'debt',useVal:25,useDesc:'Clear 25 prayer debt'},
+  {id:'i24',name:'Ring of Abdelrahman',icon:'💍',rarity:'legendary',desc:'The ring of one who never quit.',use:'xp',useVal:1000,useDesc:'+1000 XP'}
 ];
 var RC={common:'#888',rare:'#4488ff',epic:'#aa44ff',legendary:'#ffd700'};
 var PIDs=['fajr','duhr','asr','maghrib','isha'];
@@ -555,7 +588,7 @@ function SH(ic,ti,col){return h('div',{style:{display:'flex',alignItems:'center'
 // INIT STATE
 function initState(){
   var saved=loadSafe(),fajrCache=null;try{var fc=sessionStorage.getItem('pt_'+today());if(fc){var pt=JSON.parse(fc);fajrCache=pt.Fajr||null;}}catch(e){}var td=getLogicalDay(fajrCache);
-  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},streakFreezes:0,badHabits:[{id:'bh1',label:'Junk Food',icon:'🍟',penXp:15,log:{}},{id:'bh2',label:'Missed Sleep',icon:'😴',penXp:10,log:{}},{id:'bh3',label:'Phone Before Bed',icon:'📱',penXp:10,log:{}}],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
+  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},streakFreezes:0,activeEffects:{},badHabits:[{id:'bh1',label:'Junk Food',icon:'🍟',penXp:15,log:{}},{id:'bh2',label:'Missed Sleep',icon:'😴',penXp:10,log:{}},{id:'bh3',label:'Phone Before Bed',icon:'📱',penXp:10,log:{}}],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[]};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
   if(saved.lastDay!==td){
@@ -671,13 +704,13 @@ function Heatmap(props){
     logMap[en.date]=done/totalQ;
   });
   function heatCol(pct,hasDat){
-    if(!hasDat)return C.bdr;
-    if(pct===0)return '#5a1a1a';
-    if(pct<=0.25)return '#7a3a00';
-    if(pct<=0.50)return '#7a6a00';
-    if(pct<=0.75)return '#1a5a1a';
-    if(pct<1)return '#1a7a2a';
-    return '#00cc44';
+    if(!hasDat)return '#1e1e2e';
+    if(pct===0)return '#4a1010';
+    if(pct<=0.25)return '#7a2800';
+    if(pct<=0.50)return '#7a6000';
+    if(pct<=0.75)return '#1a5c1a';
+    if(pct<1)return '#1a8a2a';
+    return '#00bb44';
   }
   // Calendar format — show by month
   var now=new Date();
@@ -698,9 +731,18 @@ function Heatmap(props){
       var isFut=dateStr>td;
       var hasDat=dateStr in logMap;
       var pct=logMap[dateStr]||0;
-      var bg=isFut?C.bdr+'33':hasDat?heatCol(pct,true):'#1a1a2a';
-      var pctStr=hasDat?Math.round(pct*100)+'%':isFut?'':'-';
-      days.push(h('div',{key:d,title:dateStr+(pctStr?' — '+pctStr:''),style:{width:'13%',aspectRatio:'1',borderRadius:4,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,color:pct>=1?'#fff':C.dim,fontWeight:pct>=1?'bold':'normal',opacity:isFut?0.3:1}},d));
+      var bg=isFut?'transparent':hasDat?heatCol(pct,true):'#1e1e2e';
+      var border=isFut?'1px solid transparent':hasDat?'none':'1px solid #2a2a3a';
+      var pctStr=hasDat?Math.round(pct*100)+'%':isFut?'future':'-';
+      var isToday=dateStr===td;
+      days.push(h('div',{key:d,title:dateStr+' — '+pctStr,style:{
+        width:'13%',aspectRatio:'1',borderRadius:5,
+        background:bg,border:isToday?'2px solid #ffd700':border,
+        display:'flex',alignItems:'center',justifyContent:'center',
+        fontSize:8,color:hasDat&&pct>0?'transparent':isFut?'transparent':'#444',
+        opacity:isFut?0.15:1,
+        transition:'transform 0.1s'
+      }},isFut?'':hasDat?'':d));
     }
     months.push(h('div',{key:mKey,style:{marginBottom:14}},
       h('div',{style:{fontSize:11,fontWeight:'700',color:C.gold,marginBottom:6,letterSpacing:'0.05em'}},mName+' '+mYear),
@@ -712,8 +754,8 @@ function Heatmap(props){
   }
   return h('div',null,
     months,
-    h('div',{style:{display:'flex',gap:10,marginTop:4,fontSize:9,flexWrap:'wrap'}},
-      [{c:'#5a1a1a',l:'0%'},{c:'#7a3a00',l:'≤25%'},{c:'#7a6a00',l:'≤50%'},{c:'#1a7a2a',l:'≤75%'},{c:'#00cc44',l:'100%'}].map(function(s,i){
+    h('div',{style:{display:'flex',gap:10,marginTop:8,fontSize:9,flexWrap:'wrap'}},
+      [{c:'#4a1010',l:'0%'},{c:'#7a2800',l:'≤25%'},{c:'#7a6000',l:'≤50%'},{c:'#1a8a2a',l:'≤75%'},{c:'#00bb44',l:'100%'}].map(function(s,i){
         return h('div',{key:i,style:{display:'flex',alignItems:'center',gap:4}},
           h('div',{style:{width:10,height:10,borderRadius:2,background:s.c}}),
           h('span',{style:{color:C.dim}},s.l)
@@ -901,7 +943,14 @@ function App(){
 
   function doHabit(hab){
     var done=!!st.done[hab.id];
-    setSt(function(p){return Object.assign({},p,{done:Object.assign({},p.done,Object.defineProperty({},[hab.id],{value:!done,enumerable:true})),xp:Math.max(0,p.xp+(done?-hab.xp:hab.xp))});});
+    var td=today();
+    var has2x=(st.activeEffects||{})['xp2x']===td;
+    var xpMult=has2x?2:1;
+    setSt(function(p){
+      var has2xP=(p.activeEffects||{})['xp2x']===td;
+      var mult=has2xP?2:1;
+      return Object.assign({},p,{done:Object.assign({},p.done,Object.defineProperty({},[hab.id],{value:!done,enumerable:true})),xp:Math.max(0,p.xp+(done?-hab.xp:hab.xp*mult))});
+    });
     if(!done){popXp(hab.id,hab.xp);if(Math.random()<0.09){var item=randItem();if(item){setSt(function(p){return Object.assign({},p,{inventory:(p.inventory||[]).concat([Object.assign({},item,{got:today()})])});});setTimeout(function(){setLoot(item);setTimeout(function(){setLoot(null);},3500);},700);}}}
   }
   function doChore(ch){var done=!!st.doneChores[ch.id];setSt(function(p){return Object.assign({},p,{doneChores:Object.assign({},p.doneChores,Object.defineProperty({},[ch.id],{value:!done,enumerable:true})),xp:Math.max(0,p.xp+(done?-15:15))});});if(!done)popXp(ch.id,15);}
@@ -1556,7 +1605,22 @@ function App(){
 
       SH('🎒','Inventory',C.purT),
       (st.inventory||[]).length===0&&h('div',{style:{textAlign:'center',color:C.fnt,padding:20,fontSize:12}},'No items yet. Complete habits for random drops.'),
-      h('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:7,marginBottom:14}},(st.inventory||[]).map(function(item,i){return h('div',{key:i,title:item.desc,style:{background:C.card,border:'1px solid '+RC[item.rarity]+'44',borderRadius:8,padding:'9px 5px',textAlign:'center'}},h('div',{style:{fontSize:22,marginBottom:3}},item.icon),h('div',{style:{fontSize:9,color:RC[item.rarity],textTransform:'uppercase'}},item.rarity),h('div',{style:{fontSize:9,color:C.dim,marginTop:1}},item.name));})),
+      h('div',{style:{display:'flex',flexDirection:'column',gap:7,marginBottom:14}},
+        (st.inventory||[]).map(function(item,i){
+          return h('div',{key:i,style:{background:C.card,border:'1px solid '+RC[item.rarity]+'44',borderRadius:12,padding:'10px 13px',display:'flex',alignItems:'center',gap:11}},
+            h('div',{style:{fontSize:28,flexShrink:0}},item.icon),
+            h('div',{style:{flex:1}},
+              h('div',{style:{display:'flex',alignItems:'center',gap:7,marginBottom:2}},
+                h('span',{style:{fontSize:13,fontWeight:'bold',color:C.txt}},item.name),
+                h('span',{style:{fontSize:9,color:RC[item.rarity],textTransform:'uppercase',background:RC[item.rarity]+'22',padding:'2px 6px',borderRadius:10}},item.rarity)
+              ),
+              h('div',{style:{fontSize:11,color:C.dim,marginBottom:3}},item.desc),
+              item.useDesc&&h('div',{style:{fontSize:10,color:RC[item.rarity]}},'Effect: '+item.useDesc)
+            ),
+            item.use&&h('button',{onClick:function(){useItem(item,i);},style:{background:RC[item.rarity]+'22',border:'1px solid '+RC[item.rarity]+'44',borderRadius:8,padding:'7px 12px',color:RC[item.rarity],fontSize:11,fontWeight:'bold',flexShrink:0,whiteSpace:'nowrap'}},'Use')
+          );
+        })
+      ),
       SH('🔥','Streak Milestones',C.gold),
       h('div',{style:cs(C,{marginBottom:14})},MILESTONES.map(function(m){var claimed=(st.milestonesClaimed||[]).indexOf(m.days)>=0,achieved=st.streak>=m.days;return h('div',{key:m.days,style:{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid '+C.bdr,opacity:achieved?1:0.4}},h('div',{style:{width:40,height:40,borderRadius:'50%',background:claimed?C.gold+'22':C.bg,border:'1px solid '+(claimed?C.gold:C.bdr),display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}},claimed?'✅':m.days+'d'),h('div',{style:{flex:1}},h('div',{style:{fontSize:12,color:claimed?C.gold:C.txt,fontWeight:'bold'}},m.title||m.days+' Day Streak'),h('div',{style:{fontSize:10,color:C.dim}},m.msg)),h('div',{style:{fontSize:11,color:RC[m.rarity],textAlign:'right'}},'+'+m.xp+' XP'));})),
       SH('🏪','XP Shop',C.gold),
@@ -1568,14 +1632,78 @@ function App(){
     if(tab==='history') return h('div',null,
       SH('🗓️','Habit Heatmap — 6 Months',C.grnT),
       h('div',{style:cs(C,{marginBottom:14})},h(Heatmap,{log:st.log,C:C,totalQ:([].concat(st.habits,st.prayers,st.life)).length||1})),
-      SH('📊','Weekly Report Card',C.gold),
+      SH('📊','Weekly Review',C.gold),
       h('div',{style:cs(C,{marginBottom:14})},
-        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Generate your weekly performance grade.'),
-        h('button',{onClick:function(){var now=new Date(),wa=new Date(now);wa.setDate(wa.getDate()-7);var wl=st.log.filter(function(d){return d.date>=wa.toISOString().split('T')[0];});var rc=genRC(st,wl);setSt(function(p){return Object.assign({},p,{reportCards:(p.reportCards||[]).slice(-11).concat([rc])});});showT('Week graded: '+rc.grade+' ('+rc.ov+'%)','gold');},style:Object.assign({},btn(true),{width:'100%',fontSize:12,marginBottom:12})},"Generate This Week's Report"),
-        (st.reportCards||[]).slice(-1).map(function(rc,i){return h('div',{key:i},
-          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},h('div',null,h('div',{style:{fontSize:11,color:C.dim}},'Week ending '+rc.date),h('div',{style:{fontSize:13,color:C.txt,marginTop:2}},'Overall: '+rc.ov+'%')),h('div',{style:{fontSize:48,fontWeight:'bold',color:rc.grade==='S'?C.gold:rc.grade==='A'?C.grnT:rc.grade==='B'?C.bluT:rc.grade==='C'?C.ambT:rc.grade==='D'?C.redT:'#666'}},rc.grade)),
-          [{l:'Quests',v:rc.qp,c:C.gold},{l:'Prayers',v:rc.pp,c:C.bluT},{l:'Calories',v:rc.cp,c:C.ambT},{l:'Water',v:rc.wp,c:C.telT},{l:'Sleep',v:rc.sp,c:C.purT},{l:'Workouts',v:rc.wkp,c:C.purT}].map(function(s){return h('div',{key:s.l,style:{marginBottom:6}},h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:2}},h('span',{style:{fontSize:11,color:C.dim}},s.l),h('span',{style:{fontSize:11,color:s.c}},s.v+'%')),h('div',{style:{height:5,background:C.bdr,borderRadius:3,overflow:'hidden'}},h('div',{style:{height:'100%',width:s.v+'%',background:s.c,borderRadius:3,transition:'width 0.5s'}})));})
-        );})
+        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Your full week at a glance. Generate any time — best done on Sundays.'),
+        h('button',{onClick:function(){
+          var now=new Date(),wa=new Date(now);wa.setDate(wa.getDate()-7);
+          var weekStart=wa.toISOString().split('T')[0];
+          var wl=st.log.filter(function(d){return d.date>=weekStart;});
+          var rc=genRC(st,wl);
+          // Find best and worst day
+          var bestDay=null,worstDay=null,bestPct=0,worstPct=101;
+          wl.forEach(function(d){
+            var nonB=[].concat(st.habits,st.prayers,st.life);
+            var cnt=nonB.filter(function(h){return d.done&&d.done[h.id];}).length;
+            var pct=nonB.length?Math.round((cnt/nonB.length)*100):0;
+            if(pct>bestPct){bestPct=pct;bestDay=d.date;}
+            if(pct<worstPct){worstPct=pct;worstDay=d.date;}
+          });
+          // XP this week
+          var weekXp=wl.reduce(function(s,d){return s+(d.penXp?0:0);},0);
+          // Weight change
+          var weekWts=(st.wtLog||[]).filter(function(w){return w.date>=weekStart;});
+          var wtChange=weekWts.length>=2?weekWts[weekWts.length-1].wt-weekWts[0].wt:null;
+          // Steps average
+          var weekSteps=Object.entries(st.stepLog||{}).filter(function(e){return e[0]>=weekStart;});
+          var avgSteps=weekSteps.length?Math.round(weekSteps.reduce(function(s,e){return s+e[1];},0)/weekSteps.length):0;
+          var review=Object.assign({},rc,{
+            date:today(),weekStart:weekStart,
+            bestDay:bestDay,bestPct:bestPct,
+            worstDay:worstDay,worstPct:worstPct,
+            wtChange:wtChange,avgSteps:avgSteps,
+            streakAtEnd:st.streak
+          });
+          setSt(function(p){return Object.assign({},p,{reportCards:(p.reportCards||[]).slice(-11).concat([rc]),weeklyReviews:(p.weeklyReviews||[]).slice(-11).concat([review])});});
+          showT('Week reviewed: '+rc.grade+' ('+rc.ov+'%)','gold');
+        },style:Object.assign({},btn(true),{width:'100%',fontSize:12,marginBottom:12})},"Generate This Week's Review"),
+        (st.weeklyReviews||st.reportCards||[]).slice(-1).map(function(rv,i){
+          var rc=rv;
+          return h('div',{key:i},
+            h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}},
+              h('div',null,
+                h('div',{style:{fontSize:11,color:C.dim}},'Week ending '+rc.date),
+                h('div',{style:{fontSize:12,color:C.txt,marginTop:2}},'Streak: '+(rv.streakAtEnd||0)+' days 🔥'),
+                rv.wtChange!=null&&h('div',{style:{fontSize:12,color:rv.wtChange<0?C.grnT:C.redT,marginTop:2}},'Weight: '+(rv.wtChange<0?'':'+')+(rv.wtChange||0).toFixed(1)+'kg'),
+                rv.avgSteps>0&&h('div',{style:{fontSize:12,color:C.telT,marginTop:2}},'Avg steps: '+(rv.avgSteps||0).toLocaleString()+'/day')
+              ),
+              h('div',{style:{fontSize:60,fontWeight:'bold',color:rc.grade==='S'?C.gold:rc.grade==='A'?C.grnT:rc.grade==='B'?C.bluT:rc.grade==='C'?C.ambT:rc.grade==='D'?C.redT:'#666',lineHeight:1}},rc.grade)
+            ),
+            [{l:'Quests',v:rc.qp,c:C.gold},{l:'Prayers',v:rc.pp,c:C.bluT},{l:'Calories',v:rc.cp,c:C.ambT},{l:'Water',v:rc.wp,c:C.telT},{l:'Sleep',v:rc.sp,c:C.purT},{l:'Workouts',v:rc.wkp,c:C.purT}].map(function(s){
+              return h('div',{key:s.l,style:{marginBottom:8}},
+                h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:3}},
+                  h('span',{style:{fontSize:11,color:C.dim}},s.l),
+                  h('span',{style:{fontSize:11,color:s.c,fontWeight:'600'}},s.v+'%')
+                ),
+                h('div',{style:{height:6,background:C.bdr,borderRadius:3,overflow:'hidden'}},
+                  h('div',{style:{height:'100%',width:s.v+'%',background:s.c,borderRadius:3,transition:'width 0.5s'}})
+                )
+              );
+            }),
+            rv.bestDay&&h('div',{style:{display:'flex',gap:10,marginTop:10}},
+              h('div',{style:{flex:1,background:C.grn+'22',border:'1px solid '+C.grn+'33',borderRadius:8,padding:'8px 10px',textAlign:'center'}},
+                h('div',{style:{fontSize:9,color:C.dim,marginBottom:3}},'BEST DAY'),
+                h('div',{style:{fontSize:12,color:C.grnT,fontWeight:'bold'}},rv.bestDay),
+                h('div',{style:{fontSize:11,color:C.grnT}},rv.bestPct+'%')
+              ),
+              rv.worstDay&&h('div',{style:{flex:1,background:C.red+'22',border:'1px solid '+C.redT+'33',borderRadius:8,padding:'8px 10px',textAlign:'center'}},
+                h('div',{style:{fontSize:9,color:C.dim,marginBottom:3}},'NEEDS WORK'),
+                h('div',{style:{fontSize:12,color:C.redT,fontWeight:'bold'}},rv.worstDay),
+                h('div',{style:{fontSize:11,color:C.redT}},rv.worstPct+'%')
+              )
+            )
+          );
+        })
       ),
       SH('📜','Log History',C.dim),
       h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Tap × to remove an entry. Use "Fill Past Day" to add or correct data.'),
@@ -1740,6 +1868,7 @@ function App(){
             h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:2}},h('span',{style:{fontSize:9,color:C.dim}},xpIn+'/'+xpNd+' XP'),h('span',{style:{fontSize:9,color:C.dim}},'→ '+nxLvl.name))
           )
         ),
+        (st.activeEffects||{})['xp2x']===today()&&h('div',{style:{background:C.gold+'22',border:'1px solid '+C.gold,borderRadius:8,padding:'6px 12px',marginBottom:8,textAlign:'center',fontSize:12,color:C.gold,fontWeight:'bold'}},'⚡ 2x XP ACTIVE TODAY — every quest gives double XP!'),
         nxtP&&h('div',{style:{background:C.blu,border:'1px solid '+C.bluT+'44',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',justifyContent:'space-between',alignItems:'center'}},h('div',null,h('div',{style:{fontSize:10,color:C.bluT,letterSpacing:'0.12em'}},'NEXT PRAYER'),h('div',{style:{fontSize:14,color:C.txt,fontWeight:'bold'}},nxtP.name+' · '+nxtP.time)),h('div',{style:{fontSize:13,color:C.bluT,fontFamily:'monospace'}},cd)),
         h('div',{style:{display:'flex',gap:6}},[{l:'Lost',v:wLost>0?wLost.toFixed(1)+'kg':'—',c:C.grnT},{l:'Debt',v:''+totDebt,c:totDebt>0?C.redT:C.grnT},{l:'Kcal',v:todCal?''+todCal.cal:'—',c:C.bluT},{l:'H₂O',v:Math.round((st.waterToday||0)/100)/10+'L',c:C.telT}].map(function(s){return h('div',{key:s.l,style:{flex:1,background:C.bg,borderRadius:6,padding:6,textAlign:'center',border:'1px solid '+C.bdr}},h('div',{style:{fontSize:13,fontWeight:'bold',color:s.c}},s.v),h('div',{style:{fontSize:9,color:C.dim}},s.l));}))
       ),
