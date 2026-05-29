@@ -587,7 +587,23 @@ function initState(){
     }
     var curWeek=getWeekMon();
     var weekChanged=(saved.currentWeek||'')!==curWeek;
-    return Object.assign({},s,{done:{},doneChores:{},chores:(saved.chores||[]).filter(function(c){return !c.once||!(saved.doneChores||{})[c.id];}),lastDay:td,streak:newStreak,habitStreaks:newHS,habitMissed:newHM,xp:Math.max(0,(saved.xp||0)-penXp),debt:nd,waterToday:0,prayerHist:Object.assign({},saved.prayerHist||{},Object.defineProperty({},[saved.lastDay],{value:yp,enumerable:true})),log:[].concat(saved.log||[],[{date:saved.lastDay,done:saved.done||{},allDone:allDone,penXp:penXp}]),weeklyChDone:weekChanged?{}:(saved.weeklyChDone||{}),currentWeek:curWeek});
+    var newReports=(saved.reportCards||[]).slice();
+    if(weekChanged&&saved.currentWeek){
+      var owl=(saved.log||[]).filter(function(d){return d.date>=saved.currentWeek&&d.date<curWeek;});
+      if(saved.lastDay>=saved.currentWeek&&saved.lastDay<curWeek)owl=owl.concat([{date:saved.lastDay,done:saved.done||{},allDone:allDone,penXp:penXp}]);
+      if(owl.length){
+        var rc0=genRC(saved,owl);
+        var nB0=[].concat(saved.habits||[],saved.prayers||[],saved.life||[]);
+        var bD=null,wD=null,bP=-1,wP=101;
+        owl.forEach(function(d){var c=nB0.filter(function(hh){return d.done&&d.done[hh.id];}).length;var pc=nB0.length?Math.round(c/nB0.length*100):0;if(pc>bP){bP=pc;bD=d.date;}if(pc<wP){wP=pc;wD=d.date;}});
+        var wts0=(saved.wtLog||[]).filter(function(w){return w.date>=saved.currentWeek&&w.date<curWeek;});
+        var wtc0=wts0.length>=2?wts0[wts0.length-1].wt-wts0[0].wt:null;
+        var stp0=Object.keys(saved.stepLog||{}).filter(function(k){return k>=saved.currentWeek&&k<curWeek;});
+        var avgS0=stp0.length?Math.round(stp0.reduce(function(s,k){return s+(saved.stepLog[k]||0);},0)/stp0.length):0;
+        newReports=newReports.slice(-15).concat([Object.assign({},rc0,{weekStart:saved.currentWeek,date:saved.lastDay,bestDay:bD,bestPct:bP<0?0:bP,worstDay:wD,worstPct:wP>100?0:wP,wtChange:wtc0,avgSteps:avgS0,streakAtEnd:newStreak,auto:true})]);
+      }
+    }
+    return Object.assign({},s,{done:{},doneChores:{},chores:(saved.chores||[]).filter(function(c){return !c.once||!(saved.doneChores||{})[c.id];}),lastDay:td,streak:newStreak,habitStreaks:newHS,habitMissed:newHM,xp:Math.max(0,(saved.xp||0)-penXp),debt:nd,waterToday:0,prayerHist:Object.assign({},saved.prayerHist||{},Object.defineProperty({},[saved.lastDay],{value:yp,enumerable:true})),log:[].concat(saved.log||[],[{date:saved.lastDay,done:saved.done||{},allDone:allDone,penXp:penXp}]),weeklyChDone:weekChanged?{}:(saved.weeklyChDone||{}),currentWeek:curWeek,reportCards:newReports});
   }
   return s;
 }
@@ -770,7 +786,7 @@ function genRC(st,weekLog){
   var cd=weekLog.filter(function(d){var c=(st.calLog||[]).find(function(en){return en.date===d.date;});return c&&c.cal<=st.calTarget;}).length;
   var wd=weekLog.filter(function(d){var w=(st.waterLog||[]).find(function(en){return en.date===d.date;});return w&&w.ml>=(st.waterTarget||3000);}).length;
   var sd=weekLog.filter(function(d){var s=(st.sleepLog||[]).find(function(en){return en.date===d.date;});return s&&s.hrs>=7;}).length;
-  var wkd=(st.workouts||[]).filter(function(w){return weekLog.some(function(d){return d.date===w.date;});}).length;
+  var wkd=0;weekLog.forEach(function(d){var has=(st.workouts||[]).some(function(w){return w.date===d.date;})||(((st.workoutSessions||{})[d.date]||[]).length>0);if(has)wkd++;});
   var qp=Math.round((qd/7)*100),pp=Math.round((pd/7)*100),cp=Math.round((cd/7)*100),wp=Math.round((wd/7)*100),sp=Math.round((sd/7)*100),wkp=Math.min(100,Math.round((wkd/4)*100));
   var ov=Math.round((qp+pp+cp+wp+sp+wkp)/6);
   return{qp:qp,pp:pp,cp:cp,wp:wp,sp:sp,wkp:wkp,ov:ov,grade:gm(ov),date:today()};
@@ -953,6 +969,8 @@ function App(){
   var cwXpS=useState('200'),setCwXp=cwXpS[1],cwXp=cwXpS[0];
   var wkDayS=useState(today()),wkDay=wkDayS[0],setWkDay=wkDayS[1];
   var wkSheetS=useState(null),wkSheet=wkSheetS[0],setWkSheet=wkSheetS[1];
+  var hvRangeS=useState('month'),hvRange=hvRangeS[0],setHvRange=hvRangeS[1];
+  var hvDayS=useState(null),hvDay=hvDayS[0],setHvDay=hvDayS[1];
   var nudgeRef=useRef(null);
   var prevLvlRef=useRef(getLvl(st.xp).level);
   var ptData=usePT();var pTimes=ptData.times,nxtP=ptData.nxt,cd=ptData.cd;
@@ -1692,108 +1710,142 @@ function App(){
       st.titleUnlocked&&h('div',{style:cs(C,{textAlign:'center',background:C.gold+'11',border:'1px solid '+C.gold+'33'})},h('div',{style:{fontSize:11,color:C.goldD,letterSpacing:'0.2em',marginBottom:4}},'TITLE UNLOCKED'),h('div',{style:{fontSize:18,color:C.gold,fontWeight:'bold'}},st.titleUnlocked))
     );
 
-    if(tab==='history') return h('div',null,
-      SH('🗓️','Habit Heatmap — 6 Months',C.grnT),
-      h('div',{style:cs(C,{marginBottom:14})},h(Heatmap,{log:st.log,C:C,totalQ:([].concat(st.habits,st.prayers,st.life)).length||1})),
-      SH('📊','Weekly Review',C.gold),
-      h('div',{style:cs(C,{marginBottom:14})},
-        h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Your full week at a glance. Generate any time — best done on Sundays.'),
-        h('button',{onClick:function(){
-          var now=new Date(),wa=new Date(now);wa.setDate(wa.getDate()-7);
-          var weekStart=wa.toISOString().split('T')[0];
-          var wl=st.log.filter(function(d){return d.date>=weekStart;});
-          var rc=genRC(st,wl);
-          // Find best and worst day
-          var bestDay=null,worstDay=null,bestPct=0,worstPct=101;
-          wl.forEach(function(d){
-            var nonB=[].concat(st.habits,st.prayers,st.life);
-            var cnt=nonB.filter(function(h){return d.done&&d.done[h.id];}).length;
-            var pct=nonB.length?Math.round((cnt/nonB.length)*100):0;
-            if(pct>bestPct){bestPct=pct;bestDay=d.date;}
-            if(pct<worstPct){worstPct=pct;worstDay=d.date;}
-          });
-          // XP this week
-          var weekXp=wl.reduce(function(s,d){return s+(d.penXp?0:0);},0);
-          // Weight change
-          var weekWts=(st.wtLog||[]).filter(function(w){return w.date>=weekStart;});
-          var wtChange=weekWts.length>=2?weekWts[weekWts.length-1].wt-weekWts[0].wt:null;
-          // Steps average
-          var weekSteps=Object.entries(st.stepLog||{}).filter(function(e){return e[0]>=weekStart;});
-          var avgSteps=weekSteps.length?Math.round(weekSteps.reduce(function(s,e){return s+e[1];},0)/weekSteps.length):0;
-          var review=Object.assign({},rc,{
-            date:today(),weekStart:weekStart,
-            bestDay:bestDay,bestPct:bestPct,
-            worstDay:worstDay,worstPct:worstPct,
-            wtChange:wtChange,avgSteps:avgSteps,
-            streakAtEnd:st.streak
-          });
-          setSt(function(p){return Object.assign({},p,{reportCards:(p.reportCards||[]).slice(-11).concat([rc]),weeklyReviews:(p.weeklyReviews||[]).slice(-11).concat([review])});});
-          showT('Week reviewed: '+rc.grade+' ('+rc.ov+'%)','gold');
-        },style:Object.assign({},btn(true),{width:'100%',fontSize:12,marginBottom:12})},"Generate This Week's Review"),
-        (st.weeklyReviews||st.reportCards||[]).slice(-1).map(function(rv,i){
-          var rc=rv;
-          return h('div',{key:i},
-            h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}},
+    if(tab==='history') return (function(){
+      var nonB=[].concat(st.habits,st.prayers,st.life);
+      var totalQ=nonB.length||1;
+      var td=today();
+      var logMap={};
+      (st.log||[]).forEach(function(en){var cnt=nonB.filter(function(hh){return en.done&&en.done[hh.id];}).length;logMap[en.date]={pct:cnt/totalQ,cnt:cnt};});
+      var tdc=nonB.filter(function(hh){return st.done[hh.id];}).length;logMap[td]={pct:tdc/totalQ,cnt:tdc};
+      var gm=function(p){if(p>=90)return'S';if(p>=80)return'A';if(p>=65)return'B';if(p>=50)return'C';if(p>=35)return'D';return'F';};
+      var gradeCol=function(g){return g==='S'?C.gold:g==='A'?C.grnT:g==='B'?C.bluT:g==='C'?C.ambT:g==='D'?C.redT:'#888';};
+      function colOf(pct,has,fut){
+        if(fut)return{bg:'transparent',bd:'1px dashed '+C.bdr,txt:C.fnt};
+        if(!has)return{bg:'transparent',bd:'1px solid '+C.bdr,txt:C.dim};
+        if(pct>=1)return{bg:'#ffd479',bd:'none',txt:'#150f04'};
+        if(pct>=0.71)return{bg:'#3fcf5a',bd:'none',txt:'#08280f'};
+        if(pct>=0.41)return{bg:'#e6c633',bd:'none',txt:'#2a2400'};
+        if(pct>0)return{bg:'#ef8b3a',bd:'none',txt:'#2a1500'};
+        return{bg:'#e0524f',bd:'none',txt:'#2a0a0a'};
+      }
+      function cell(dateStr,fs){
+        var fut=dateStr>td,rec=logMap[dateStr],has=!!rec,pct=rec?rec.pct:0,c=colOf(pct,has,fut);
+        var dnum=parseInt(dateStr.split('-')[2],10),isT=dateStr===td;
+        return h('div',{key:dateStr,onClick:fut?null:function(){setHvDay(dateStr);},className:'cz',style:{aspectRatio:'1',borderRadius:'50%',background:c.bg,border:c.bd==='none'?'none':c.bd,display:'flex',alignItems:'center',justifyContent:'center',fontSize:fs||12.5,fontWeight:700,color:c.txt,cursor:fut?'default':'pointer',boxShadow:isT?'0 0 0 2px '+C.gold+',0 0 12px '+C.gold+'55':'none',transition:'transform .12s'}},dnum);
+      }
+      function blanks(n,pre){var a=[];for(var i=0;i<n;i++)a.push(h('div',{key:pre+i}));return a;}
+      function monthBlock(y,m,fs,showLabel){
+        var first=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),cells=blanks(first,'e'+y+m+'_');
+        for(var d=1;d<=dim;d++){cells.push(cell(y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'),fs));}
+        return h('div',{key:y+'-'+m,style:{marginBottom:fs<11?16:6}},
+          showLabel&&h('div',{className:'cz',style:{fontSize:13,fontWeight:700,color:C.gold,marginBottom:8}},WK_MON[m]+' '+y),
+          h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:fs<11?5:8}},cells)
+        );
+      }
+      var dowHead=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:8,marginBottom:8}},['S','M','T','W','T','F','S'].map(function(d,i){return h('div',{key:i,style:{textAlign:'center',fontSize:10,fontWeight:700,color:C.dim,letterSpacing:'.05em'}},d);}));
+      var now=new Date();
+      var calBody;
+      if(hvRange==='week'){
+        var wd=[];for(var i=6;i>=0;i--){var dd=new Date();dd.setDate(dd.getDate()-i);wd.push(wkYmd(dd));}
+        calBody=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:8}},wd.map(function(ds){var d=wkParse(ds);return h('div',{key:ds,style:{display:'flex',flexDirection:'column',alignItems:'center',gap:6}},h('div',{style:{fontSize:10,fontWeight:700,color:C.dim}},WK_DOW[d.getDay()][0]),cell(ds,15));}));
+      } else if(hvRange==='month'){
+        calBody=h('div',null,dowHead,monthBlock(now.getFullYear(),now.getMonth(),13,false));
+      } else {
+        var blocks=[];for(var mi=5;mi>=0;mi--){var md=new Date(now.getFullYear(),now.getMonth()-mi,1);blocks.push(monthBlock(md.getFullYear(),md.getMonth(),10,true));}
+        calBody=h('div',null,blocks);
+      }
+      var legend=h('div',{style:{display:'flex',flexWrap:'wrap',gap:10,justifyContent:'center',marginBottom:6,marginTop:4}},
+        [['#e0524f','Missed'],['#ef8b3a','Low'],['#e6c633','Half'],['#3fcf5a','Good'],['#ffd479','Perfect']].map(function(p){return h('div',{key:p[1],style:{display:'flex',alignItems:'center',gap:5}},h('div',{style:{width:11,height:11,borderRadius:'50%',background:p[0]}}),h('span',{style:{fontSize:10,color:C.dim,fontWeight:600}},p[1]));})
+      );
+      // live current week
+      var cwStart=getWeekMon();
+      var liveEntries=(st.log||[]).filter(function(d){return d.date>=cwStart&&d.date<td;}).concat([{date:td,done:st.done}]);
+      var lp=liveEntries.map(function(d){var c=nonB.filter(function(hh){return d.done&&d.done[hh.id];}).length;return nonB.length?c/nonB.length:0;});
+      var avgPct=lp.length?Math.round(lp.reduce(function(a,b){return a+b;},0)/lp.length*100):0;
+      var fullDays=liveEntries.filter(function(d){return nonB.length&&nonB.every(function(hh){return d.done&&d.done[hh.id];});}).length;
+      var liveGrade=gm(avgPct);
+      var past=[].concat(st.reportCards||[]).reverse();
+      return h('div',{className:'rise'},
+        SH('🗓️','History',C.grnT),
+        h('div',{style:{display:'flex',gap:7,marginBottom:14}},[['week','Week'],['month','Month'],['6mo','6 Months']].map(function(r){return h('button',{key:r[0],onClick:function(){setHvRange(r[0]);},style:Object.assign({},btn(hvRange===r[0]),{flex:1,fontSize:12})},r[1]);})),
+        h('div',{style:cs(C,{marginBottom:10})},calBody),
+        legend,
+        SH('📊','Weekly Review',C.gold),
+        h('div',{style:cs(C,{marginBottom:12})},
+          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
+            h('div',null,h('div',{style:{fontSize:10,color:C.dim,letterSpacing:'.12em',textTransform:'uppercase',fontWeight:700}},'This Week · in progress'),h('div',{className:'cz',style:{fontSize:18,fontWeight:700,color:C.txt,marginTop:2}},avgPct+'% average')),
+            h('div',{className:'cz',style:{fontSize:46,fontWeight:700,lineHeight:1,color:gradeCol(liveGrade)}},liveGrade)
+          ),
+          h('div',{style:{display:'flex',gap:8,marginTop:12}},
+            [{l:'Days active',v:liveEntries.length},{l:'Full clears',v:fullDays},{l:'Streak',v:st.streak+'🔥'}].map(function(s){return h('div',{key:s.l,style:{flex:1,background:C.bg,borderRadius:14,padding:'10px 4px',textAlign:'center',border:'1px solid '+C.bdr}},h('div',{className:'cz',style:{fontSize:17,fontWeight:700,color:C.gold}},s.v),h('div',{style:{fontSize:9.5,color:C.dim,fontWeight:600,marginTop:2}},s.l));}))
+        ),
+        past.length===0&&h('div',{style:{fontSize:11,color:C.dim,textAlign:'center',padding:'4px 10px 8px'}},'Your first full weekly review saves automatically when the week rolls over (Monday).'),
+        past.map(function(rc,i){
+          return h('div',{key:i,style:cs(C,{marginBottom:10})},
+            h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},
               h('div',null,
-                h('div',{style:{fontSize:11,color:C.dim}},'Week ending '+rc.date),
-                h('div',{style:{fontSize:12,color:C.txt,marginTop:2}},'Streak: '+(rv.streakAtEnd||0)+' days 🔥'),
-                rv.wtChange!=null&&h('div',{style:{fontSize:12,color:rv.wtChange<0?C.grnT:C.redT,marginTop:2}},'Weight: '+(rv.wtChange<0?'':'+')+(rv.wtChange||0).toFixed(1)+'kg'),
-                rv.avgSteps>0&&h('div',{style:{fontSize:12,color:C.telT,marginTop:2}},'Avg steps: '+(rv.avgSteps||0).toLocaleString()+'/day')
+                h('div',{style:{fontSize:11,color:C.dim,fontWeight:600}},'Week of '+(rc.weekStart?wkPretty(rc.weekStart).replace('Today','this week'):rc.date)),
+                h('div',{style:{fontSize:12,color:C.txt,marginTop:2,fontWeight:600}},'Streak: '+(rc.streakAtEnd||0)+' 🔥'),
+                rc.wtChange!=null&&h('div',{style:{fontSize:12,color:rc.wtChange<0?C.grnT:C.redT,marginTop:2,fontWeight:600}},'Weight '+(rc.wtChange<0?'':'+')+(rc.wtChange||0).toFixed(1)+'kg'),
+                rc.avgSteps>0&&h('div',{style:{fontSize:12,color:C.telT,marginTop:2,fontWeight:600}},(rc.avgSteps||0).toLocaleString()+' steps/day')
               ),
-              h('div',{style:{fontSize:60,fontWeight:'bold',color:rc.grade==='S'?C.gold:rc.grade==='A'?C.grnT:rc.grade==='B'?C.bluT:rc.grade==='C'?C.ambT:rc.grade==='D'?C.redT:'#666',lineHeight:1}},rc.grade)
+              h('div',{className:'cz',style:{fontSize:54,fontWeight:700,lineHeight:1,color:gradeCol(rc.grade)}},rc.grade)
             ),
-            [{l:'Quests',v:rc.qp,c:C.gold},{l:'Prayers',v:rc.pp,c:C.bluT},{l:'Calories',v:rc.cp,c:C.ambT},{l:'Water',v:rc.wp,c:C.telT},{l:'Sleep',v:rc.sp,c:C.purT},{l:'Workouts',v:rc.wkp,c:C.purT}].map(function(s){
-              return h('div',{key:s.l,style:{marginBottom:8}},
-                h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:3}},
-                  h('span',{style:{fontSize:11,color:C.dim}},s.l),
-                  h('span',{style:{fontSize:11,color:s.c,fontWeight:'600'}},s.v+'%')
-                ),
-                h('div',{style:{height:6,background:C.bdr,borderRadius:3,overflow:'hidden'}},
-                  h('div',{style:{height:'100%',width:s.v+'%',background:s.c,borderRadius:3,transition:'width 0.5s'}})
-                )
-              );
-            }),
-            rv.bestDay&&h('div',{style:{display:'flex',gap:10,marginTop:10}},
-              h('div',{style:{flex:1,background:C.grn+'22',border:'1px solid '+C.grn+'33',borderRadius:8,padding:'8px 10px',textAlign:'center'}},
-                h('div',{style:{fontSize:9,color:C.dim,marginBottom:3}},'BEST DAY'),
-                h('div',{style:{fontSize:12,color:C.grnT,fontWeight:'bold'}},rv.bestDay),
-                h('div',{style:{fontSize:11,color:C.grnT}},rv.bestPct+'%')
-              ),
-              rv.worstDay&&h('div',{style:{flex:1,background:C.red+'22',border:'1px solid '+C.redT+'33',borderRadius:8,padding:'8px 10px',textAlign:'center'}},
-                h('div',{style:{fontSize:9,color:C.dim,marginBottom:3}},'NEEDS WORK'),
-                h('div',{style:{fontSize:12,color:C.redT,fontWeight:'bold'}},rv.worstDay),
-                h('div',{style:{fontSize:11,color:C.redT}},rv.worstPct+'%')
-              )
+            [{l:'Quests',v:rc.qp,c:C.gold},{l:'Prayers',v:rc.pp,c:C.bluT},{l:'Calories',v:rc.cp,c:C.ambT},{l:'Water',v:rc.wp,c:C.telT},{l:'Sleep',v:rc.sp,c:C.purT},{l:'Workouts',v:rc.wkp,c:C.grnT}].map(function(s){return h('div',{key:s.l,style:{marginBottom:8}},
+              h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:4}},h('span',{style:{fontSize:11,color:C.dim,fontWeight:600}},s.l),h('span',{style:{fontSize:11,color:s.c,fontWeight:700}},(s.v||0)+'%')),
+              h('div',{style:{height:7,background:C.bg,borderRadius:5,overflow:'hidden',border:'1px solid '+C.bdr}},h('div',{style:{height:'100%',width:(s.v||0)+'%',background:s.c,borderRadius:5,transition:'width 0.5s'}}))
+            );}),
+            rc.bestDay&&h('div',{style:{display:'flex',gap:9,marginTop:10}},
+              h('div',{style:{flex:1,background:C.grn+'22',border:'1px solid '+C.grn+'44',borderRadius:14,padding:'9px 10px',textAlign:'center'}},h('div',{style:{fontSize:9,color:C.dim,marginBottom:3,fontWeight:700}},'BEST DAY'),h('div',{style:{fontSize:12,color:C.grnT,fontWeight:700}},rc.bestDay?wkPretty(rc.bestDay):'—'),h('div',{style:{fontSize:11,color:C.grnT}},(rc.bestPct||0)+'%')),
+              h('div',{style:{flex:1,background:C.red+'22',border:'1px solid '+C.redT+'44',borderRadius:14,padding:'9px 10px',textAlign:'center'}},h('div',{style:{fontSize:9,color:C.dim,marginBottom:3,fontWeight:700}},'NEEDS WORK'),h('div',{style:{fontSize:12,color:C.redT,fontWeight:700}},rc.worstDay?wkPretty(rc.worstDay):'—'),h('div',{style:{fontSize:11,color:C.redT}},(rc.worstPct||0)+'%'))
             )
           );
-        })
-      ),
-      SH('📜','Log History',C.dim),
-      h('div',{style:{fontSize:11,color:C.dim,marginBottom:10}},'Tap × to remove an entry. Use "Fill Past Day" to add or correct data.'),
-      st.log.length===0&&h('div',{style:{textAlign:'center',color:C.fnt,padding:40,fontSize:13}},'No history yet.'),
-      [].concat(st.log).reverse().slice(0,60).map(function(entry,i){
-        var cnt=allH.filter(function(hh){return entry.done&&entry.done[hh.id];}).length;
-        var pct=allH.length?Math.round((cnt/allH.length)*100):0;
-        var ce=(st.calLog||[]).find(function(en){return en.date===entry.date;});
-        var we=(st.wtLog||[]).find(function(en){return en.date===entry.date;});
-        var ne=(st.notes||{})[entry.date];
-        var sl=(st.sleepLog||[]).find(function(en){return en.date===entry.date;});
-        return h('div',{key:i,style:cs(C,{marginBottom:6,padding:'10px 13px'})},
-          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
-            h('div',null,h('div',{style:{fontSize:12,color:C.txt}},entry.date,entry.backdated&&h('span',{style:{fontSize:9,color:C.ambT,marginLeft:5}},'(backdated)')),entry.penXp>0&&h('div',{style:{fontSize:10,color:C.redT,marginTop:1}},'-'+entry.penXp+' XP penalty')),
-            h('div',{style:{display:'flex',alignItems:'center',gap:8}},h('div',{style:{fontSize:16,fontWeight:'bold',color:pct===100?C.gold:pct>=60?C.grnT:pct>=40?'#ddaa44':C.redT}},pct+'%'),h('button',{onClick:function(){removeLog(entry.date);},style:{background:'none',border:'none',color:C.fnt,fontSize:16,cursor:'pointer',lineHeight:1}},'×'))
-          ),
-          h('div',{style:{fontSize:11,color:C.dim,marginTop:3}},
-            allH.filter(function(hh){return entry.done&&entry.done[hh.id];}).map(function(hh){return hh.icon;}).join(' ')||'Nothing logged',
-            ce&&h('span',{style:{marginLeft:6,color:C.bluT}},'· '+ce.cal+'kcal'),
-            we&&h('span',{style:{marginLeft:6,color:C.grnT}},'· '+we.wt+'kg'),
-            (st.stepLog||{})[entry.date]&&h('span',{style:{marginLeft:6,color:C.telT}},'· '+((st.stepLog||{})[entry.date]||0).toLocaleString()+'steps'),
-            sl&&h('span',{style:{marginLeft:6,color:C.purT}},'· '+sl.hrs+'h sleep'),
-            ne&&ne.mood&&h('span',{style:{marginLeft:6,color:C.ambT}},'· '+ne.mood)
-          )
-        );
-      })
-    );
+        }),
+        hvDay&&(function(){
+          var dd=hvDay,entry=(st.log||[]).find(function(e){return e.date===dd;}),liveT=dd===td;
+          var doneMap=liveT?st.done:(entry?entry.done:{});
+          var doneQ=nonB.filter(function(hh){return doneMap&&doneMap[hh.id];});
+          var bonusDone=(st.bonus||[]).filter(function(hh){return doneMap&&doneMap[hh.id];});
+          var pct=nonB.length?Math.round(doneQ.length/nonB.length*100):0;
+          var cal=(st.calLog||[]).find(function(e){return e.date===dd;}),wt=(st.wtLog||[]).find(function(e){return e.date===dd;}),water=(st.waterLog||[]).find(function(e){return e.date===dd;}),sleep=(st.sleepLog||[]).find(function(e){return e.date===dd;}),steps=(st.stepLog||{})[dd],note=(st.notes||{})[dd],wkouts=(st.workoutSessions||{})[dd]||[];
+          var prayers=(st.prayers||[]).map(function(p){var done=liveT?st.done[p.id]:((st.prayerHist||{})[dd]||{})[p.id];return {label:p.label,icon:p.icon,done:!!done};});
+          var stats=[];
+          if(cal)stats.push({i:'🍗',v:cal.cal+(cal.prot?' · '+cal.prot+'g':''),l:'kcal'+(cal.prot?' / protein':''),c:C.ambT});
+          if(wt)stats.push({i:'⚖️',v:wt.wt+'kg',l:'weight',c:C.grnT});
+          if(water)stats.push({i:'💧',v:(Math.round(water.ml/100)/10)+'L',l:'water',c:C.telT});
+          if(sleep)stats.push({i:'😴',v:sleep.hrs+'h',l:'sleep',c:C.purT});
+          if(steps)stats.push({i:'👟',v:steps.toLocaleString(),l:'steps',c:C.bluT});
+          function sessLine(S){if(S.type==='gym')return S.sets.length+' sets · '+S.topW+'kg';var b=[];if(S.duration)b.push(S.duration+'min');if(S.distance)b.push(S.distance+'km');if(S.reps)b.push(S.reps+' skips');return b.join(' · ')||wkActOf(S.type).name;}
+          return h('div',null,
+            h('div',{className:'scrim',onClick:function(){setHvDay(null);}}),
+            h('div',{className:'sheet'},
+              h('div',{className:'grab'}),
+              h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}},
+                h('div',null,h('div',{className:'cz',style:{fontSize:21,fontWeight:700,color:C.txt}},wkPretty(dd)),h('div',{style:{fontSize:12,color:C.dim,fontWeight:600,marginTop:1}},(function(){var d=wkParse(dd);return WK_DOW[d.getDay()]+', '+d.getDate()+' '+WK_MON[d.getMonth()]+' '+d.getFullYear();})())),
+                h('div',{style:{width:54,height:54,borderRadius:'50%',display:'grid',placeItems:'center',background:'conic-gradient('+C.gold+' '+(pct*3.6)+'deg,'+C.bdr+' 0deg)'}},h('div',{className:'cz',style:{width:42,height:42,borderRadius:'50%',background:C.card,display:'grid',placeItems:'center',fontSize:13,fontWeight:700,color:C.gold}},pct+'%'))
+              ),
+              entry&&entry.penXp>0&&h('div',{style:{background:C.red+'22',border:'1px solid '+C.redT+'44',borderRadius:12,padding:'8px 12px',marginBottom:12,fontSize:12,color:C.redT,fontWeight:600}},'⚠️ −'+entry.penXp+' XP penalty this day'),
+              stats.length>0&&h('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:9,marginBottom:14}},stats.map(function(s,i){return h('div',{key:i,style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:16,padding:'12px 13px'}},h('div',{style:{fontSize:15,marginBottom:5}},s.i),h('div',{className:'cz',style:{fontSize:18,fontWeight:700,color:s.c}},s.v),h('div',{style:{fontSize:10,color:C.dim,fontWeight:600,marginTop:2}},s.l));})),
+              h('div',{style:{fontSize:11,color:C.dim,letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700,marginBottom:8}},'Quests · '+doneQ.length+'/'+nonB.length),
+              doneQ.length>0?h('div',{style:{display:'flex',flexWrap:'wrap',gap:6,marginBottom:14}},doneQ.concat(bonusDone).map(function(hh){return h('div',{key:hh.id,style:{display:'flex',alignItems:'center',gap:5,background:C.grn+'22',border:'1px solid '+C.grn+'44',borderRadius:999,padding:'6px 11px'}},h('span',{style:{fontSize:13}},hh.icon),h('span',{style:{fontSize:11,color:C.grnT,fontWeight:600}},hh.label));})):h('div',{style:{fontSize:12,color:C.fnt,marginBottom:14}},'No quests completed this day'),
+              prayers.length>0&&h('div',null,
+                h('div',{style:{fontSize:11,color:C.dim,letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700,marginBottom:8}},'Prayers'),
+                h('div',{style:{display:'flex',gap:7,marginBottom:14}},prayers.map(function(p,i){return h('div',{key:i,style:{flex:1,textAlign:'center',background:p.done?C.blu:C.bg,border:'1px solid '+(p.done?C.bluT+'55':C.bdr),borderRadius:13,padding:'9px 2px'}},h('div',{style:{fontSize:15,opacity:p.done?1:0.35}},p.icon),h('div',{style:{fontSize:8.5,color:p.done?C.bluT:C.fnt,fontWeight:700,marginTop:3}},p.label.slice(0,6)));}))
+              ),
+              wkouts.length>0&&h('div',null,
+                h('div',{style:{fontSize:11,color:C.dim,letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700,marginBottom:8}},'Workouts'),
+                wkouts.map(function(S){var a=wkActOf(S.type);return h('div',{key:S.id,style:{display:'flex',alignItems:'center',gap:10,background:C.bg,border:'1px solid '+C.bdr,borderRadius:14,padding:'10px 12px',marginBottom:7}},h('div',{style:{width:34,height:34,borderRadius:11,display:'grid',placeItems:'center',fontSize:17,background:wkTint(a.color,0.15)}},a.icon),h('div',{style:{flex:1}},h('div',{style:{fontSize:13,color:C.txt,fontWeight:700}},S.type==='gym'?S.name:a.name),h('div',{style:{fontSize:11,color:C.dim}},sessLine(S))));})
+              ),
+              note&&note.text&&h('div',{style:{marginTop:4,marginBottom:6}},
+                h('div',{style:{fontSize:11,color:C.dim,letterSpacing:'.1em',textTransform:'uppercase',fontWeight:700,marginBottom:8}},'Note'+(note.mood?' · '+note.mood:'')),
+                h('div',{style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:14,padding:'12px 14px',fontSize:13,color:C.txt,lineHeight:1.5,whiteSpace:'pre-wrap'}},note.text)
+              ),
+              h('button',{className:'bigbtn ghost',style:{marginTop:14},onClick:function(){var el=(st.log||[]).find(function(l){return l.date===dd;});setBfDone(el&&el.done?Object.assign({},el.done):{});setBfCal(cal?String(cal.cal):'');setBfProt(cal&&cal.prot?String(cal.prot):'');setBfWt(wt?String(wt.wt):'');setBfWater(water?String(water.ml):'');setBfNote(note?note.text:'');setBfDate(dd);setBfOpen(true);setHvDay(null);setTab('today');showT('Editing '+wkPretty(dd)+' — form is open below ↓','gold');}},'✏️ Edit / fill this day')
+            )
+          );
+        })()
+      );
+    })();
 
     if(tab==='settings') return h('div',null,
       SH('🌓','Appearance',C.dim),
