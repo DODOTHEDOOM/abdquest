@@ -752,16 +752,25 @@ var GH_METRICS={
   calOut:{type:'total-calories',camel:'totalCalories',snake:'total_calories',order:['roll','listI'],min:200},
   calOut2:{type:'active-energy-burned',camel:'activeEnergyBurned',snake:'active_energy_burned',order:['roll','listI'],min:5},
   azm:{type:'active-zone-minutes',camel:'activeZoneMinutes',snake:'active_zone_minutes',order:['roll','listI'],min:1},
-  rhr:{type:'daily-resting-heart-rate',camel:'dailyRestingHeartRate',snake:'daily_resting_heart_rate',order:['listD','roll','listI'],min:25,max:200,agg:'avg'},
+  rhr:{type:'daily-resting-heart-rate',camel:'dailyRestingHeartRate',snake:'daily_resting_heart_rate',order:['listDR'],min:25,max:200,agg:'avg'},
   hrAvg:{type:'heart-rate',camel:'heartRate',snake:'heart_rate',order:['listS'],min:25,max:230,agg:'avg',cap:1},
-  calIn:{type:'nutrition',camel:'nutrition',snake:'nutrition',order:['roll','listI'],min:50}
+  calIn:{types:['nutrition-logs','food-logs','nutrition-log','food-log','nutrition-summary','foods'],catRe:'nutrition|food',camel:'nutrition',order:['roll','listI','listDR'],min:50}
 };
-function ghMetric(key,dateKey,at,cb){
-  var metric=GH_METRICS[key];if(!metric)return cb(0,'unknown');
-  var camel=metric.camel,type=metric.type,snake=metric.snake;
+function ghTypesCached(){try{return JSON.parse(localStorage.getItem('abdquest_gh_types')||'[]');}catch(e){return [];}}
+function ghCatalog(at,cb){
+  ghReqE('GET','/users/me/dataTypes?pageSize=300',at,null,function(ok,d,stt,err){
+    if(!ok)return cb(null,stt+' '+err);
+    try{var ids=(d.dataTypes||[]).map(function(t){return t.id||t.name||t.dataTypeId||'';}).filter(Boolean).map(function(x){return String(x).split('/').pop();});
+      if(ids.length){try{localStorage.setItem('abdquest_gh_types',JSON.stringify(ids));}catch(e){}}
+      cb(ids,'');}catch(e){cb(null,'parse');}
+  });
+}
+function ghMetricOne(metric,type,dateKey,at,cb){
+  var camel=metric.camel,snake=type.replace(/-/g,'_');
   var R=ghDayRangeZ(dateKey);
   function clean(dp,drop){var c=Object.assign({},dp[camel]||dp);(drop||[]).forEach(function(k){delete c[k];});return c;}
   var methods={
+    listDR:function(done){var f=encodeURIComponent(snake+'.date >= "'+dateKey+'" AND '+snake+'.date <= "'+dateKey+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var dp=(d.dataPoints||[])[0];if(!dp)return done(0,'no points');done(ghNum(clean(dp,['date']),0),'');}catch(e){done(0,'parse');}});},
     roll:function(done){ghReqE('POST','/users/me/dataTypes/'+type+'/dataPoints:dailyRollUp',at,{range:{start:ghCivil(dateKey,0,0,0),end:ghCivil(dateKey,23,59,59)},windowSizeDays:1},function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var rp=d.rollupDataPoints[0];var c=Object.assign({},rp);delete c.civilStartTime;delete c.civilEndTime;done(ghNum(c,0),'');}catch(e){done(0,'empty');}});},
     listI:function(done){var f=encodeURIComponent(snake+'.interval.end_time >= "'+R[0]+'" AND '+snake+'.interval.end_time <= "'+R[1]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var sum=0,n=0;(d.dataPoints||[]).forEach(function(dp){var v=ghNum(clean(dp,['interval']),0);if(v>0){sum+=v;n++;}});if(!n)return done(0,'no points');done(metric.agg==='avg'?Math.round(sum/n):sum,'');}catch(e){done(0,'parse');}});},
     listD:function(done){var f=encodeURIComponent(snake+'.date = "'+dateKey+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var dp=(d.dataPoints||[])[0];if(!dp)return done(0,'no points');done(ghNum(clean(dp,['date']),0),'');}catch(e){done(0,'parse');}});},
@@ -780,6 +789,26 @@ function ghMetric(key,dateKey,at,cb){
       var pass=v>0&&(!metric.min||v>=metric.min)&&(!metric.max||v<=metric.max);
       if(pass){GH_STRAT[type]=order[i];ghStratSave();return cb(Math.round(v),order[i]);}
       next(i+1);
+    });
+  })(0);
+}
+function ghMetric(key,dateKey,at,cb){
+  var metric=GH_METRICS[key];if(!metric)return cb(0,'unknown');
+  var types=metric.types?metric.types.slice():[metric.type];
+  if(metric.catRe){
+    var rx=new RegExp(metric.catRe,'i');
+    var fromCat=ghTypesCached().filter(function(t){return rx.test(t)&&types.indexOf(t)<0;});
+    types=fromCat.concat(types);
+  }
+  var savedType=GH_STRAT['type:'+key];
+  if(savedType&&types.indexOf(savedType)>=0)types=[savedType].concat(types.filter(function(x){return x!==savedType;}));
+  var allNotes=[];
+  (function nextT(j){
+    if(j>=types.length)return cb(0,allNotes.join(' || ')||'all empty');
+    ghMetricOne(metric,types[j],dateKey,at,function(v,note){
+      if(v>0){GH_STRAT['type:'+key]=types[j];ghStratSave();return cb(v,types[j]+' '+note);}
+      if(note)allNotes.push(types[j]+': '+note);
+      nextT(j+1);
     });
   })(0);
 }
@@ -840,7 +869,8 @@ function ghExercisesDay(dateKey,at,cb){
   var p=dateKey.split('-');
   var d0=new Date(+p[0],+p[1]-1,+p[2],0,0,0),d1=new Date(+p[0],+p[1]-1,+p[2],23,59,59);
   var filter=encodeURIComponent('exercise.interval.end_time >= "'+d0.toISOString()+'" AND exercise.interval.end_time < "'+d1.toISOString()+'"');
-  ghReq('GET','/users/me/dataTypes/exercise/dataPoints?filter='+filter,at,null,function(d){
+  ghReqE('GET','/users/me/dataTypes/exercise/dataPoints?filter='+filter,at,null,function(ok,d,stt,err){
+    if(!ok)return cb(null,stt+' '+err);
     try{
       var list=[];
       (d.dataPoints||[]).forEach(function(dp){
@@ -873,8 +903,8 @@ function ghExercisesDay(dateKey,at,cb){
         walk(ex,0,'');
         list.push({name:String(name),dur:dur,dist:dist,cal:cal,hr:hr,start:startHM,info:info,key:key});
       });
-      cb(list);
-    }catch(e){cb(null);}
+      cb(list,'');
+    }catch(e){cb(null,'parse');}
   });
 }
 function ghHourlySteps(dateKey,at,cb){
@@ -908,7 +938,7 @@ function fbFetchDay(dateKey,cb,full){
     ghMetric('calOut',dateKey,at,function(v,note){if(v>0){out.diag.calOut='ok ('+note+')';out.calOut=v;done(true);}else ghMetric('calOut2',dateKey,at,function(v2,note2){out.diag.calOut=v2>0?('ok active ('+note2+')'):(note+' || '+note2);if(v2>0)out.calOut=v2;done(v2>0);});});
     ghMetric('calIn',dateKey,at,function(v,note){out.diag.calIn=v>0?('ok ('+note+')'):note;if(v>0)out.calIn=v;done(v>0);});
     ghMetric('azm',dateKey,at,function(v,note){out.diag.azm=v>0?('ok ('+note+')'):note;if(v>0)out.azm=v;done(v>0);});
-    ghExercisesDay(dateKey,at,function(list){out.diag.exercise=(list&&list.length)?('ok ('+list.length+')'):'empty';if(list&&list.length)out.exercises=list;done(!!(list&&list.length));});
+    ghExercisesDay(dateKey,at,function(list,note){out.diag.exercise=(list&&list.length)?('ok ('+list.length+')'):(note||'no sessions');if(list&&list.length)out.exercises=list;done(!!(list&&list.length));});
     if(full)ghHourlySteps(dateKey,at,function(arr){if(arr)out.stepsHr=arr;done(!!arr);});
   });
 }
@@ -1624,6 +1654,7 @@ function App(){
   var ovSheetS=useState(null),ovSheet=ovSheetS[0],setOvSheet=ovSheetS[1];
   function fbDoctor(){
     setFbDoc(['Running checks…']);
+    fbEnsureToken(function(at){if(at)ghCatalog(at,function(){});});
     fbFetchDay(today(),function(r){
       if(!r){setFbDoc(['❌ Token failed — disconnect & reconnect.']);return;}
       var L=[];
@@ -1634,6 +1665,9 @@ function App(){
       L.push((r.azm?'✅ Zone minutes: '+r.azm:'⚪ Zone min: '+(r.diag.azm||'empty')));
       L.push((r.calIn?'✅ Food: '+r.calIn+' kcal':'⚪ Food: '+(r.diag.calIn||'empty')));
       L.push((r.exercises?'✅ Workouts: '+r.exercises.length:'⚪ Workouts: '+(r.diag.exercise||'empty')));
+      var cat=ghTypesCached();
+      if(cat.length){var rel=cat.filter(function(t){return /nutri|food|exer|heart|calor|sleep|active/i.test(t);});L.push('📚 Your account\u2019s data types'+(rel.length?' (relevant): '+rel.join(', '):': '+cat.slice(0,20).join(', ')));}
+      else L.push('📚 Type catalogue not retrieved yet — run the doctor once more.');
       setFbDoc(L);
     },true);
   }
