@@ -597,7 +597,7 @@ function SH(ic,ti,col){return h('div',{style:{display:'flex',alignItems:'center'
 // INIT STATE
 function initState(){
   var saved=loadSafe(),fajrCache=null;try{var fc=sessionStorage.getItem('pt_'+today());if(fc){var pt=JSON.parse(fc);fajrCache=pt.Fajr||null;}}catch(e){}var td=getLogicalDay(fajrCache);
-  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},streakFreezes:0,activeEffects:{},badHabits:[{id:'bh1',label:'Junk Food',icon:'🍟',penXp:15,log:{}},{id:'bh2',label:'Missed Sleep',icon:'😴',penXp:10,log:{}},{id:'bh3',label:'Phone Before Bed',icon:'📱',penXp:10,log:{}}],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[],streakMin:0,workoutSessions:{},gymLib:[],customActs:[],wkMigrated:false,coins:0,coinsEarned:0,achievements:[],pdAward:'',bestStreak:0};
+  var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},streakFreezes:0,activeEffects:{},badHabits:[{id:'bh1',label:'Junk Food',icon:'🍟',penXp:15,log:{}},{id:'bh2',label:'Missed Sleep',icon:'😴',penXp:10,log:{}},{id:'bh3',label:'Phone Before Bed',icon:'📱',penXp:10,log:{}}],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[],streakMin:0,workoutSessions:{},gymLib:[],customActs:[],wkMigrated:false,coins:0,coinsEarned:0,achievements:[],pdAward:'',bestStreak:0,fbDaily:{}};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
   if(!s.wkMigrated&&s.workouts&&s.workouts.length){
@@ -675,6 +675,95 @@ function initState(){
     return Object.assign({},s,{done:{},doneChores:{},chores:(saved.chores||[]).filter(function(c){return !c.once||!(saved.doneChores||{})[c.id];}),lastDay:td,streak:newStreak,habitStreaks:newHS,habitMissed:newHM,xp:Math.max(0,(saved.xp||0)-penXp),debt:nd,waterToday:0,prayerHist:Object.assign({},saved.prayerHist||{},Object.defineProperty({},[saved.lastDay],{value:yp,enumerable:true})),log:[].concat(saved.log||[],[{date:saved.lastDay,done:saved.done||{},allDone:allDone,penXp:penXp}]),weeklyChDone:weekChanged?{}:(saved.weeklyChDone||{}),currentWeek:curWeek,reportCards:newReports,bestStreak:Math.max(saved.bestStreak||0,newStreak)});
   }
   return s;
+}
+
+// GOOGLE HEALTH SYNC MODULE (Google Health API v4 — serves Fitbit device data; replaces legacy Fitbit Web API)
+var FB_KEY='abdquest_gh';
+function fbGet(){try{return JSON.parse(localStorage.getItem(FB_KEY)||'null');}catch(e){return null;}}
+function fbSet(v){try{if(v)localStorage.setItem(FB_KEY,JSON.stringify(v));else localStorage.removeItem(FB_KEY);}catch(e){}}
+function fbRedirectUri(){return location.origin+location.pathname;}
+function fbConnect(clientId,clientSecret){
+  try{
+    var stt=Math.random().toString(36).slice(2);
+    sessionStorage.setItem('gh_state',stt);sessionStorage.setItem('gh_cid',clientId);sessionStorage.setItem('gh_csec',clientSecret);
+    try{localStorage.setItem('abdquest_gh_cid',clientId);localStorage.setItem('abdquest_gh_csec',clientSecret);}catch(e){}
+    var scopes=['https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly','https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly','https://www.googleapis.com/auth/googlehealth.sleep.readonly','https://www.googleapis.com/auth/googlehealth.nutrition.readonly'];
+    location.href='https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id='+encodeURIComponent(clientId)+'&redirect_uri='+encodeURIComponent(fbRedirectUri())+'&scope='+encodeURIComponent(scopes.join(' '))+'&access_type=offline&prompt=consent&state='+stt;
+  }catch(e){alert('Could not start Google Health connect: '+e.message);}
+}
+function fbToken(params,cb){
+  var body=Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
+  fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+    .then(function(r){return r.json();}).then(cb).catch(function(){cb(null);});
+}
+function fbHandleRedirect(cb){
+  var m=location.search.match(/[?&]code=([^&#]+)/);
+  if(!m)return cb(false,null);
+  var code=decodeURIComponent(m[1]);
+  var sm=location.search.match(/[?&]state=([^&#]+)/);
+  var cid=sessionStorage.getItem('gh_cid')||localStorage.getItem('abdquest_gh_cid');
+  var csec=sessionStorage.getItem('gh_csec')||localStorage.getItem('abdquest_gh_csec');
+  var expState=sessionStorage.getItem('gh_state');
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  if(expState&&sm&&decodeURIComponent(sm[1])!==expState)return cb(false,'state mismatch — please tap Connect again');
+  if(!cid||!csec)return cb(false,'missing credentials — please tap Connect again');
+  fbToken({code:code,client_id:cid,client_secret:csec,redirect_uri:fbRedirectUri(),grant_type:'authorization_code'},function(d){
+    if(d&&d.access_token){fbSet({cid:cid,csec:csec,at:d.access_token,rt:d.refresh_token||null,exp:Date.now()+((d.expires_in||3600)*1000)});cb(true,null);}
+    else cb(false,(d&&(d.error_description||d.error))||'token exchange failed — check Client ID/Secret & redirect URL');
+  });
+}
+function fbEnsureToken(cb){
+  var t=fbGet();if(!t)return cb(null);
+  if(Date.now()<t.exp-60000)return cb(t.at);
+  if(!t.rt)return cb(null);
+  fbToken({client_id:t.cid,client_secret:t.csec,refresh_token:t.rt,grant_type:'refresh_token'},function(d){
+    if(d&&d.access_token){t.at=d.access_token;if(d.refresh_token)t.rt=d.refresh_token;t.exp=Date.now()+((d.expires_in||3600)*1000);fbSet(t);cb(t.at);}
+    else cb(null);
+  });
+}
+function ghReq(method,path,at,body,cb){
+  var o={method:method,headers:{'Authorization':'Bearer '+at,'Accept':'application/json'}};
+  if(body){o.headers['Content-Type']='application/json';o.body=JSON.stringify(body);}
+  fetch('https://health.googleapis.com/v4'+path,o).then(function(r){return r.ok?r.json():null;}).then(cb).catch(function(){cb(null);});
+}
+function ghCivil(dateKey,hh,mm,ss){var p=dateKey.split('-');return {date:{year:+p[0],month:+p[1],day:+p[2]},time:{hours:hh,minutes:mm,seconds:ss,nanos:0}};}
+function ghNum(o,depth){if(o==null||depth>4)return 0;if(typeof o==='number')return o;if(typeof o==='string'){var f=parseFloat(o);return isNaN(f)?0:f;}if(typeof o==='object'){for(var k in o){if(!o.hasOwnProperty(k))continue;if(k==='civilStartTime'||k==='civilEndTime'||k==='startTime'||k==='endTime')continue;var v=ghNum(o[k],(depth||0)+1);if(v)return v;}}return 0;}
+function ghDailySum(type,dateKey,at,cb){
+  ghReq('POST','/users/me/dataTypes/'+type+'/dataPoints:dailyRollUp',at,{range:{start:ghCivil(dateKey,0,0,0),end:ghCivil(dateKey,23,59,59)},windowSizeDays:1},function(d){
+    try{var rp=d.rollupDataPoints[0];var c=Object.assign({},rp);delete c.civilStartTime;delete c.civilEndTime;cb(ghNum(c,0));}catch(e){cb(0);}
+  });
+}
+function ghSleepDay(dateKey,at,cb){
+  var filter=encodeURIComponent('sleep.interval.civil_end_time >= "'+dateKey+'"');
+  ghReq('GET','/users/me/dataTypes/sleep/dataPoints?filter='+filter,at,null,function(d){
+    try{
+      var best=0;
+      (d.dataPoints||[]).forEach(function(dp){
+        var s=dp.sleep;if(!s||!s.summary)return;
+        var ce=s.interval&&s.interval.civilEndTime&&s.interval.civilEndTime.date;
+        if(ce){var k=ce.year+'-'+String(ce.month).padStart(2,'0')+'-'+String(ce.day).padStart(2,'0');if(k!==dateKey)return;}
+        var mins=parseFloat(s.summary.minutesAsleep)||0;
+        var isMain=s.metadata&&s.metadata.main;
+        if(isMain){best=mins;}else if(mins>best)best=mins;
+      });
+      cb(best>0?Math.round(best/6)/10:0);
+    }catch(e){cb(0);}
+  });
+}
+function fbExportCode(){var t=fbGet();if(!t)return null;try{return 'AQGH1.'+btoa(JSON.stringify(t));}catch(e){return null;}}
+function fbImportCode(s){try{s=(s||'').trim();if(s.indexOf('AQGH1.')===0)s=s.slice(6);var o=JSON.parse(atob(s));if(o&&o.cid&&o.csec&&(o.rt||o.at)){fbSet(o);return true;}}catch(e){}return false;}
+function fbIsStandalone(){try{return window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;}catch(e){return false;}}
+function fbFetchDay(dateKey,cb){
+  fbEnsureToken(function(at){
+    if(!at)return cb(null);
+    var out={},pend=5,any=false;
+    function done(ok){if(ok)any=true;if(--pend===0)cb(any?out:null);}
+    ghDailySum('steps',dateKey,at,function(v){if(v>0){out.steps=Math.round(v);}done(v>0);});
+    ghSleepDay(dateKey,at,function(h){if(h>0)out.sleepHrs=h;done(h>0);});
+    ghDailySum('resting-heart-rate',dateKey,at,function(v){if(v>20&&v<200)out.rhr=Math.round(v);done(v>0);});
+    ghDailySum('calories',dateKey,at,function(v){if(v>0)out.calOut=Math.round(v);done(v>0);});
+    ghDailySum('calories-in',dateKey,at,function(v){if(v>0)out.calIn=Math.round(v);done(v>0);});
+  });
 }
 
 // COMPONENTS
@@ -1324,6 +1413,46 @@ function App(){
     showT('Past day saved ✓','gold');
   }
   function removeLog(date){if(!window.confirm('Remove log entry for '+date+'?'))return;setSt(function(p){return Object.assign({},p,{log:p.log.filter(function(l){return l.date!==date;})});});showT('Removed','info');}
+  // ----- Fitbit sync -----
+  var fbConnS=useState(!!fbGet()),fbConn=fbConnS[0],setFbConn=fbConnS[1];
+  var fbBusyS=useState(false),fbBusy=fbBusyS[0],setFbBusy=fbBusyS[1];
+  var fbCidS=useState(function(){try{return localStorage.getItem('abdquest_gh_cid')||'';}catch(e){return '';}}),fbCid=fbCidS[0],setFbCid=fbCidS[1];
+  var fbCsecS=useState(function(){try{return localStorage.getItem('abdquest_gh_csec')||'';}catch(e){return '';}}),fbCsec=fbCsecS[0],setFbCsec=fbCsecS[1];
+  var fbCodeS=useState(''),fbCode=fbCodeS[0],setFbCode=fbCodeS[1];
+  function fbApplyDay(p,dateKey,r){
+    var np=Object.assign({},p);
+    if(r.steps>0){var sl=Object.assign({},np.stepLog||{});sl[dateKey]=r.steps;np.stepLog=sl;}
+    if(r.sleepHrs>0){np.sleepLog=(np.sleepLog||[]).filter(function(e){return e.date!==dateKey;}).concat([{date:dateKey,hrs:r.sleepHrs}]).sort(function(a,b){return a.date.localeCompare(b.date);});}
+    if(r.calIn>0){np.calLog=(np.calLog||[]).filter(function(e){return e.date!==dateKey;}).concat([{date:dateKey,cal:r.calIn,prot:r.protIn||0}]).sort(function(a,b){return a.date.localeCompare(b.date);});}
+    var fd=Object.assign({},np.fbDaily||{});fd[dateKey]={rhr:r.rhr||0,calOut:r.calOut||0,t:Date.now()};np.fbDaily=fd;
+    return np;
+  }
+  function fbSync(manual){
+    if(fbBusy)return;setFbBusy(true);
+    if(manual)showT('Syncing with Fitbit…','info');
+    var td=today();var yd=(function(){var d=new Date();d.setDate(d.getDate()-1);return wkYmd(d);})();
+    fbFetchDay(yd,function(ry){
+      fbFetchDay(td,function(rt){
+        setFbBusy(false);
+        if(!rt&&!ry){if(manual)showT('Fitbit sync failed — reconnect in Settings','red');if(!fbGet())setFbConn(false);return;}
+        setSt(function(p){var np=p;if(ry)np=fbApplyDay(np,yd,ry);if(rt)np=fbApplyDay(np,td,rt);return np;});
+        try{localStorage.setItem('abdquest_fb_last',''+Date.now());}catch(e){}
+        var bits=[];if(rt&&rt.steps>0)bits.push(rt.steps.toLocaleString()+' steps');if(rt&&rt.sleepHrs>0)bits.push(rt.sleepHrs+'h sleep');if(rt&&rt.rhr)bits.push(rt.rhr+' bpm');
+        showT('⌚ Fitbit synced'+(bits.length?' — '+bits.join(', '):'')+' ✓','gold');
+      });
+    });
+  }
+  useEffect(function(){
+    fbHandleRedirect(function(ok,err){
+      if(ok){setFbConn(true);setTab('settings');showT('⌚ Google Health connected ✓','gold');setTimeout(function(){fbSync(false);},600);}
+      else if(err){showT('Fitbit: '+err,'red');}
+      else if(fbGet()){
+        var last=0;try{last=parseInt(localStorage.getItem('abdquest_fb_last'))||0;}catch(e){}
+        if(Date.now()-last>30*60*1000)setTimeout(function(){fbSync(false);},1500);
+      }
+    });
+  },[]);
+
   function saveDayEdit(dateKey,d){
     var done=d.done||{};
     setSt(function(p){
@@ -1700,6 +1829,14 @@ function App(){
     );
 
     if(tab==='track') return h('div',null,
+      (function(){var f=(st.fbDaily||{})[today()];if(!f||(!f.rhr&&!f.calOut))return null;return h('div',{style:cs(C,{marginBottom:14,border:'1px solid '+wkTint(C.telT,0.35)})},
+        h('div',{style:{display:'flex',alignItems:'center',gap:8,marginBottom:10}},h('span',{style:{fontSize:15}},'⌚'),h('span',{style:{fontSize:11,fontWeight:800,color:C.telT,letterSpacing:'.12em',textTransform:'uppercase'}},'Fitbit · Today')),
+        h('div',{style:{display:'flex',gap:8}},
+          f.rhr?h('div',{style:{flex:1,background:C.bg,borderRadius:14,padding:'11px 4px',textAlign:'center',border:'1px solid '+C.bdr}},h('div',{className:'cz',style:{fontSize:19,fontWeight:700,color:C.redT}},f.rhr),h('div',{style:{fontSize:9.5,color:C.dim,fontWeight:600,marginTop:2}},'resting bpm')):null,
+          f.calOut?h('div',{style:{flex:1,background:C.bg,borderRadius:14,padding:'11px 4px',textAlign:'center',border:'1px solid '+C.bdr}},h('div',{className:'cz',style:{fontSize:19,fontWeight:700,color:C.ambT}},f.calOut.toLocaleString()),h('div',{style:{fontSize:9.5,color:C.dim,fontWeight:600,marginTop:2}},'kcal burned')):null,
+          h('div',{style:{flex:1,background:C.bg,borderRadius:14,padding:'11px 4px',textAlign:'center',border:'1px solid '+C.bdr}},h('div',{className:'cz',style:{fontSize:19,fontWeight:700,color:C.telT}},((st.stepLog||{})[today()]||0).toLocaleString()),h('div',{style:{fontSize:9.5,color:C.dim,fontWeight:600,marginTop:2}},'steps'))
+        )
+      );})(),
       h('div',{style:{display:'flex',gap:5,marginBottom:11}},
         [{id:'calories',l:'🍗 Cal'},{id:'weight',l:'⚖️ Wt'},{id:'water',l:'💧 H2O'},{id:'sleep',l:'😴 Sleep'},{id:'steps',l:'👟 Steps'}].map(function(t){return h('button',{key:t.id,onClick:function(){setTv(t.id);},style:Object.assign({},btn(tv===t.id),{flex:1,fontSize:10})},t.l);})
       ),
@@ -2079,6 +2216,37 @@ function App(){
           ),
           h('button',{onClick:function(){setSt(function(p){var max=[].concat(p.habits,p.prayers,p.life).length;return Object.assign({},p,{streakMin:Math.min(max,(p.streakMin||0)+1)});});},style:Object.assign({},btn(false),{padding:'8px 14px',fontSize:16})},'+')
         )
+      ),
+      SH('⌚','Google Health Sync',C.telT),
+      h('div',{style:cs(C,{marginBottom:12})},
+        fbConn
+        ? h('div',null,
+            h('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:10}},
+              h('div',{style:{fontSize:20}},'✅'),
+              h('div',null,
+                h('div',{style:{fontSize:13,color:C.grnT,fontWeight:'bold'}},'Google Health connected'),
+                h('div',{style:{fontSize:11,color:C.dim}},'Your Fitbit Air data — steps, sleep, resting HR, calories — syncs automatically when you open the app, for today + yesterday.')
+              )
+            ),
+            !fbIsStandalone()&&h('div',{style:{background:C.amb,border:'1px solid '+C.ambT+'55',borderRadius:12,padding:'9px 12px',marginBottom:9,fontSize:11,color:C.ambT,lineHeight:1.5,fontWeight:600}},'⚠️ This looks like Safari, not your home-screen app. Tap "Copy connection code" below, open Abd\u2019s Quest from your home screen, and paste it there (Settings → Google Health Sync).'),
+            h('button',{onClick:function(){var code=fbExportCode();if(!code){showT('No connection to copy','red');return;}try{navigator.clipboard.writeText(code);showT('Connection code copied ✓','gold');}catch(e){window.prompt('Copy this code:',code);}},style:Object.assign({},btn(false,C.gold),{width:'100%',fontSize:12,marginBottom:7,color:C.gold})},'📋 Copy connection code (for your home-screen app)'),
+            h('button',{onClick:function(){fbSync(true);},disabled:fbBusy,style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13,marginBottom:7,opacity:fbBusy?0.6:1})},fbBusy?'Syncing…':'🔄 Sync now'),
+            h('button',{onClick:function(){fbSet(null);setFbConn(false);showT('Disconnected','info');},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'Disconnect')
+          )
+        : h('div',null,
+            h('div',{style:{fontSize:11.5,color:C.dim,lineHeight:1.6,marginBottom:10}},
+              'One-time setup (free, ~10 min) at ',h('span',{style:{color:C.telT,fontWeight:700}},'developers.google.com/health/setup'),': enable the ',h('span',{style:{color:C.txt,fontWeight:700}},'Google Health API'),', create an ',h('span',{style:{color:C.txt,fontWeight:700}},'OAuth Client (Web)'),' with this exact Authorized redirect URI:'),
+            h('div',{onClick:function(){try{navigator.clipboard.writeText(fbRedirectUri());showT('Copied ✓','gold');}catch(e){}},style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:10,padding:'9px 11px',fontSize:10.5,color:C.telT,wordBreak:'break-all',marginBottom:10,cursor:'pointer'}},fbRedirectUri()+'  (tap to copy)'),
+            h('div',{style:{fontSize:11.5,color:C.dim,marginBottom:8}},'Add yourself as a test user (or publish), pick the four ',h('span',{style:{color:C.txt,fontWeight:700}},'googlehealth …readonly'),' scopes, then paste your credentials:'),
+            h('input',{value:fbCid,placeholder:'Client ID (…apps.googleusercontent.com)',onChange:function(e){setFbCid(e.target.value);},style:Object.assign({},ins(C),{marginBottom:8})}),
+            h('input',{value:fbCsec,placeholder:'Client Secret (GOCSPX-…)',onChange:function(e){setFbCsec(e.target.value);},style:Object.assign({},ins(C),{marginBottom:9})}),
+            h('button',{onClick:function(){var cid=(fbCid||'').trim(),cs2=(fbCsec||'').trim();if(!cid||!cs2){showT('Paste Client ID and Secret first','info');return;}fbConnect(cid,cs2);},style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13})},'⌚ Connect Google Health'),
+            h('div',{style:{borderTop:'1px solid '+C.bdr,margin:'13px 0 10px'}}),
+            h('div',{style:{fontSize:11,color:C.dim,marginBottom:7,fontWeight:600}},'Already connected in Safari? Paste the connection code here:'),
+            h('input',{value:fbCode,placeholder:'AQGH1.…',onChange:function(e){setFbCode(e.target.value);},style:Object.assign({},ins(C),{marginBottom:8,fontSize:13})}),
+            h('button',{onClick:function(){if(fbImportCode(fbCode)){setFbConn(true);setFbCode('');showT('⌚ Connected via code ✓','gold');setTimeout(function(){fbSync(true);},400);}else showT('That code didn\u2019t work — copy it again from Safari','red');},style:Object.assign({},btn(false,C.telT),{width:'100%',fontSize:12})},'Apply connection code'),
+            h('div',{style:{fontSize:10,color:C.fnt,marginTop:8,lineHeight:1.5}},'You\u2019ll approve on Google\u2019s page, then return here. Credentials and data stay on your device only.')
+          )
       ),
       SH('☁️','Sync & Safety',C.grnT),
       h('div',{style:cs(C,{marginBottom:12})},
