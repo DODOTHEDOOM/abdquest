@@ -745,7 +745,8 @@ function ghReqE(method,path,at,body,cb){
     });
   }).catch(function(e){cb(false,null,0,'network: '+e.message);});
 }
-function ghDayRangeZ(dateKey){var p=dateKey.split('-');var d0=new Date(+p[0],+p[1]-1,+p[2],0,0,0),d1=new Date(+p[0],+p[1]-1,+p[2],23,59,59);return [d0.toISOString(),d1.toISOString()];}
+function ghRfc(d){return d.toISOString().replace(/\.\d{3}Z$/,'Z');}
+function ghDayRangeZ(dateKey){var p=dateKey.split('-');var d0=new Date(+p[0],+p[1]-1,+p[2],0,0,0),d1=new Date(+p[0],+p[1]-1,+p[2],23,59,59);return [ghRfc(d0),ghRfc(d1)];}
 var GH_STRAT=(function(){try{return JSON.parse(localStorage.getItem('abdquest_gh_strat')||'{}');}catch(e){return {};}})();
 function ghStratSave(){try{localStorage.setItem('abdquest_gh_strat',JSON.stringify(GH_STRAT));}catch(e){}}
 var GH_METRICS={
@@ -878,38 +879,37 @@ function ghPretty(k){return String(k).replace(/[_-]/g,' ').replace(/([a-z])([A-Z
 function ghExercisesDay(dateKey,at,cb){
   var p=dateKey.split('-');
   var d0=new Date(+p[0],+p[1]-1,+p[2],0,0,0),d1=new Date(+p[0],+p[1]-1,+p[2],23,59,59);
-  var cands=['exercise','activity','workout','session','exercise-session','activity-summary'];
-  var fromCat=ghTypesCached().filter(function(t){return /exercise|workout|activit|session/i.test(t)&&cands.indexOf(t)<0;});
-  cands=fromCat.concat(cands);
-  var saved=GH_STRAT['type:exercise'];if(saved&&cands.indexOf(saved)>=0)cands=[saved].concat(cands.filter(function(x){return x!==saved;}));
+  var R=ghDayRangeZ(dateKey);
+  var filters=[
+    'exercise.interval.start_time >= "'+R[0]+'" AND exercise.interval.start_time <= "'+R[1]+'"',
+    'exercise.interval.end_time >= "'+R[0]+'" AND exercise.interval.end_time <= "'+R[1]+'"',
+    'exercise.start_time >= "'+R[0]+'" AND exercise.start_time <= "'+R[1]+'"'
+  ];
+  var savedFi=GH_STRAT['exfilter'];if(savedFi!=null&&filters[savedFi])filters=[filters[savedFi]].concat(filters.filter(function(_,i){return i!==savedFi;}));
   var notes=[];
-  (function tryT(ti){
-    if(ti>=cands.length)return cb(null,notes.join(' | ')||'no type');
-    var etype=cands[ti];
-    // No filter — list recent, match day client-side (the comparator-free pattern that works for RHR)
-    ghReqE('GET','/users/me/dataTypes/'+etype+'/dataPoints?pageSize=50',at,null,function(ok,d,stt,err){
-    if(!ok){notes.push(etype+': '+stt);return tryT(ti+1);}
-    GH_STRAT['type:exercise']=etype;ghStratSave();
+  (function tryF(fi){
+    if(fi>=filters.length)return cb(null,notes.join(' | ')||'no filter worked');
+    ghReqE('GET','/users/me/dataTypes/exercise/dataPoints?filter='+encodeURIComponent(filters[fi])+'&pageSize=50',at,null,function(ok,d,stt,err){
+    if(!ok){notes.push('f'+fi+': '+stt+' '+(err||'').slice(0,40));return tryF(fi+1);}
+    GH_STRAT['exfilter']=filters.indexOf(filters[fi]);ghStratSave();
     try{
       var list=[];
       (d.dataPoints||[]).forEach(function(dp){
-        var ex=dp.exercise||dp.activitySummary||dp.exerciseSession||dp.workout||dp.activity||(function(){for(var kk in dp){if(dp.hasOwnProperty(kk)&&typeof dp[kk]==='object'&&kk!=='interval')return dp[kk];}return null;})();if(!ex)return;
+        var ex=dp.exercise||(function(){for(var kk in dp){if(dp.hasOwnProperty(kk)&&typeof dp[kk]==='object'&&kk!=='interval')return dp[kk];}return null;})();if(!ex)return;
         var name=ex.activityType||ex.activityName||ex.name||'Workout';
         name=ghPretty(name);
+        var ivl=ex.interval||dp.interval||{};
         var dur=0,startHM='',key=''+list.length,startDay='';
-        try{var st2=new Date(ex.interval.startTime),en=new Date(ex.interval.endTime);dur=Math.round((en-st2)/60000);startHM=String(st2.getHours()).padStart(2,'0')+':'+String(st2.getMinutes()).padStart(2,'0');key=String(st2.getHours()).padStart(2,'0')+String(st2.getMinutes()).padStart(2,'0');startDay=st2.getFullYear()+'-'+String(st2.getMonth()+1).padStart(2,'0')+'-'+String(st2.getDate()).padStart(2,'0');}catch(e){}
+        try{var st2=new Date(ivl.startTime),en=new Date(ivl.endTime);dur=Math.round((en-st2)/60000);startHM=String(st2.getHours()).padStart(2,'0')+':'+String(st2.getMinutes()).padStart(2,'0');key=String(st2.getHours()).padStart(2,'0')+String(st2.getMinutes()).padStart(2,'0');startDay=st2.getFullYear()+'-'+String(st2.getMonth()+1).padStart(2,'0')+'-'+String(st2.getDate()).padStart(2,'0');}catch(e){}
         var info={},dist=0,cal=0,hr=0;
         function walk(o,depth,prefix){
-          if(o==null||depth>3)return;
-          if(typeof o!=='object'){return;}
+          if(o==null||depth>3||typeof o!=='object')return;
           for(var k in o){
             if(!o.hasOwnProperty(k))continue;
             if(k==='interval'||k==='metadata'||k==='events'||k==='splits'||k==='laps')continue;
-            var v=o[k];
-            if(v==null)continue;
+            var v=o[k];if(v==null)continue;
             if(typeof v==='number'||typeof v==='string'){
-              var num=typeof v==='number'?v:parseFloat(v);
-              var kl=k.toLowerCase();
+              var num=typeof v==='number'?v:parseFloat(v);var kl=k.toLowerCase();
               if(!isNaN(num)&&num>0){
                 if(kl.indexOf('calorie')>=0||kl==='kcal'||kl.indexOf('energy')>=0){if(!cal)cal=Math.round(num);}
                 else if(kl.indexOf('distance')>=0){if(!dist)dist=num>500?Math.round(num/100)/10:Math.round(num*100)/100;}
@@ -920,12 +920,10 @@ function ghExercisesDay(dateKey,at,cb){
           }
         }
         walk(ex,0,'');
-        if(startDay&&startDay!==dateKey){var endOk=false;try{var en2=new Date(ex.interval.endTime);endOk=(en2>=d0&&en2<=d1);}catch(e){}if(!endOk)return;}
         list.push({name:String(name),dur:dur,dist:dist,cal:cal,hr:hr,start:startHM,startDay:startDay,info:info,key:key});
       });
-      if(!list.length)return tryT(ti+1);
       cb(list,'');
-    }catch(e){tryT(ti+1);}
+    }catch(e){tryF(fi+1);}
     });
   })(0);
 }
@@ -940,7 +938,7 @@ function ghHeartSeries(dateKey,at,cb){
   (function tryF(fi){
     if(fi>=filters.length)return cb(null,'all HR filters rejected');
     var f=encodeURIComponent(filters[fi]);
-    var url='/users/me/dataTypes/heart-rate/dataPoints?'+(filters[fi]?('filter='+f+'&'):'')+'pageSize=2000';
+    var url='/users/me/dataTypes/heart-rate/dataPoints?'+(filters[fi]?('filter='+f+'&'):'')+'pageSize=1000';
     ghReqE('GET',url,at,null,function(ok,d,stt,err){
     if(!ok){if(stt===400)return tryF(fi+1);return cb(null,stt+' '+err);}
     try{
@@ -1074,7 +1072,7 @@ function TrendChart(props){
   var gid='tg'+(++__ringSeq);
   return h('div',null,
     h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:8}},
-      h('div',null,h('div',{className:'cz',style:{fontSize:24,fontWeight:700,color:col,lineHeight:1}},fmt(sp.v)+(unit?h('span',{style:{fontSize:12,color:C.dim}}, ' '+unit):'')),h('div',{style:{fontSize:10.5,color:C.dim,fontWeight:600,marginTop:2}},sp.label)),
+      h('div',null,h('div',{className:'cz',style:{fontSize:24,fontWeight:700,color:col,lineHeight:1}},''+fmt(sp.v),unit?h('span',{style:{fontSize:12,color:C.dim,fontWeight:600}},' '+unit):null),h('div',{style:{fontSize:10.5,color:C.dim,fontWeight:600,marginTop:2}},sp.label)),
       h('div',{style:{textAlign:'right'}},h('div',{style:{fontSize:11,color:C.dim,fontWeight:600}},'avg '+fmt(avg)),h('div',{style:{fontSize:10,color:pts[pts.length-1].v<=pts[0].v?C.grnT:C.ambT,fontWeight:700,marginTop:1}},(pts[pts.length-1].v-pts[0].v>=0?'▲ +':'▼ ')+fmt(Math.abs(pts[pts.length-1].v-pts[0].v))))
     ),
     h('svg',{viewBox:'0 0 '+W+' '+(H+2),width:'100%',height:108,preserveAspectRatio:'none',style:{overflow:'visible'}},
@@ -1767,6 +1765,33 @@ function App(){
       setFbDoc(L);
     },true);
     }
+  }
+  function fbProbe(){
+    setFbDoc(['🔬 Probing HR + workout filters…']);
+    fbEnsureToken(function(at){
+      if(!at){setFbDoc(['❌ token failed']);return;}
+      var td=today();var R=ghDayRangeZ(td);
+      function F(p){return encodeURIComponent(p);}
+      var tests=[
+        ['HR range','GET','/users/me/dataTypes/heart-rate/dataPoints?filter='+F('heart_rate.sample_time.physical_time >= "'+R[0]+'" AND heart_rate.sample_time.physical_time <= "'+R[1]+'"')+'&pageSize=3',null],
+        ['HR >=only','GET','/users/me/dataTypes/heart-rate/dataPoints?filter='+F('heart_rate.sample_time.physical_time >= "'+R[0]+'"')+'&pageSize=3',null],
+        ['HR rollup','POST','/users/me/dataTypes/heart-rate/dataPoints:dailyRollup',{range:{start:ghCivil(td,0,0,0),end:ghCivil(td,23,59,59)},windowSizeDays:1}],
+        ['EX nofilter','GET','/users/me/dataTypes/exercise/dataPoints?pageSize=3',null],
+        ['EX iv.start','GET','/users/me/dataTypes/exercise/dataPoints?filter='+F('exercise.interval.start_time >= "'+R[0]+'" AND exercise.interval.start_time <= "'+R[1]+'"')+'&pageSize=3',null],
+        ['EX iv.end','GET','/users/me/dataTypes/exercise/dataPoints?filter='+F('exercise.interval.end_time >= "'+R[0]+'" AND exercise.interval.end_time <= "'+R[1]+'"')+'&pageSize=3',null],
+        ['EX start_time','GET','/users/me/dataTypes/exercise/dataPoints?filter='+F('exercise.start_time >= "'+R[0]+'"')+'&pageSize=3',null]
+      ];
+      var out=[];
+      (function run(i){
+        if(i>=tests.length){out.push('— send this whole list to Claude —');setFbDoc(out.slice());return;}
+        var t=tests[i];
+        ghReqE(t[1],t[2],at,t[3],function(ok,d,stt,err){
+          if(ok){var pts=(d&&(d.dataPoints||d.rollupDataPoints))||[];var keys='';try{keys=pts[0]?Object.keys(pts[0]).join(','):'';}catch(e){}out.push('✅ '+t[0]+': '+pts.length+' pts'+(keys?' ['+keys+']':''));}
+          else out.push('⚪ '+t[0]+': '+stt+' '+String(err||'').slice(0,64));
+          setFbDoc(out.slice());run(i+1);
+        });
+      })(0);
+    });
   }
   function fbApplyDay(p,dateKey,r){
     var np=Object.assign({},p);
@@ -2724,7 +2749,9 @@ function App(){
             !fbIsStandalone()&&h('div',{style:{background:C.amb,border:'1px solid '+C.ambT+'55',borderRadius:12,padding:'9px 12px',marginBottom:9,fontSize:11,color:C.ambT,lineHeight:1.5,fontWeight:600}},'⚠️ This looks like Safari, not your home-screen app. Tap "Copy connection code" below, open Abd\u2019s Quest from your home screen, and paste it there (Settings → Google Health Sync).'),
             h('button',{onClick:function(){var code=fbExportCode();if(!code){showT('No connection to copy','red');return;}try{navigator.clipboard.writeText(code);showT('Connection code copied ✓','gold');}catch(e){window.prompt('Copy this code:',code);}},style:Object.assign({},btn(false,C.gold),{width:'100%',fontSize:12,marginBottom:7,color:C.gold})},'📋 Copy connection code (for your home-screen app)'),
             h('button',{onClick:function(){fbSync(true);},disabled:fbBusy,style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13,marginBottom:7,opacity:fbBusy?0.6:1})},fbBusy?'Syncing…':'🔄 Sync now'),
+            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 19'),
             h('button',{onClick:fbDoctor,style:Object.assign({},btn(false,C.ambT),{width:'100%',fontSize:12,marginBottom:7,color:C.ambT})},'🩺 Run sync doctor'),
+            h('button',{onClick:fbProbe,style:Object.assign({},btn(false,C.bluT),{width:'100%',fontSize:12,marginBottom:7,color:C.bluT})},'🔬 Deep probe (HR + workouts)'),
             fbDoc&&h('div',{style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:12,padding:'10px 12px',marginBottom:7}},fbDoc.map(function(l,i){return h('div',{key:i,style:{fontSize:10.5,color:C.txt,lineHeight:1.7,wordBreak:'break-word'}},l);}),h('div',{style:{fontSize:9.5,color:C.dim,marginTop:5}},'⚪ rows show why a metric is empty — send these to Claude to fix.')),
             h('button',{onClick:function(){fbSet(null);setFbConn(false);showT('Disconnected','info');},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'Disconnect')
           )
