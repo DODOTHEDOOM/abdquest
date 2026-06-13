@@ -758,15 +758,21 @@ var GH_METRICS={
 };
 function ghTypesCached(){try{return JSON.parse(localStorage.getItem('abdquest_gh_types')||'[]');}catch(e){return [];}}
 function ghCatalog(at,cb){
-  ghReqE('GET','/users/me/dataTypes?pageSize=400',at,null,function(ok,d,stt,err){
-    if(!ok)return cb(null,stt+' '+err);
-    try{
-      var raw=d.dataTypes||d.dataTypeList||d.types||[];
-      var ids=raw.map(function(t){return (typeof t==='string')?t:(t.id||t.name||t.dataTypeId||t.dataType||'');}).filter(Boolean).map(function(x){return String(x).split('/').pop();});
-      if(ids.length){try{localStorage.setItem('abdquest_gh_types',JSON.stringify(ids));}catch(e){}cb(ids,'');}
-      else cb([],'no ids in '+JSON.stringify(Object.keys(d||{})).slice(0,60));
-    }catch(e){cb(null,'parse');}
-  });
+  var urls=['/users/me/dataTypes?pageSize=400','/users/me/dataTypes','/dataTypes?pageSize=400','/users/me/dataSources','/users/me/dataTypes:list'];
+  var notes=[];
+  (function tryU(i){
+    if(i>=urls.length)return cb([],notes.join(' | '));
+    ghReqE('GET',urls[i],at,null,function(ok,d,stt,err){
+      if(!ok){notes.push(urls[i].split('?')[0]+': '+stt+' '+(err||'').slice(0,40));return tryU(i+1);}
+      try{
+        var raw=d.dataTypes||d.dataTypeList||d.types||d.dataSources||d.dataSource||[];
+        if(!Array.isArray(raw)&&typeof raw==='object')raw=Object.keys(raw);
+        var ids=(raw||[]).map(function(t){return (typeof t==='string')?t:(t.id||t.name||t.dataTypeId||t.dataType||'');}).filter(Boolean).map(function(x){return String(x).split('/').pop();});
+        if(ids.length){try{localStorage.setItem('abdquest_gh_types',JSON.stringify(ids));}catch(e){}return cb(ids,'via '+urls[i].split('?')[0]);}
+        notes.push(urls[i].split('?')[0]+': keys '+JSON.stringify(Object.keys(d||{})).slice(0,50));tryU(i+1);
+      }catch(e){notes.push(urls[i].split('?')[0]+': parse');tryU(i+1);}
+    });
+  })(0);
 }
 function ghMetricOne(metric,type,dateKey,at,cb){
   var camel=metric.camel,snake=type.replace(/-/g,'_');
@@ -872,16 +878,16 @@ function ghPretty(k){return String(k).replace(/[_-]/g,' ').replace(/([a-z])([A-Z
 function ghExercisesDay(dateKey,at,cb){
   var p=dateKey.split('-');
   var d0=new Date(+p[0],+p[1]-1,+p[2],0,0,0),d1=new Date(+p[0],+p[1]-1,+p[2],23,59,59);
-  var cands=['activity-summary','exercise-sessions','exercise-session','workouts','activities','exercise'];
+  var cands=['exercise','activity','workout','session','exercise-session','activity-summary'];
   var fromCat=ghTypesCached().filter(function(t){return /exercise|workout|activit|session/i.test(t)&&cands.indexOf(t)<0;});
   cands=fromCat.concat(cands);
   var saved=GH_STRAT['type:exercise'];if(saved&&cands.indexOf(saved)>=0)cands=[saved].concat(cands.filter(function(x){return x!==saved;}));
   var notes=[];
   (function tryT(ti){
     if(ti>=cands.length)return cb(null,notes.join(' | ')||'no type');
-    var etype=cands[ti],esnake=etype.replace(/-/g,'_');
-    var filter=encodeURIComponent(esnake+'.interval.end_time >= "'+d0.toISOString()+'" AND '+esnake+'.interval.end_time < "'+d1.toISOString()+'"');
-    ghReqE('GET','/users/me/dataTypes/'+etype+'/dataPoints?filter='+filter,at,null,function(ok,d,stt,err){
+    var etype=cands[ti];
+    // No filter — list recent, match day client-side (the comparator-free pattern that works for RHR)
+    ghReqE('GET','/users/me/dataTypes/'+etype+'/dataPoints?pageSize=50',at,null,function(ok,d,stt,err){
     if(!ok){notes.push(etype+': '+stt);return tryT(ti+1);}
     GH_STRAT['type:exercise']=etype;ghStratSave();
     try{
@@ -914,6 +920,7 @@ function ghExercisesDay(dateKey,at,cb){
           }
         }
         walk(ex,0,'');
+        if(startDay&&startDay!==dateKey){var endOk=false;try{var en2=new Date(ex.interval.endTime);endOk=(en2>=d0&&en2<=d1);}catch(e){}if(!endOk)return;}
         list.push({name:String(name),dur:dur,dist:dist,cal:cal,hr:hr,start:startHM,startDay:startDay,info:info,key:key});
       });
       if(!list.length)return tryT(ti+1);
@@ -927,12 +934,14 @@ function ghHeartSeries(dateKey,at,cb){
   var filters=[
     'heart_rate.interval.end_time >= "'+R[0]+'" AND heart_rate.interval.end_time <= "'+R[1]+'"',
     'heart_rate.sample_time.physical_time >= "'+R[0]+'" AND heart_rate.sample_time.physical_time <= "'+R[1]+'"',
-    'heart_rate.date = "'+dateKey+'"'
+    'heart_rate.date = "'+dateKey+'"',
+    ''
   ];
   (function tryF(fi){
     if(fi>=filters.length)return cb(null,'all HR filters rejected');
     var f=encodeURIComponent(filters[fi]);
-    ghReqE('GET','/users/me/dataTypes/heart-rate/dataPoints?filter='+f+'&pageSize=2000',at,null,function(ok,d,stt,err){
+    var url='/users/me/dataTypes/heart-rate/dataPoints?'+(filters[fi]?('filter='+f+'&'):'')+'pageSize=2000';
+    ghReqE('GET',url,at,null,function(ok,d,stt,err){
     if(!ok){if(stt===400)return tryF(fi+1);return cb(null,stt+' '+err);}
     try{
       var hourly=[];for(var i=0;i<24;i++)hourly.push({sum:0,n:0,min:999,max:0});
@@ -940,7 +949,9 @@ function ghHeartSeries(dateKey,at,cb){
       (d.dataPoints||[]).forEach(function(dp){
         var c=Object.assign({},dp.heartRate||dp);var ts=c.sampleTime;delete c.sampleTime;
         var bpm=ghNum(c,0);if(!(bpm>20&&bpm<240))return;
-        var hr=0;try{hr=new Date(ts.physicalTime||ts).getHours();}catch(e){}
+        var when=null;try{when=new Date(ts.physicalTime||ts);}catch(e){}
+        if(when){var wk=when.getFullYear()+'-'+String(when.getMonth()+1).padStart(2,'0')+'-'+String(when.getDate()).padStart(2,'0');if(wk!==dateKey)return;}
+        var hr=when?when.getHours():0;
         if(hr>=0&&hr<24){hourly[hr].sum+=bpm;hourly[hr].n++;if(bpm<hourly[hr].min)hourly[hr].min=bpm;if(bpm>hourly[hr].max)hourly[hr].max=bpm;}
         all.push(bpm);if(bpm<mn)mn=bpm;if(bpm>mx)mx=bpm;
       });
