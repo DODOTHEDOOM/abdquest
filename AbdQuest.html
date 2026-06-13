@@ -872,13 +872,22 @@ function ghPretty(k){return String(k).replace(/[_-]/g,' ').replace(/([a-z])([A-Z
 function ghExercisesDay(dateKey,at,cb){
   var p=dateKey.split('-');
   var d0=new Date(+p[0],+p[1]-1,+p[2],0,0,0),d1=new Date(+p[0],+p[1]-1,+p[2],23,59,59);
-  var filter=encodeURIComponent('exercise.interval.end_time >= "'+d0.toISOString()+'" AND exercise.interval.end_time < "'+d1.toISOString()+'"');
-  ghReqE('GET','/users/me/dataTypes/exercise/dataPoints?filter='+filter,at,null,function(ok,d,stt,err){
-    if(!ok)return cb(null,stt+' '+err);
+  var cands=['activity-summary','exercise-sessions','exercise-session','workouts','activities','exercise'];
+  var fromCat=ghTypesCached().filter(function(t){return /exercise|workout|activit|session/i.test(t)&&cands.indexOf(t)<0;});
+  cands=fromCat.concat(cands);
+  var saved=GH_STRAT['type:exercise'];if(saved&&cands.indexOf(saved)>=0)cands=[saved].concat(cands.filter(function(x){return x!==saved;}));
+  var notes=[];
+  (function tryT(ti){
+    if(ti>=cands.length)return cb(null,notes.join(' | ')||'no type');
+    var etype=cands[ti],esnake=etype.replace(/-/g,'_');
+    var filter=encodeURIComponent(esnake+'.interval.end_time >= "'+d0.toISOString()+'" AND '+esnake+'.interval.end_time < "'+d1.toISOString()+'"');
+    ghReqE('GET','/users/me/dataTypes/'+etype+'/dataPoints?filter='+filter,at,null,function(ok,d,stt,err){
+    if(!ok){notes.push(etype+': '+stt);return tryT(ti+1);}
+    GH_STRAT['type:exercise']=etype;ghStratSave();
     try{
       var list=[];
       (d.dataPoints||[]).forEach(function(dp){
-        var ex=dp.exercise;if(!ex)return;
+        var ex=dp.exercise||dp.activitySummary||dp.exerciseSession||dp.workout||dp.activity||(function(){for(var kk in dp){if(dp.hasOwnProperty(kk)&&typeof dp[kk]==='object'&&kk!=='interval')return dp[kk];}return null;})();if(!ex)return;
         var name=ex.activityType||ex.activityName||ex.name||'Workout';
         name=ghPretty(name);
         var dur=0,startHM='',key=''+list.length;
@@ -907,15 +916,24 @@ function ghExercisesDay(dateKey,at,cb){
         walk(ex,0,'');
         list.push({name:String(name),dur:dur,dist:dist,cal:cal,hr:hr,start:startHM,info:info,key:key});
       });
+      if(!list.length)return tryT(ti+1);
       cb(list,'');
-    }catch(e){cb(null,'parse');}
-  });
+    }catch(e){tryT(ti+1);}
+    });
+  })(0);
 }
 function ghHeartSeries(dateKey,at,cb){
   var R=ghDayRangeZ(dateKey);
-  var f=encodeURIComponent('heart_rate.sample_time.physical_time >= "'+R[0]+'" AND heart_rate.sample_time.physical_time <= "'+R[1]+'"');
-  ghReqE('GET','/users/me/dataTypes/heart-rate/dataPoints?filter='+f+'&pageSize=2000',at,null,function(ok,d,stt,err){
-    if(!ok)return cb(null,stt+' '+err);
+  var filters=[
+    'heart_rate.interval.end_time >= "'+R[0]+'" AND heart_rate.interval.end_time <= "'+R[1]+'"',
+    'heart_rate.sample_time.physical_time >= "'+R[0]+'" AND heart_rate.sample_time.physical_time <= "'+R[1]+'"',
+    'heart_rate.date = "'+dateKey+'"'
+  ];
+  (function tryF(fi){
+    if(fi>=filters.length)return cb(null,'all HR filters rejected');
+    var f=encodeURIComponent(filters[fi]);
+    ghReqE('GET','/users/me/dataTypes/heart-rate/dataPoints?filter='+f+'&pageSize=2000',at,null,function(ok,d,stt,err){
+    if(!ok){if(stt===400)return tryF(fi+1);return cb(null,stt+' '+err);}
     try{
       var hourly=[];for(var i=0;i<24;i++)hourly.push({sum:0,n:0,min:999,max:0});
       var all=[],mn=999,mx=0;
@@ -926,12 +944,14 @@ function ghHeartSeries(dateKey,at,cb){
         if(hr>=0&&hr<24){hourly[hr].sum+=bpm;hourly[hr].n++;if(bpm<hourly[hr].min)hourly[hr].min=bpm;if(bpm>hourly[hr].max)hourly[hr].max=bpm;}
         all.push(bpm);if(bpm<mn)mn=bpm;if(bpm>mx)mx=bpm;
       });
-      if(!all.length)return cb(null,'no points');
+      if(!all.length)return tryF(fi+1);
       var avg=Math.round(all.reduce(function(a,b){return a+b;},0)/all.length);
       var series=hourly.map(function(h){return h.n?{avg:Math.round(h.sum/h.n),min:h.min,max:h.max}:null;});
+      if(!all.length)return tryF(fi+1);
       cb({avg:avg,min:mn,max:mx,series:series,count:all.length},'');
     }catch(e){cb(null,'parse');}
-  });
+    });
+  })(0);
 }
 function ghHourlySteps(dateKey,at,cb){
   try{
@@ -963,7 +983,7 @@ function fbFetchDay(dateKey,cb,full){
     ghMetric('rhr',dateKey,at,function(v,note){out.diag.rhr=v>0?('ok ('+note+')'):note;if(v>0)out.rhr=v;done(v>0);});
     ghMetric('calOut',dateKey,at,function(v,note){if(v>0){out.diag.calOut='ok ('+note+')';out.calOut=v;done(true);}else ghMetric('calOut2',dateKey,at,function(v2,note2){out.diag.calOut=v2>0?('ok active ('+note2+')'):(note+' || '+note2);if(v2>0)out.calOut=v2;done(v2>0);});});
     ghMetric('calIn',dateKey,at,function(v,note){out.diag.calIn=v>0?('ok ('+note+')'):note;if(v>0)out.calIn=v;done(v>0);});
-    ghMetric('azm',dateKey,at,function(v,note){out.diag.azm=v>0?('ok ('+note+')'):note;if(v>0)out.azm=v;done(v>0);});
+    ghMetric('azm',dateKey,at,function(v,note){if(v>300)v=Math.round(v/60);out.diag.azm=v>0?('ok ('+note+')'):note;if(v>0)out.azm=v;done(v>0);});
     ghExercisesDay(dateKey,at,function(list,note){out.diag.exercise=(list&&list.length)?('ok ('+list.length+')'):(note||'no sessions');if(list&&list.length)out.exercises=list;done(!!(list&&list.length));});
     if(full){ghHourlySteps(dateKey,at,function(arr){if(arr)out.stepsHr=arr;done(!!arr);});
       ghHeartSeries(dateKey,at,function(hs,note){out.diag.hr=hs?('ok ('+hs.count+' pts)'):note;if(hs){out.hrSeries=hs.series;out.hrAvg=hs.avg;out.hrMin=hs.min;out.hrMax=hs.max;}done(!!hs);});
@@ -1728,6 +1748,7 @@ function App(){
   function fbSync(manual){
     if(fbBusy)return;setFbBusy(true);
     if(manual)showT('Syncing with Fitbit…','info');
+    fbEnsureToken(function(at){if(at&&ghTypesCached().length===0)ghCatalog(at,function(){});});
     var td=today();var yd=(function(){var d=new Date();d.setDate(d.getDate()-1);return wkYmd(d);})();
     fbFetchDay(yd,function(ry){
       fbFetchDay(td,function(rt){
@@ -1746,7 +1767,7 @@ function App(){
       else if(err){showT('Fitbit: '+err,'red');}
       else if(fbGet()){
         var last=0;try{last=parseInt(localStorage.getItem('abdquest_fb_last'))||0;}catch(e){}
-        if(Date.now()-last>30*60*1000)setTimeout(function(){fbSync(false);},1500);
+        if(Date.now()-last>10*60*1000)setTimeout(function(){fbSync(false);},1200);
       }
     });
   },[]);
@@ -2856,6 +2877,6 @@ try{var _mnt=document.getElementById('app');_mnt.removeAttribute('style');ReactD
 catch(err){document.getElementById('app').innerHTML='<div style="padding:20px;background:#0a0a0f;min-height:100vh;color:#e8dcc8;font-family:Georgia,serif;"><div style="color:#ff6666;font-size:16px;margin-bottom:12px;">App crashed: '+err.message+'</div><button onclick="location.reload()" style="background:#ffd700;border:none;padding:10px 20px;border-radius:6px;font-size:13px;cursor:pointer;">Reload</button></div>';console.error(err);}
 })();
 </script>
-<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(function(){});}</script>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister();});}).catch(function(){});if(window.caches&&caches.keys)caches.keys().then(function(ks){ks.forEach(function(k){caches.delete(k);});}).catch(function(){});}</script>
 </body>
 </html>
