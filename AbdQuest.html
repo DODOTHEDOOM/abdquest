@@ -755,7 +755,11 @@ var GH_METRICS={
   azm:{type:'active-zone-minutes',camel:'activeZoneMinutes',snake:'active_zone_minutes',order:['roll','listAll'],min:1},
   rhr:{type:'daily-resting-heart-rate',camel:'dailyRestingHeartRate',snake:'daily_resting_heart_rate',order:['listAll'],min:25,max:200,agg:'avg'},
   hrAvg:{type:'heart-rate',camel:'heartRate',snake:'heart_rate',order:['listS'],min:25,max:230,agg:'avg',cap:1},
-  calIn:{types:['nutrition-logs','food-logs','nutrition-log','food-log','nutrition-summary','foods'],catRe:'nutrition|food',camel:'nutrition',order:['roll','listI','listDR'],min:50}
+  calIn:{types:['nutrition-logs','food-logs','nutrition-log','food-log','nutrition-summary','foods'],catRe:'nutrition|food',camel:'nutrition',order:['roll','listI','listDR'],min:50},
+  hrv:{type:'heart-rate-variability',camel:'heartRateVariability',snake:'heart_rate_variability',order:['listS1'],min:3,max:250,agg:'avg'},
+  resp:{type:'respiratory-rate-sleep-summary',camel:'respiratoryRateSleepSummary',snake:'respiratory_rate_sleep_summary',order:['listS1','listAll'],min:4,max:40,agg:'avg'},
+  spo2:{type:'oxygen-saturation',camel:'oxygenSaturation',snake:'oxygen_saturation',order:['listS1'],min:70,max:100,agg:'avg'},
+  vo2max:{type:'daily-vo2-max',camel:'dailyVo2Max',snake:'daily_vo2_max',order:['listAll'],min:10,max:90,agg:'avg'}
 };
 function ghTypesCached(){try{return JSON.parse(localStorage.getItem('abdquest_gh_types')||'[]');}catch(e){return [];}}
 function ghCatalog(at,cb){
@@ -785,7 +789,8 @@ function ghMetricOne(metric,type,dateKey,at,cb){
     roll:function(done){ghReqE('POST','/users/me/dataTypes/'+type+'/dataPoints:dailyRollUp',at,{range:{start:ghCivil(dateKey,0,0,0),end:ghCivil(dateKey,23,59,59)},windowSizeDays:1},function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var rp=d.rollupDataPoints[0];var c=Object.assign({},rp);delete c.civilStartTime;delete c.civilEndTime;done(ghNum(c,0),'');}catch(e){done(0,'empty');}});},
     listI:function(done){var f=encodeURIComponent(snake+'.interval.end_time >= "'+R[0]+'" AND '+snake+'.interval.end_time <= "'+R[1]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var sum=0,n=0;(d.dataPoints||[]).forEach(function(dp){var v=ghNum(clean(dp,['interval']),0);if(v>0){sum+=v;n++;}});if(!n)return done(0,'no points');done(metric.agg==='avg'?Math.round(sum/n):sum,'');}catch(e){done(0,'parse');}});},
     listD:function(done){var f=encodeURIComponent(snake+'.date = "'+dateKey+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var dp=(d.dataPoints||[])[0];if(!dp)return done(0,'no points');done(ghNum(clean(dp,['date']),0),'');}catch(e){done(0,'parse');}});},
-    listS:function(done){var f=encodeURIComponent(snake+'.sample_time.physical_time >= "'+R[0]+'" AND '+snake+'.sample_time.physical_time <= "'+R[1]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var sum=0,n=0;(d.dataPoints||[]).slice(0,800).forEach(function(dp){var v=ghNum(clean(dp,['sampleTime']),0);if(v>0&&(!metric.max||v<=metric.max)){sum+=v;n++;}});if(!n)return done(0,'no points');done(metric.agg==='avg'?Math.round(sum/n):sum,'');}catch(e){done(0,'parse');}});}
+    listS:function(done){var f=encodeURIComponent(snake+'.sample_time.physical_time >= "'+R[0]+'" AND '+snake+'.sample_time.physical_time <= "'+R[1]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var sum=0,n=0;(d.dataPoints||[]).slice(0,800).forEach(function(dp){var v=ghNum(clean(dp,['sampleTime']),0);if(v>0&&(!metric.max||v<=metric.max)){sum+=v;n++;}});if(!n)return done(0,'no points');done(metric.agg==='avg'?Math.round(sum/n):sum,'');}catch(e){done(0,'parse');}});},
+    listS1:function(done){var f=encodeURIComponent(snake+'.sample_time.physical_time >= "'+R[0]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f+'&pageSize=1000',at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+String(err||'').slice(0,40));try{var vals=[];(d.dataPoints||[]).forEach(function(dp){var c=Object.assign({},dp[camel]||dp);var ts=c.sampleTime;delete c.sampleTime;var when=null;try{when=new Date((ts&&(ts.physicalTime||ts.endTime))||ts);}catch(e){}if(when&&!isNaN(when)){var wk=when.getFullYear()+'-'+String(when.getMonth()+1).padStart(2,'0')+'-'+String(when.getDate()).padStart(2,'0');if(wk!==dateKey)return;}var v=ghNum(c,0);if(v>0&&(!metric.min||v>=metric.min)&&(!metric.max||v<=metric.max))vals.push(v);});if(!vals.length)return done(0,'no points');done(metric.agg==='sum'?vals.reduce(function(a,b){return a+b;},0):Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length*10)/10,'');}catch(e){done(0,'parse');}});},
   };
   var order=metric.order.slice();
   var cached=GH_STRAT[type];
@@ -974,7 +979,7 @@ function fbIsStandalone(){try{return window.navigator.standalone===true||window.
 function fbFetchDay(dateKey,cb,full){
   fbEnsureToken(function(at){
     if(!at)return cb(null);
-    var out={diag:{}},pend=full?9:7,any=false;
+    var out={diag:{}},pend=full?13:11,any=false;
     function done(ok){if(ok)any=true;if(--pend===0)cb(any?out:null);}
     ghDailySum('steps',dateKey,at,function(v){out.diag.steps=v>0?'ok':'empty';if(v>0){out.steps=Math.round(v);}done(v>0);});
     ghSleepDay(dateKey,at,function(s){out.diag.sleep=s?'ok':'empty';if(s&&s.hrs>0){out.sleepHrs=s.hrs;out.sleepStart=s.start;out.sleepEnd=s.end;out.sleepStages=s.stages;out.sleepSeq=s.seq;}done(!!s);});
@@ -982,6 +987,10 @@ function fbFetchDay(dateKey,cb,full){
     ghMetric('calOut',dateKey,at,function(v,note){if(v>0){out.diag.calOut='ok ('+note+')';out.calOut=v;done(true);}else ghMetric('calOut2',dateKey,at,function(v2,note2){out.diag.calOut=v2>0?('ok active ('+note2+')'):(note+' || '+note2);if(v2>0)out.calOut=v2;done(v2>0);});});
     ghMetric('calIn',dateKey,at,function(v,note){out.diag.calIn=v>0?('ok ('+note+')'):note;if(v>0)out.calIn=v;done(v>0);});
     ghMetric('azm',dateKey,at,function(v,note){if(v>300)v=Math.round(v/60);out.diag.azm=v>0?('ok ('+note+')'):note;if(v>0)out.azm=v;done(v>0);});
+    ghMetric('hrv',dateKey,at,function(v,note){out.diag.hrv=v>0?('ok ('+note+')'):note;if(v>0)out.hrv=v;done(v>0);});
+    ghMetric('resp',dateKey,at,function(v,note){out.diag.resp=v>0?('ok ('+note+')'):note;if(v>0)out.resp=v;done(v>0);});
+    ghMetric('spo2',dateKey,at,function(v,note){out.diag.spo2=v>0?('ok ('+note+')'):note;if(v>0)out.spo2=v;done(v>0);});
+    ghMetric('vo2max',dateKey,at,function(v,note){out.diag.vo2max=v>0?('ok ('+note+')'):note;if(v>0)out.vo2max=v;done(v>0);});
     ghExercisesDay(dateKey,at,function(list,note){out.diag.exercise=(list&&list.length)?('ok ('+list.length+')'):(note||'no sessions');if(list&&list.length)out.exercises=list;done(!!(list&&list.length));});
     if(full){ghHourlySteps(dateKey,at,function(arr){if(arr)out.stepsHr=arr;done(!!arr);});
       ghHeartSeries(dateKey,at,function(hs,note){out.diag.hr=hs?('ok ('+hs.count+' pts)'):note;if(hs){out.hrSeries=hs.series;out.hrAvg=hs.avg;out.hrMin=hs.min;out.hrMax=hs.max;}done(!!hs);});
@@ -1747,6 +1756,10 @@ function App(){
       L.push((r.azm?'✅ Zone minutes: '+r.azm:'⚪ Zone min: '+(r.diag.azm||'empty')));
       L.push((r.calIn?'✅ Food: '+r.calIn+' kcal':'⚪ Food: '+(r.diag.calIn||'empty')));
       L.push((r.hrAvg?'✅ Heart rate (all-day): '+r.hrAvg+' avg, '+r.hrMin+'–'+r.hrMax+' bpm':'⚪ Heart rate: '+(r.diag.hr||'empty')));
+      L.push((r.hrv?'✅ HRV: '+r.hrv+' ms':'⚪ HRV: '+(r.diag.hrv||'empty')));
+      L.push((r.resp?'✅ Respiratory: '+r.resp+' br/min':'⚪ Respiratory: '+(r.diag.resp||'empty')));
+      L.push((r.vo2max?'✅ VO₂ max: '+r.vo2max:'⚪ VO₂ max: '+(r.diag.vo2max||'empty')));
+      L.push((r.spo2?'✅ SpO₂: '+r.spo2+'%':'⚪ SpO₂: '+(r.diag.spo2||'empty')));
       L.push((r.exercises?'✅ Workouts: '+r.exercises.length:'⚪ Workouts: '+(r.diag.exercise||'no sessions')));
       var cat=ghTypesCached();
       if(cat.length){var rel=cat.filter(function(t){return /nutri|food|exer|workout|heart|calor|sleep|active|zone/i.test(t);});L.push('📚 Data types'+(rel.length?': '+rel.join(', '):' (first 25): '+cat.slice(0,25).join(', ')));}
@@ -1788,7 +1801,7 @@ function App(){
     if(r.sleepHrs>0){np.sleepLog=(np.sleepLog||[]).filter(function(e){return e.date!==dateKey;}).concat([{date:dateKey,hrs:r.sleepHrs}]).sort(function(a,b){return a.date.localeCompare(b.date);});}
     if(r.calIn>0){np.calLog=(np.calLog||[]).filter(function(e){return e.date!==dateKey;}).concat([{date:dateKey,cal:r.calIn,prot:r.protIn||0}]).sort(function(a,b){return a.date.localeCompare(b.date);});}
     var fd=Object.assign({},np.fbDaily||{});
-    fd[dateKey]=Object.assign({},fd[dateKey]||{},{rhr:r.rhr||((fd[dateKey]||{}).rhr||0),calOut:r.calOut||((fd[dateKey]||{}).calOut||0),azm:r.azm||((fd[dateKey]||{}).azm||0),sleepStart:r.sleepStart||((fd[dateKey]||{}).sleepStart||null),sleepEnd:r.sleepEnd||((fd[dateKey]||{}).sleepEnd||null),sleepStages:r.sleepStages||((fd[dateKey]||{}).sleepStages||null),sleepSeq:r.sleepSeq||((fd[dateKey]||{}).sleepSeq||null),hrSeries:r.hrSeries||((fd[dateKey]||{}).hrSeries||null),hrAvg:r.hrAvg||((fd[dateKey]||{}).hrAvg||0),hrMin:r.hrMin||((fd[dateKey]||{}).hrMin||0),hrMax:r.hrMax||((fd[dateKey]||{}).hrMax||0),stepsHr:r.stepsHr||((fd[dateKey]||{}).stepsHr||null),t:Date.now()});
+    fd[dateKey]=Object.assign({},fd[dateKey]||{},{rhr:r.rhr||((fd[dateKey]||{}).rhr||0),calOut:r.calOut||((fd[dateKey]||{}).calOut||0),azm:r.azm||((fd[dateKey]||{}).azm||0),sleepStart:r.sleepStart||((fd[dateKey]||{}).sleepStart||null),sleepEnd:r.sleepEnd||((fd[dateKey]||{}).sleepEnd||null),sleepStages:r.sleepStages||((fd[dateKey]||{}).sleepStages||null),sleepSeq:r.sleepSeq||((fd[dateKey]||{}).sleepSeq||null),hrSeries:r.hrSeries||((fd[dateKey]||{}).hrSeries||null),hrAvg:r.hrAvg||((fd[dateKey]||{}).hrAvg||0),hrMin:r.hrMin||((fd[dateKey]||{}).hrMin||0),hrMax:r.hrMax||((fd[dateKey]||{}).hrMax||0),hrv:r.hrv||((fd[dateKey]||{}).hrv||0),resp:r.resp||((fd[dateKey]||{}).resp||0),spo2:r.spo2||((fd[dateKey]||{}).spo2||0),vo2max:r.vo2max||((fd[dateKey]||{}).vo2max||0),stepsHr:r.stepsHr||((fd[dateKey]||{}).stepsHr||null),t:Date.now()});
     np.fbDaily=fd;
     if(r.exercises&&r.exercises.length){
       function classify(nm){nm=(nm||'').toLowerCase();if(nm.indexOf('run')>=0||nm.indexOf('jog')>=0)return 'run';if(nm.indexOf('walk')>=0||nm.indexOf('hike')>=0)return 'walk';if(nm.indexOf('bike')>=0||nm.indexOf('cycl')>=0||nm.indexOf('spin')>=0)return 'cycle';if(nm.indexOf('swim')>=0)return 'swim';if(nm.indexOf('rope')>=0||nm.indexOf('skip')>=0)return 'rope';return 'fbx';}
@@ -2768,7 +2781,7 @@ function App(){
             !fbIsStandalone()&&h('div',{style:{background:C.amb,border:'1px solid '+C.ambT+'55',borderRadius:12,padding:'9px 12px',marginBottom:9,fontSize:11,color:C.ambT,lineHeight:1.5,fontWeight:600}},'⚠️ This looks like Safari, not your home-screen app. Tap "Copy connection code" below, open Abd\u2019s Quest from your home screen, and paste it there (Settings → Google Health Sync).'),
             h('button',{onClick:function(){var code=fbExportCode();if(!code){showT('No connection to copy','red');return;}try{navigator.clipboard.writeText(code);showT('Connection code copied ✓','gold');}catch(e){window.prompt('Copy this code:',code);}},style:Object.assign({},btn(false,C.gold),{width:'100%',fontSize:12,marginBottom:7,color:C.gold})},'📋 Copy connection code (for your home-screen app)'),
             h('button',{onClick:function(){fbSync(true);},disabled:fbBusy,style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13,marginBottom:7,opacity:fbBusy?0.6:1})},fbBusy?'Syncing…':'🔄 Sync now'),
-            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 21'),
+            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 22'),
             h('button',{onClick:fbDoctor,style:Object.assign({},btn(false,C.ambT),{width:'100%',fontSize:12,marginBottom:7,color:C.ambT})},'🩺 Run sync doctor'),
             h('button',{onClick:fbProbe,style:Object.assign({},btn(false,C.bluT),{width:'100%',fontSize:12,marginBottom:7,color:C.bluT})},'🔬 Deep probe (HR + workouts)'),
             fbDoc&&h('div',{style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:12,padding:'10px 12px',marginBottom:7}},fbDoc.map(function(l,i){return h('div',{key:i,style:{fontSize:10.5,color:C.txt,lineHeight:1.7,wordBreak:'break-word'}},l);}),h('div',{style:{fontSize:9.5,color:C.dim,marginTop:5}},'⚪ rows show why a metric is empty — send these to Claude to fix.')),
