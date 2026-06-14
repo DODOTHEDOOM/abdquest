@@ -879,19 +879,8 @@ function ghPretty(k){return String(k).replace(/[_-]/g,' ').replace(/([a-z])([A-Z
 function ghExercisesDay(dateKey,at,cb){
   var p=dateKey.split('-');
   var d0=new Date(+p[0],+p[1]-1,+p[2],0,0,0),d1=new Date(+p[0],+p[1]-1,+p[2],23,59,59);
-  var R=ghDayRangeZ(dateKey);
-  var filters=[
-    'exercise.interval.start_time >= "'+R[0]+'" AND exercise.interval.start_time <= "'+R[1]+'"',
-    'exercise.interval.end_time >= "'+R[0]+'" AND exercise.interval.end_time <= "'+R[1]+'"',
-    'exercise.start_time >= "'+R[0]+'" AND exercise.start_time <= "'+R[1]+'"'
-  ];
-  var savedFi=GH_STRAT['exfilter'];if(savedFi!=null&&filters[savedFi])filters=[filters[savedFi]].concat(filters.filter(function(_,i){return i!==savedFi;}));
-  var notes=[];
-  (function tryF(fi){
-    if(fi>=filters.length)return cb(null,notes.join(' | ')||'no filter worked');
-    ghReqE('GET','/users/me/dataTypes/exercise/dataPoints?filter='+encodeURIComponent(filters[fi])+'&pageSize=50',at,null,function(ok,d,stt,err){
-    if(!ok){notes.push('f'+fi+': '+stt+' '+(err||'').slice(0,40));return tryF(fi+1);}
-    GH_STRAT['exfilter']=filters.indexOf(filters[fi]);ghStratSave();
+  ghReqE('GET','/users/me/dataTypes/exercise/dataPoints?pageSize=40',at,null,function(ok,d,stt,err){
+    if(!ok)return cb(null,stt+' '+String(err||'').slice(0,50));
     try{
       var list=[];
       (d.dataPoints||[]).forEach(function(dp){
@@ -920,19 +909,17 @@ function ghExercisesDay(dateKey,at,cb){
           }
         }
         walk(ex,0,'');
-        list.push({name:String(name),dur:dur,dist:dist,cal:cal,hr:hr,start:startHM,startDay:startDay,info:info,key:key});
+        if(!startDay||startDay===dateKey)list.push({name:String(name),dur:dur,dist:dist,cal:cal,hr:hr,start:startHM,startDay:startDay||dateKey,info:info,key:key});
       });
       cb(list,'');
-    }catch(e){tryF(fi+1);}
-    });
-  })(0);
+    }catch(e){cb(null,'parse');}
+  });
 }
 function ghHeartSeries(dateKey,at,cb){
   var R=ghDayRangeZ(dateKey);
   var filters=[
-    'heart_rate.interval.end_time >= "'+R[0]+'" AND heart_rate.interval.end_time <= "'+R[1]+'"',
+    'heart_rate.sample_time.physical_time >= "'+R[0]+'"',
     'heart_rate.sample_time.physical_time >= "'+R[0]+'" AND heart_rate.sample_time.physical_time <= "'+R[1]+'"',
-    'heart_rate.date = "'+dateKey+'"',
     ''
   ];
   (function tryF(fi){
@@ -945,11 +932,13 @@ function ghHeartSeries(dateKey,at,cb){
       var hourly=[];for(var i=0;i<24;i++)hourly.push({sum:0,n:0,min:999,max:0});
       var all=[],mn=999,mx=0;
       (d.dataPoints||[]).forEach(function(dp){
-        var c=Object.assign({},dp.heartRate||dp);var ts=c.sampleTime;delete c.sampleTime;
+        var hrObj=dp.heartRate||dp;
+        var ts=hrObj.sampleTime||dp.sampleTime||hrObj.endTime||dp.endTime||null;
+        var c=Object.assign({},hrObj);delete c.sampleTime;delete c.endTime;
         var bpm=ghNum(c,0);if(!(bpm>20&&bpm<240))return;
-        var when=null;try{when=new Date(ts.physicalTime||ts);}catch(e){}
-        if(when){var wk=when.getFullYear()+'-'+String(when.getMonth()+1).padStart(2,'0')+'-'+String(when.getDate()).padStart(2,'0');if(wk!==dateKey)return;}
-        var hr=when?when.getHours():0;
+        var when=null;try{when=new Date((ts&&(ts.physicalTime||ts.endTime))||ts);}catch(e){}
+        if(when&&!isNaN(when)){var wk=when.getFullYear()+'-'+String(when.getMonth()+1).padStart(2,'0')+'-'+String(when.getDate()).padStart(2,'0');if(wk!==dateKey)return;}
+        var hr=(when&&!isNaN(when))?when.getHours():0;
         if(hr>=0&&hr<24){hourly[hr].sum+=bpm;hourly[hr].n++;if(bpm<hourly[hr].min)hourly[hr].min=bpm;if(bpm>hourly[hr].max)hourly[hr].max=bpm;}
         all.push(bpm);if(bpm<mn)mn=bpm;if(bpm>mx)mx=bpm;
       });
@@ -2749,7 +2738,7 @@ function App(){
             !fbIsStandalone()&&h('div',{style:{background:C.amb,border:'1px solid '+C.ambT+'55',borderRadius:12,padding:'9px 12px',marginBottom:9,fontSize:11,color:C.ambT,lineHeight:1.5,fontWeight:600}},'⚠️ This looks like Safari, not your home-screen app. Tap "Copy connection code" below, open Abd\u2019s Quest from your home screen, and paste it there (Settings → Google Health Sync).'),
             h('button',{onClick:function(){var code=fbExportCode();if(!code){showT('No connection to copy','red');return;}try{navigator.clipboard.writeText(code);showT('Connection code copied ✓','gold');}catch(e){window.prompt('Copy this code:',code);}},style:Object.assign({},btn(false,C.gold),{width:'100%',fontSize:12,marginBottom:7,color:C.gold})},'📋 Copy connection code (for your home-screen app)'),
             h('button',{onClick:function(){fbSync(true);},disabled:fbBusy,style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13,marginBottom:7,opacity:fbBusy?0.6:1})},fbBusy?'Syncing…':'🔄 Sync now'),
-            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 19'),
+            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 20'),
             h('button',{onClick:fbDoctor,style:Object.assign({},btn(false,C.ambT),{width:'100%',fontSize:12,marginBottom:7,color:C.ambT})},'🩺 Run sync doctor'),
             h('button',{onClick:fbProbe,style:Object.assign({},btn(false,C.bluT),{width:'100%',fontSize:12,marginBottom:7,color:C.bluT})},'🔬 Deep probe (HR + workouts)'),
             fbDoc&&h('div',{style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:12,padding:'10px 12px',marginBottom:7}},fbDoc.map(function(l,i){return h('div',{key:i,style:{fontSize:10.5,color:C.txt,lineHeight:1.7,wordBreak:'break-word'}},l);}),h('div',{style:{fontSize:9.5,color:C.dim,marginTop:5}},'⚪ rows show why a metric is empty — send these to Claude to fix.')),
