@@ -1965,6 +1965,28 @@ function App(){
     return {score:score,label:label,col:col,sleepHrs:hrs,sleepStart:f.sleepStart,sleepEnd:f.sleepEnd,rhr:f.rhr||0,rhrBase:base?Math.round(base):0,ydSteps:ydSteps,ydWk:ydWk,sleepPct:sleepScore,rhrPct:rhrScore,actPct:actScore};
   }
 
+  function bodyInsights(){
+    var td=today();var f=(st.fbDaily||{})[td]||{};var fd=st.fbDaily||{};
+    var R=readiness();
+    var rhrArr=[];Object.keys(fd).sort().forEach(function(k){if(fd[k].rhr)rhrArr.push(fd[k].rhr);});
+    var rhr=f.rhr||(rhrArr.length?rhrArr[rhrArr.length-1]:0);
+    var rhrAvg=rhrArr.length>=3?Math.round(rhrArr.slice(-7).reduce(function(a,b){return a+b;},0)/Math.min(rhrArr.length,7)):null;
+    var steps=(st.stepLog||{})[td]||0,az=f.azm||0,burned=f.calOut||0,hrMax=f.hrMax||0;
+    var wkCount=((st.workoutSessions||{})[td]||[]).length;
+    var hrLoad=(hrMax&&rhr)?Math.max(0,(hrMax-rhr)/(200-rhr)):0;
+    var strain=Math.max(0,Math.min(21,az*0.13+steps/4000+wkCount*2.5+hrLoad*3));
+    var strainLabel=strain>=18?'All-out':strain>=14?'High':strain>=10?'Moderate':strain>=5?'Light':'Minimal';
+    var sl7=(st.sleepLog||[]).slice(-7);var debt=0;sl7.forEach(function(e){debt+=Math.max(0,8-e.hrs);});
+    var slAvg=sl7.length?sl7.reduce(function(a,b){return a+b.hrs;},0)/sl7.length:null;
+    var stp=[];for(var i=1;i<=14;i++){var d=new Date();d.setDate(d.getDate()-i);var v=(st.stepLog||{})[wkYmd(d)];if(v)stp.push(v);}
+    var stAvg=stp.length?stp.reduce(function(a,b){return a+b;},0)/stp.length:null;
+    var vo2=rhr?Math.round(15*((220-22)/rhr)):0;
+    var cardio=rhr?(rhr<55?'Excellent':rhr<62?'Great':rhr<70?'Good':rhr<78?'Average':'Building'):'—';
+    var hAge=null;if(rhrAvg&&slAvg&&stAvg){hAge=Math.round(22+(rhrAvg-60)*0.25+(7.5-slAvg)*1.5+(10000-stAvg)/3500);hAge=Math.max(16,Math.min(60,hAge));}
+    var hrNow=0;if(f.hrSeries){for(var j=f.hrSeries.length-1;j>=0;j--){if(f.hrSeries[j]){hrNow=f.hrSeries[j].avg;break;}}}
+    return {recovery:R?R.score:null,recLabel:R?R.label:'',recCol:R?R.col:C.gold,strain:Math.round(strain*10)/10,strainLabel:strainLabel,sleepDebt:Math.round(debt*10)/10,slAvg:slAvg,vo2:vo2,cardio:cardio,rhr:rhr,rhrAvg:rhrAvg,healthAge:hAge,hrNow:hrNow,az:az,burned:burned,steps:steps,hrMax:hrMax};
+  }
+
   function renderTab(){
 
     if(tab==='today') return (function(){
@@ -2012,6 +2034,14 @@ function App(){
               [{l:'Day load',v:fd.azm?fd.azm+' zone min':'—',c:C.ambT},{l:'Burned',v:calOut?calOut.toLocaleString()+' kcal':'—',c:C.telT},{l:'HR vs avg',v:(R.rhr&&R.rhrBase)?((R.rhr-R.rhrBase>=0?'+':'')+(R.rhr-R.rhrBase)+' bpm'):'—',c:(R.rhr&&R.rhrBase&&R.rhr<=R.rhrBase)?C.grnT:C.ambT}].map(function(x){return h('div',{key:x.l,style:{flex:1,textAlign:'center'}},h('div',{className:'cz',style:{fontSize:13.5,fontWeight:700,color:x.c}},x.v),h('div',{style:{fontSize:9,color:C.dim,fontWeight:700,marginTop:2}},x.l.toUpperCase()));}))
           )
         : h('div',{style:cs(C,{marginBottom:10,padding:'13px 15px'})},h('div',{style:{fontSize:12,color:C.dim,lineHeight:1.5}},'⌚ Your readiness score appears once your watch has sleep data — wear it tonight and sync in the morning.')),
+        (function(){var BI=bodyInsights();if(BI.recovery==null&&!BI.strain)return null;return h('div',{onClick:function(){setOvSheet('insights');},style:cs(C,{marginBottom:10,padding:14,cursor:'pointer'})},
+          h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},h('div',{style:{fontSize:10,color:C.dim,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase'}},'🫀 Body insights'),h('div',{style:{fontSize:11.5,color:C.gold,fontWeight:700}},'More ›')),
+          h('div',{style:{display:'flex',gap:10}},
+            h('div',{style:{flex:1,display:'flex',alignItems:'center',gap:11}},h(Ring,{size:62,sw:7,pct:(BI.recovery||0)/100,col:BI.recCol,col2:wkTint(BI.recCol,0.5)},h('div',{className:'cz',style:{fontSize:16,fontWeight:700,color:BI.recCol}},BI.recovery!=null?BI.recovery:'—')),h('div',null,h('div',{style:{fontSize:9.5,color:C.dim,fontWeight:700,letterSpacing:'.06em'}},'RECOVERY'),h('div',{style:{fontSize:12.5,color:C.txt,fontWeight:700}},BI.recLabel||'—'))),
+            h('div',{style:{width:1,background:C.bdr}}),
+            h('div',{style:{flex:1,display:'flex',alignItems:'center',gap:11}},h(Ring,{size:62,sw:7,pct:BI.strain/21,col:C.bluT,col2:wkTint(C.bluT,0.5)},h('div',{className:'cz',style:{fontSize:16,fontWeight:700,color:C.bluT}},BI.strain)),h('div',null,h('div',{style:{fontSize:9.5,color:C.dim,fontWeight:700,letterSpacing:'.06em'}},'STRAIN'),h('div',{style:{fontSize:12.5,color:C.txt,fontWeight:700}},BI.strainLabel)))
+          )
+        );})(),
         h('div',{style:{display:'flex',gap:9,marginBottom:9}},
           h('div',{style:cs(C,{flex:1,padding:13,textAlign:'center'})},
             h('div',{style:{fontSize:10,color:C.dim,fontWeight:700,letterSpacing:'.1em',textTransform:'uppercase',marginBottom:9}},'👟 Steps'),
@@ -2738,7 +2768,7 @@ function App(){
             !fbIsStandalone()&&h('div',{style:{background:C.amb,border:'1px solid '+C.ambT+'55',borderRadius:12,padding:'9px 12px',marginBottom:9,fontSize:11,color:C.ambT,lineHeight:1.5,fontWeight:600}},'⚠️ This looks like Safari, not your home-screen app. Tap "Copy connection code" below, open Abd\u2019s Quest from your home screen, and paste it there (Settings → Google Health Sync).'),
             h('button',{onClick:function(){var code=fbExportCode();if(!code){showT('No connection to copy','red');return;}try{navigator.clipboard.writeText(code);showT('Connection code copied ✓','gold');}catch(e){window.prompt('Copy this code:',code);}},style:Object.assign({},btn(false,C.gold),{width:'100%',fontSize:12,marginBottom:7,color:C.gold})},'📋 Copy connection code (for your home-screen app)'),
             h('button',{onClick:function(){fbSync(true);},disabled:fbBusy,style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13,marginBottom:7,opacity:fbBusy?0.6:1})},fbBusy?'Syncing…':'🔄 Sync now'),
-            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 20'),
+            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 21'),
             h('button',{onClick:fbDoctor,style:Object.assign({},btn(false,C.ambT),{width:'100%',fontSize:12,marginBottom:7,color:C.ambT})},'🩺 Run sync doctor'),
             h('button',{onClick:fbProbe,style:Object.assign({},btn(false,C.bluT),{width:'100%',fontSize:12,marginBottom:7,color:C.bluT})},'🔬 Deep probe (HR + workouts)'),
             fbDoc&&h('div',{style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:12,padding:'10px 12px',marginBottom:7}},fbDoc.map(function(l,i){return h('div',{key:i,style:{fontSize:10.5,color:C.txt,lineHeight:1.7,wordBreak:'break-word'}},l);}),h('div',{style:{fontSize:9.5,color:C.dim,marginTop:5}},'⚪ rows show why a metric is empty — send these to Claude to fix.')),
@@ -2856,6 +2886,28 @@ function App(){
         rows.map(function(r,i){return h('div',{key:i,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 2px',borderBottom:'1px solid var(--wc-line)'}},h('span',{style:{fontSize:12.5,color:'var(--wc-dim)',fontWeight:600}},r[0]),h('span',{className:'cz',style:{fontSize:14,color:'var(--wc-txt)',fontWeight:700}},r[1]));}),
         h('div',{style:{fontSize:10.5,color:'var(--wc-dim)',marginTop:14,lineHeight:1.5,textAlign:'center'}},'To change this workout, edit it in the Fitbit app and tap Sync now in Settings.')
       );})(),
+    ovSheet==='insights'&&(function(){
+      var B=bodyInsights();
+      function metric(ic,label,val,sub,col){return h('div',{style:{background:'var(--wc-card)',border:'1px solid var(--wc-line)',borderRadius:16,padding:'13px 12px'}},h('div',{style:{fontSize:15,marginBottom:6}},ic),h('div',{className:'cz',style:{fontSize:21,fontWeight:700,color:col||C.txt,lineHeight:1}},val),h('div',{style:{fontSize:10,color:C.dim,fontWeight:700,marginTop:4,letterSpacing:'.03em'}},label),h('div',{style:{fontSize:9.5,color:C.fnt,marginTop:1}},sub));}
+      return h(Sheet,{onClose:function(){setOvSheet(null);}},
+        h('div',{className:'sheettitle'},'Body Insights'),
+        h('div',{className:'sheetsub'},'Your day, decoded — Whoop & Bevel style'),
+        h('div',{style:{display:'flex',gap:12,marginBottom:18}},
+          h('div',{style:{flex:1,textAlign:'center'}},h('div',{style:{display:'flex',justifyContent:'center',marginBottom:8}},h(Ring,{size:104,sw:9,pct:(B.recovery||0)/100,col:B.recCol,col2:wkTint(B.recCol,0.5)},h('div',{style:{textAlign:'center'}},h('div',{className:'cz',style:{fontSize:26,fontWeight:700,color:B.recCol,lineHeight:1}},B.recovery!=null?B.recovery:'—'),h('div',{style:{fontSize:7.5,color:C.dim,fontWeight:800,letterSpacing:'.1em',marginTop:2}},'RECOVERY')))),h('div',{className:'cz',style:{fontSize:13,fontWeight:700,color:B.recCol}},B.recLabel)),
+          h('div',{style:{flex:1,textAlign:'center'}},h('div',{style:{display:'flex',justifyContent:'center',marginBottom:8}},h(Ring,{size:104,sw:9,pct:B.strain/21,col:C.bluT,col2:wkTint(C.bluT,0.5)},h('div',{style:{textAlign:'center'}},h('div',{className:'cz',style:{fontSize:26,fontWeight:700,color:C.bluT,lineHeight:1}},B.strain),h('div',{style:{fontSize:7.5,color:C.dim,fontWeight:800,letterSpacing:'.1em',marginTop:2}},'STRAIN /21')))),h('div',{className:'cz',style:{fontSize:13,fontWeight:700,color:C.bluT}},B.strainLabel))
+        ),
+        h('div',{style:{fontSize:11.5,color:C.dim,lineHeight:1.6,marginBottom:16,textAlign:'center'}},B.recovery>=70&&B.strain<10?'Well recovered and under-exerted — a great day to push hard. 💪':B.strain>14&&B.recovery<60?'High strain on lower recovery — prioritise rest & sleep tonight. 😴':'Balanced effort. Keep stacking good days. 🔥'),
+        h('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:10,marginBottom:16}},
+          metric('🎂','Health age',B.healthAge!=null?'~'+B.healthAge:'—',B.healthAge!=null?(B.healthAge<=22?'younger than 22 🎉':B.healthAge<=25?'about your age':'room to improve'):'needs ~3 days HR',B.healthAge!=null&&B.healthAge<=22?C.grnT:C.ambT),
+          metric('🫁','Est. VO₂ max',B.vo2||'—',B.cardio+' cardio fitness',C.telT),
+          metric('🛌','Sleep debt · 7d',B.sleepDebt>0?B.sleepDebt+'h':'0h',B.sleepDebt>5?'pay it back soon':B.sleepDebt>0?'minor — catch up':'fully rested ✓',B.sleepDebt>5?C.redT:B.sleepDebt>0?C.ambT:C.grnT),
+          metric('❤️','Resting HR',B.rhr||'—',B.rhrAvg?'7-day avg '+B.rhrAvg:'baseline building',C.redT),
+          metric('⚡','Day strain',B.strain,B.az+' zone min · '+(B.burned?B.burned.toLocaleString()+' kcal':'—'),C.bluT),
+          metric('💓','HR range today',B.hrMax?B.rhr+'–'+B.hrMax:'—',B.hrNow?'latest ~'+B.hrNow+' bpm':'all-day spread',C.purT)
+        ),
+        h('div',{style:{fontSize:10,color:C.fnt,lineHeight:1.6}},'Strain (0–21) estimates today\u2019s cardiovascular load from zone minutes, steps, workouts and heart-rate elevation. Recovery is your readiness score. VO₂ max and Health age are rough estimates from resting HR, sleep and steps — they sharpen as data builds, and aren\u2019t medical advice. The goal: stack high-recovery days and train when your body\u2019s ready.')
+      );
+    })(),
     ovSheet==='sleep'&&h(SleepSheet,{st:st,C:C,onClose:function(){setOvSheet(null);}}),
     ovSheet==='ready'&&(function(){
       var R=readiness();if(!R)return null;
