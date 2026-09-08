@@ -1,0 +1,11 @@
+dist/
+legacy/
+node_modules/
+coverage/
+package-lock.json
+
+# Legacy root artifacts — frozen until the Phase 3 cutover, don't reformat.
+AbdQuest.html
+sw.js
+manifest.json
+privacy.html
