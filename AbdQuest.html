@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Abd's Quest">
 <meta name="theme-color" content="#0a0a0f">
 <title>Abd's Quest</title>
+<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -652,7 +653,6 @@ function initState(){
       penXp=0;// No penalty on a frozen day
       // Reduce freeze count
       s.streakFreezes=(saved.streakFreezes||0)-1;
-      console.log('[Streak] Freeze used! '+s.streakFreezes+' remaining');
     } else {
       newStreak=0;
     }
@@ -1930,7 +1930,21 @@ function App(){
     setEdit(null);showT('Saved!','gold');
   }
   function exportData(){var blob=new Blob([JSON.stringify(st,null,2)],{type:'application/json'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='abdquest_backup_'+today()+'.json';a.click();URL.revokeObjectURL(url);showT('Backup downloaded!','gold');}
-  function importData(ev){var f=ev.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(en){try{setSt(JSON.parse(en.target.result));showT('Restored!','gold');}catch(e){showT('Invalid file','red');}};r.readAsText(f);}
+  function importData(ev){
+    var f=ev.target.files[0];ev.target.value='';// reset so re-importing the same file fires onChange
+    if(!f)return;
+    if(f.size>8*1024*1024){showT('That file is too large to be an AbdQuest backup','red');return;}
+    var r=new FileReader();
+    r.onload=function(en){
+      var parsed;
+      try{parsed=JSON.parse(en.target.result);}catch(e){showT('Not a valid JSON file','red');return;}
+      if(!vState(parsed)){showT('That doesn’t look like an AbdQuest backup','red');return;}
+      setSt(parsed);
+      showT('Restored!','gold');
+    };
+    r.onerror=function(){showT('Could not read that file','red');};
+    r.readAsText(f);
+  }
 
   function getUnlockedTiers(){var tiers=[1];if(st.streak>=14)tiers.push(2);if(st.streak>=25)tiers.push(3);if(st.streak>=50)tiers.push(4);return tiers;}
   function filterLog(log){
@@ -3106,7 +3120,24 @@ function App(){
   );
 }
 
-try{var _mnt=document.getElementById('app');_mnt.removeAttribute('style');ReactDOM.createRoot(_mnt).render(h(App));}
+// Error boundary — catches render/lifecycle errors anywhere in the tree so a bug
+// shows a recoverable screen instead of a white page. Data is untouched.
+class ErrBoundary extends React.Component{
+  constructor(props){super(props);this.state={err:null};}
+  static getDerivedStateFromError(err){return {err:err};}
+  componentDidCatch(err,info){try{console.error('AbdQuest error boundary:',err,info);}catch(e){}}
+  render(){
+    if(!this.state.err)return this.props.children;
+    return h('div',{style:{padding:'26px 22px',minHeight:'100vh',background:'#0a0a0f',color:'#e8dcc8',fontFamily:'Georgia,serif'}},
+      h('div',{style:{color:'#ffd479',fontSize:'18px',fontWeight:'bold',marginBottom:'10px'}},'Something broke — your data is safe.'),
+      h('div',{style:{fontSize:'13px',color:'#9a8f78',marginBottom:'16px',lineHeight:1.55}},'Your progress is stored on this device and was not affected. Reload to carry on. If this keeps happening, open Settings → Export Backup on a device where the app still works.'),
+      h('div',{style:{fontSize:'11px',color:'#6b6152',marginBottom:'18px',whiteSpace:'pre-wrap',wordBreak:'break-word'}},String((this.state.err&&this.state.err.message)||this.state.err||'')),
+      h('button',{onClick:function(){location.reload();},style:{background:'#ffd479',border:'none',padding:'11px 24px',borderRadius:'8px',fontSize:'13px',fontWeight:'bold',cursor:'pointer'}},'Reload')
+    );
+  }
+}
+
+try{var _mnt=document.getElementById('app');_mnt.removeAttribute('style');ReactDOM.createRoot(_mnt).render(h(ErrBoundary,null,h(App)));}
 catch(err){document.getElementById('app').innerHTML='<div style="padding:20px;background:#0a0a0f;min-height:100vh;color:#e8dcc8;font-family:Georgia,serif;"><div style="color:#ff6666;font-size:16px;margin-bottom:12px;">App crashed: '+err.message+'</div><button onclick="location.reload()" style="background:#ffd700;border:none;padding:10px 20px;border-radius:6px;font-size:13px;cursor:pointer;">Reload</button></div>';console.error(err);}
 })();
 </script>
