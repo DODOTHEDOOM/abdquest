@@ -261,10 +261,12 @@ var h=React.createElement,useState=React.useState,useEffect=React.useEffect,useR
 // STORAGE
 var MAIN_KEY='abdquest_v2',BAK_KEY='abdquest_v2_backup';
 function vState(s){return s&&typeof s==='object'&&['xp','streak','done','habits','prayers'].every(function(k){return k in s;});}
+var lastSaveOk=true,lastSaveAt=0;
 function savMain(s){
-  try{localStorage.setItem(MAIN_KEY,JSON.stringify(s));}catch(e){}
+  try{localStorage.setItem(MAIN_KEY,JSON.stringify(s));lastSaveOk=true;lastSaveAt=Date.now();return true;}
+  catch(e){lastSaveOk=false;return false;}
 }
-function savBak(s){try{localStorage.setItem(BAK_KEY,JSON.stringify(s));}catch(e){}}
+function savBak(s){try{localStorage.setItem(BAK_KEY,JSON.stringify(s));return true;}catch(e){return false;}}
 function loadSafe(){
   try{var r=localStorage.getItem(MAIN_KEY);if(r){var p=JSON.parse(r);if(vState(p))return p;}}catch(e){}
   try{var r2=localStorage.getItem(BAK_KEY);if(r2){var p2=JSON.parse(r2);if(vState(p2))return p2;}}catch(e2){}
@@ -1596,6 +1598,7 @@ function App(){
   var hvRangeS=useState('month'),hvRange=hvRangeS[0],setHvRange=hvRangeS[1];
   var hvDayS=useState(null),hvDay=hvDayS[0],setHvDay=hvDayS[1];
   var hvAnchorS=useState(today()),hvAnchor=hvAnchorS[0],setHvAnchor=hvAnchorS[1];
+  var saveErrS=useState(false),saveErr=saveErrS[0],setSaveErr=saveErrS[1];
   var nudgeRef=useRef(null);
   var prevLvlRef=useRef(getLvl(st.xp).level);
   var ptData=usePT();var pTimes=ptData.times,nxtP=ptData.nxt,cd=ptData.cd;
@@ -1603,8 +1606,9 @@ function App(){
   var C=TH.pal;
   useEffect(function(){try{window.scrollTo(0,0);}catch(e){}},[tab]);
 
-  // Auto save — localStorage + Firebase
-  useEffect(function(){savMain(st);},[st]);
+  // Auto save — localStorage. If a write fails (device storage full), surface it
+  // instead of silently losing data.
+  useEffect(function(){setSaveErr(!savMain(st));},[st]);
   useEffect(function(){try{
     var t=themeOf(st.theme),P=t.pal,d=document.documentElement.style;
     document.body.className=t.dark?'':'lightmode';
@@ -2952,6 +2956,11 @@ function App(){
     lvlUp&&h(LvlUpScreen,{lvl:lvlUp,onClose:function(){setLvlUp(null);}}),
     achQueue.length>0&&h(AchievementUnlock,{ach:achQueue[0],onClose:function(){setAchQueue(function(q){return q.slice(1);});}}),
     nudge&&h('div',{style:{position:'fixed',top:0,left:0,right:0,zIndex:200,background:'linear-gradient(90deg,#8b0000,#600)',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'2px solid #ff4444',animation:'slideDown 0.4s ease'}},h('span',{style:{fontSize:12,color:'#fff'}},'⚠ '+nudge),h('button',{onClick:function(){setNudge(null);},style:{background:'none',border:'none',color:'#ffaaaa',fontSize:20,lineHeight:1}},'×')),
+    saveErr&&h('div',{style:{position:'fixed',top:0,left:0,right:0,zIndex:210,background:'linear-gradient(90deg,#7a2e00,#5c2200)',padding:'calc(9px + env(safe-area-inset-top)) 14px 9px',display:'flex',alignItems:'center',gap:10,borderBottom:'2px solid #ff9a3d',animation:'slideDown 0.4s ease'}},
+      h('span',{style:{fontSize:11.5,color:'#ffe1c4',flex:1,lineHeight:1.4}},'⚠ Couldn’t save — this device’s storage may be full. Export a backup now so nothing is lost.'),
+      h('button',{onClick:exportData,style:{background:'#ffcf9a',border:'none',borderRadius:7,padding:'6px 12px',fontSize:11,fontWeight:800,color:'#3a1c00',cursor:'pointer',flexShrink:0}},'Export'),
+      h('button',{onClick:function(){setSaveErr(false);},style:{background:'none',border:'none',color:'#ffb98a',fontSize:18,lineHeight:1,cursor:'pointer',flexShrink:0}},'×')
+    ),
     toast&&h('div',{style:{position:'fixed',bottom:72,left:'50%',transform:'translateX(-50%)',zIndex:300,background:toast.type==='gold'?C.amb:toast.type==='red'?C.red:C.blu,border:'1px solid '+(toast.type==='gold'?C.gold:toast.type==='red'?C.redT:C.bluT),borderRadius:8,padding:'9px 18px',fontSize:12,color:toast.type==='gold'?C.gold:toast.type==='red'?C.redT:C.bluT,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,0.5)'}},toast.msg),
     loot&&h('div',{onClick:function(){setLoot(null);},style:{position:'fixed',inset:0,zIndex:250,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}},h('div',{style:{textAlign:'center'},className:'popIn'},loot.isM&&h('div',{style:{fontSize:13,color:C.gold,letterSpacing:'0.2em',marginBottom:8,textTransform:'uppercase'}},'🔥 STREAK MILESTONE'),h('div',{style:{fontSize:13,color:RC[loot.rarity]||C.gold,letterSpacing:'0.3em',marginBottom:10,textTransform:'uppercase'}},(loot.rarity||'reward')+' '+(loot.isR?'unlocked':loot.isM?'reward':'drop')),h('div',{style:{fontSize:68,marginBottom:12}},loot.icon),h('div',{style:{fontSize:20,color:RC[loot.rarity]||C.gold,fontWeight:'bold'}},loot.name||loot.label),h('div',{style:{fontSize:12,color:'#aaa',marginTop:6}},loot.desc||loot.description),loot.isM&&h('div',{style:{fontSize:13,color:C.gold,marginTop:10,fontStyle:'italic'}},loot.msg),loot.bonusXp&&h('div',{style:{fontSize:14,color:C.gold,marginTop:8,fontWeight:'bold'}},'+'+loot.bonusXp+' XP bonus'),h('div',{style:{fontSize:10,color:'#555',marginTop:14}},'tap to dismiss'))),
     edit&&h('div',{style:{position:'fixed',inset:0,zIndex:250,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.88)',padding:20}},h('div',{style:{background:C.card,border:'1px solid '+C.bdr,borderRadius:12,padding:22,width:'100%',maxWidth:380}},h('div',{style:{fontSize:15,color:C.gold,marginBottom:16,fontWeight:'bold'}},'Edit'),[{k:'label',l:'Name',t:'text'},{k:'icon',l:'Icon',t:'text'},{k:edit._s==='s'?'cost':'xp',l:edit._s==='s'?'Coin Cost':'XP Value',t:'number'},{k:'desc',l:'Description',t:'text'}].map(function(f){return h('div',{key:f.k,style:{marginBottom:11}},h('div',{style:{fontSize:10,color:C.dim,letterSpacing:'0.1em',marginBottom:3}},f.l.toUpperCase()),h('input',{type:f.t,value:edit[f.k]||'',onChange:function(ev){setEdit(function(p){var n=Object.assign({},p);n[f.k]=f.t==='number'?Number(ev.target.value):ev.target.value;return n;});},style:ins(C)}));}),h('div',{style:{marginBottom:11}},
