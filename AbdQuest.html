@@ -9,7 +9,6 @@
 <meta name="theme-color" content="#0a0a0f">
 <title>Abd's Quest</title>
 <link rel="manifest" href="manifest.json">
-<script src="https://accounts.google.com/gsi/client" async></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -693,82 +692,49 @@ function initState(){
   return s;
 }
 
-// GOOGLE HEALTH SYNC MODULE (Google Health API v4 — Fitbit device data)
-// Auth: Google Identity Services token model. NO client secret, NO refresh token
-// is ever stored — only a short-lived access token (~1h). Re-auth happens through
-// Google's own sign-in when the token expires.
+// GOOGLE HEALTH SYNC MODULE (Google Health API v4 — serves Fitbit device data; replaces legacy Fitbit Web API)
 var FB_KEY='abdquest_gh';
-var GH_SCOPES=['https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly','https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly','https://www.googleapis.com/auth/googlehealth.sleep.readonly','https://www.googleapis.com/auth/googlehealth.nutrition.readonly'];
-function fbGet(){
-  try{
-    var t=JSON.parse(localStorage.getItem(FB_KEY)||'null');
-    // Wipe any credential blob left by the old (insecure) confidential-client flow.
-    if(t&&(t.csec||t.rt)){fbSet(null);try{localStorage.removeItem('abdquest_gh_csec');localStorage.setItem('abdquest_gh_migrated','1');}catch(e){}return null;}
-    return t;
-  }catch(e){return null;}
-}
+function fbGet(){try{return JSON.parse(localStorage.getItem(FB_KEY)||'null');}catch(e){return null;}}
 function fbSet(v){try{if(v)localStorage.setItem(FB_KEY,JSON.stringify(v));else localStorage.removeItem(FB_KEY);}catch(e){}}
-function fbClientId(){try{return localStorage.getItem('abdquest_gh_cid')||'';}catch(e){return '';}}
-function fbJsOrigin(){return location.origin;}
-function fbIsConnected(){return !!fbClientId();}
-
-var _ghClient=null,_ghQueue=[];
-function _ghDrain(tok){var q=_ghQueue;_ghQueue=[];q.forEach(function(fn){try{fn(tok);}catch(e){}});}
-function _ghReady(cb){
-  if(window.google&&google.accounts&&google.accounts.oauth2)return cb(true);
-  var n=0,iv=setInterval(function(){
-    if(window.google&&google.accounts&&google.accounts.oauth2){clearInterval(iv);cb(true);}
-    else if(++n>50){clearInterval(iv);cb(false);}
-  },100);
+function fbRedirectUri(){return location.origin+location.pathname;}
+function fbConnect(clientId,clientSecret){
+  try{
+    var stt=Math.random().toString(36).slice(2);
+    sessionStorage.setItem('gh_state',stt);sessionStorage.setItem('gh_cid',clientId);sessionStorage.setItem('gh_csec',clientSecret);
+    try{localStorage.setItem('abdquest_gh_cid',clientId);localStorage.setItem('abdquest_gh_csec',clientSecret);}catch(e){}
+    var scopes=['https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly','https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly','https://www.googleapis.com/auth/googlehealth.sleep.readonly','https://www.googleapis.com/auth/googlehealth.nutrition.readonly'];
+    location.href='https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id='+encodeURIComponent(clientId)+'&redirect_uri='+encodeURIComponent(fbRedirectUri())+'&scope='+encodeURIComponent(scopes.join(' '))+'&access_type=offline&prompt=consent&state='+stt;
+  }catch(e){alert('Could not start Google Health connect: '+e.message);}
 }
-function _ghGetClient(clientId,cb){
-  _ghReady(function(ok){
-    if(!ok)return cb(null);
-    if(!_ghClient||_ghClient.__cid!==clientId){
-      _ghClient=google.accounts.oauth2.initTokenClient({
-        client_id:clientId,
-        scope:GH_SCOPES.join(' '),
-        callback:function(resp){
-          if(resp&&resp.access_token){
-            fbSet({cid:clientId,at:resp.access_token,exp:Date.now()+((resp.expires_in||3600)*1000)});
-            _ghDrain(resp.access_token);
-          }else _ghDrain(null);
-        },
-        error_callback:function(){_ghDrain(null);}
-      });
-      _ghClient.__cid=clientId;
-    }
-    cb(_ghClient);
-  });
+function fbToken(params,cb){
+  var body=Object.keys(params).map(function(k){return k+'='+encodeURIComponent(params[k]);}).join('&');
+  fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+    .then(function(r){return r.json();}).then(cb).catch(function(){cb(null);});
 }
-// Interactive connect — must be called from a user gesture (button).
-function fbConnect(clientId,cb){
-  cb=cb||function(){};
-  clientId=(clientId||'').trim();
-  if(!clientId)return cb(false);
-  try{localStorage.setItem('abdquest_gh_cid',clientId);}catch(e){}
-  _ghGetClient(clientId,function(client){
-    if(!client){alert('Google sign-in didn’t load — check your connection and try again.');return cb(false);}
-    _ghQueue.push(function(tok){cb(!!tok);});
-    try{client.requestAccessToken({prompt:'consent'});}catch(e){_ghDrain(null);}
+function fbHandleRedirect(cb){
+  var m=location.search.match(/[?&]code=([^&#]+)/);
+  if(!m)return cb(false,null);
+  var code=decodeURIComponent(m[1]);
+  var sm=location.search.match(/[?&]state=([^&#]+)/);
+  var cid=sessionStorage.getItem('gh_cid')||localStorage.getItem('abdquest_gh_cid');
+  var csec=sessionStorage.getItem('gh_csec')||localStorage.getItem('abdquest_gh_csec');
+  var expState=sessionStorage.getItem('gh_state');
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+  if(expState&&sm&&decodeURIComponent(sm[1])!==expState)return cb(false,'state mismatch — please tap Connect again');
+  if(!cid||!csec)return cb(false,'missing credentials — please tap Connect again');
+  fbToken({code:code,client_id:cid,client_secret:csec,redirect_uri:fbRedirectUri(),grant_type:'authorization_code'},function(d){
+    if(d&&d.access_token){fbSet({cid:cid,csec:csec,at:d.access_token,rt:d.refresh_token||null,exp:Date.now()+((d.expires_in||3600)*1000)});cb(true,null);}
+    else cb(false,(d&&(d.error_description||d.error))||'token exchange failed — check Client ID/Secret & redirect URL');
   });
 }
 function fbEnsureToken(cb){
-  var t=fbGet();
-  if(t&&t.at&&Date.now()<t.exp-60000)return cb(t.at);
-  var cid=(t&&t.cid)||fbClientId();
-  if(!cid)return cb(null);
-  _ghGetClient(cid,function(client){
-    if(!client)return cb(null);
-    _ghQueue.push(cb);
-    try{client.requestAccessToken({prompt:''});}catch(e){_ghDrain(null);}
+  var t=fbGet();if(!t)return cb(null);
+  if(Date.now()<t.exp-60000)return cb(t.at);
+  if(!t.rt)return cb(null);
+  fbToken({client_id:t.cid,client_secret:t.csec,refresh_token:t.rt,grant_type:'refresh_token'},function(d){
+    if(d&&d.access_token){t.at=d.access_token;if(d.refresh_token)t.rt=d.refresh_token;t.exp=Date.now()+((d.expires_in||3600)*1000);fbSet(t);cb(t.at);}
+    else cb(null);
   });
-}
-function fbDisconnect(){
-  var t=fbGet();
-  try{if(t&&t.at&&window.google&&google.accounts&&google.accounts.oauth2)google.accounts.oauth2.revoke(t.at,function(){});}catch(e){}
-  fbSet(null);
-  try{localStorage.removeItem('abdquest_gh_cid');localStorage.removeItem('abdquest_gh_csec');}catch(e){}
 }
 function ghReq(method,path,at,body,cb){
   var o={method:method,headers:{'Authorization':'Bearer '+at,'Accept':'application/json'}};
@@ -1020,6 +986,9 @@ function ghHourlySteps(dateKey,at,cb){
     });
   }catch(e){cb(null);}
 }
+function fbExportCode(){var t=fbGet();if(!t)return null;try{return 'AQGH1.'+btoa(JSON.stringify(t));}catch(e){return null;}}
+function fbImportCode(s){try{s=(s||'').trim();if(s.indexOf('AQGH1.')===0)s=s.slice(6);var o=JSON.parse(atob(s));if(o&&o.cid&&o.csec&&(o.rt||o.at)){fbSet(o);return true;}}catch(e){}return false;}
+function fbIsStandalone(){try{return window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;}catch(e){return false;}}
 function fbFetchDay(dateKey,cb,full){
   fbEnsureToken(function(at){
     if(!at)return cb(null);
@@ -1828,6 +1797,8 @@ function App(){
   var fbConnS=useState(!!fbGet()),fbConn=fbConnS[0],setFbConn=fbConnS[1];
   var fbBusyS=useState(false),fbBusy=fbBusyS[0],setFbBusy=fbBusyS[1];
   var fbCidS=useState(function(){try{return localStorage.getItem('abdquest_gh_cid')||'';}catch(e){return '';}}),fbCid=fbCidS[0],setFbCid=fbCidS[1];
+  var fbCsecS=useState(function(){try{return localStorage.getItem('abdquest_gh_csec')||'';}catch(e){return '';}}),fbCsec=fbCsecS[0],setFbCsec=fbCsecS[1];
+  var fbCodeS=useState(''),fbCode=fbCodeS[0],setFbCode=fbCodeS[1];
   var fbDocS=useState(null),fbDoc=fbDocS[0],setFbDoc=fbDocS[1];
   var ovSheetS=useState(null),ovSheet=ovSheetS[0],setOvSheet=ovSheetS[1];
   var trendSelS=useState('rhr'),trendSel=trendSelS[0],setTrendSel=trendSelS[1];
@@ -1925,12 +1896,14 @@ function App(){
     });
   }
   useEffect(function(){
-    // One-time notice after the security upgrade removed the old stored credentials.
-    try{if(localStorage.getItem('abdquest_gh_migrated')){localStorage.removeItem('abdquest_gh_migrated');setTimeout(function(){showT('Google Health now uses a safer sign-in — reconnect it in Settings','info');},1200);}}catch(e){}
-    // If Health was set up before, try a quiet sync on open when it's been a while.
-    if(!fbIsConnected())return;
-    var last=0;try{last=parseInt(localStorage.getItem('abdquest_fb_last'))||0;}catch(e){}
-    if(Date.now()-last>10*60*1000)setTimeout(function(){fbSync(false);},1500);
+    fbHandleRedirect(function(ok,err){
+      if(ok){setFbConn(true);setTab('settings');showT('⌚ Google Health connected ✓','gold');setTimeout(function(){fbSync(false);},600);}
+      else if(err){showT('Fitbit: '+err,'red');}
+      else if(fbGet()){
+        var last=0;try{last=parseInt(localStorage.getItem('abdquest_fb_last'))||0;}catch(e){}
+        if(Date.now()-last>10*60*1000)setTimeout(function(){fbSync(false);},1200);
+      }
+    });
   },[]);
 
   function saveDayEdit(dateKey,d){
@@ -2896,24 +2869,31 @@ function App(){
               h('div',{style:{fontSize:20}},'✅'),
               h('div',null,
                 h('div',{style:{fontSize:13,color:C.grnT,fontWeight:'bold'}},'Google Health connected'),
-                h('div',{style:{fontSize:11,color:C.dim}},'Steps, sleep, resting HR and calories sync for today + yesterday whenever you open the app. Google may re-check your sign-in now and then.')
+                h('div',{style:{fontSize:11,color:C.dim}},'Your Fitbit Air data — steps, sleep, resting HR, calories — syncs automatically when you open the app, for today + yesterday.')
               )
             ),
+            !fbIsStandalone()&&h('div',{style:{background:C.amb,border:'1px solid '+C.ambT+'55',borderRadius:12,padding:'9px 12px',marginBottom:9,fontSize:11,color:C.ambT,lineHeight:1.5,fontWeight:600}},'⚠️ This looks like Safari, not your home-screen app. Tap "Copy connection code" below, open Abd\u2019s Quest from your home screen, and paste it there (Settings → Google Health Sync).'),
+            h('button',{onClick:function(){var code=fbExportCode();if(!code){showT('No connection to copy','red');return;}try{navigator.clipboard.writeText(code);showT('Connection code copied ✓','gold');}catch(e){window.prompt('Copy this code:',code);}},style:Object.assign({},btn(false,C.gold),{width:'100%',fontSize:12,marginBottom:7,color:C.gold})},'📋 Copy connection code (for your home-screen app)'),
             h('button',{onClick:function(){fbSync(true);},disabled:fbBusy,style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13,marginBottom:7,opacity:fbBusy?0.6:1})},fbBusy?'Syncing…':'🔄 Sync now'),
-            h('button',{onClick:function(){fbConnect(fbClientId()||fbCid,function(ok){if(ok){showT('Re-authorised','gold');setTimeout(function(){fbSync(true);},300);}else showT('Sign-in cancelled','info');});},style:Object.assign({},btn(false,C.telT),{width:'100%',fontSize:12,marginBottom:7})},'Re-authorise Google'),
+            h('div',{style:{textAlign:'center',fontSize:9,color:C.fnt,fontWeight:700,letterSpacing:'.1em',marginBottom:7}},'SYNC BUILD 24'),
             h('button',{onClick:fbDoctor,style:Object.assign({},btn(false,C.ambT),{width:'100%',fontSize:12,marginBottom:7,color:C.ambT})},'🩺 Run sync doctor'),
             h('button',{onClick:fbProbe,style:Object.assign({},btn(false,C.bluT),{width:'100%',fontSize:12,marginBottom:7,color:C.bluT})},'🔬 Deep probe (HR + workouts)'),
             fbDoc&&h('div',{style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:12,padding:'10px 12px',marginBottom:7}},fbDoc.map(function(l,i){return h('div',{key:i,style:{fontSize:10.5,color:C.txt,lineHeight:1.7,wordBreak:'break-word'}},l);}),h('div',{style:{fontSize:9.5,color:C.dim,marginTop:5}},'⚪ rows show why a metric is empty — send these to Claude to fix.')),
-            h('button',{onClick:function(){fbDisconnect();setFbConn(false);showT('Disconnected','info');},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'Disconnect')
+            h('button',{onClick:function(){fbSet(null);setFbConn(false);showT('Disconnected','info');},style:Object.assign({},btn(false,C.redT),{width:'100%',fontSize:12,color:C.redT})},'Disconnect')
           )
         : h('div',null,
             h('div',{style:{fontSize:11.5,color:C.dim,lineHeight:1.6,marginBottom:10}},
-              'One-time setup in the ',h('span',{style:{color:C.telT,fontWeight:700}},'Google Cloud console'),': enable the ',h('span',{style:{color:C.txt,fontWeight:700}},'Google Health API'),', add the four ',h('span',{style:{color:C.txt,fontWeight:700}},'googlehealth ...readonly'),' scopes on the OAuth consent screen, then create an ',h('span',{style:{color:C.txt,fontWeight:700}},'OAuth client (Web application)'),' with this Authorized JavaScript origin (no secret needed):'),
-            h('div',{onClick:function(){try{navigator.clipboard.writeText(fbJsOrigin());showT('Copied','gold');}catch(e){}},style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:10,padding:'9px 11px',fontSize:11,color:C.telT,wordBreak:'break-all',marginBottom:10,cursor:'pointer'}},fbJsOrigin()+'  (tap to copy)'),
-            h('div',{style:{fontSize:11.5,color:C.dim,marginBottom:8}},'Add yourself as a test user (or publish the app), then paste just the Client ID:'),
+              'One-time setup (free, ~10 min) at ',h('span',{style:{color:C.telT,fontWeight:700}},'developers.google.com/health/setup'),': enable the ',h('span',{style:{color:C.txt,fontWeight:700}},'Google Health API'),', create an ',h('span',{style:{color:C.txt,fontWeight:700}},'OAuth Client (Web)'),' with this exact Authorized redirect URI:'),
+            h('div',{onClick:function(){try{navigator.clipboard.writeText(fbRedirectUri());showT('Copied ✓','gold');}catch(e){}},style:{background:C.bg,border:'1px solid '+C.bdr,borderRadius:10,padding:'9px 11px',fontSize:10.5,color:C.telT,wordBreak:'break-all',marginBottom:10,cursor:'pointer'}},fbRedirectUri()+'  (tap to copy)'),
+            h('div',{style:{fontSize:11.5,color:C.dim,marginBottom:8}},'Add yourself as a test user (or publish), pick the four ',h('span',{style:{color:C.txt,fontWeight:700}},'googlehealth …readonly'),' scopes, then paste your credentials:'),
             h('input',{value:fbCid,placeholder:'Client ID (…apps.googleusercontent.com)',onChange:function(e){setFbCid(e.target.value);},style:Object.assign({},ins(C),{marginBottom:8})}),
-            h('button',{onClick:function(){var cid=(fbCid||'').trim();if(!cid){showT('Paste your Client ID first','info');return;}fbConnect(cid,function(ok){if(ok){setFbConn(true);showT('Google Health connected','gold');setTimeout(function(){fbSync(true);},400);}else showT('Sign-in cancelled or failed - check the Client ID','red');});},style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13})},'Connect Google Health'),
-            h('div',{style:{fontSize:10,color:C.fnt,marginTop:8,lineHeight:1.5}},'You sign in on Google\u2019s own screen. No password or secret is stored \u2014 only a short-lived access token that stays on this device.')
+            h('input',{value:fbCsec,placeholder:'Client Secret (GOCSPX-…)',onChange:function(e){setFbCsec(e.target.value);},style:Object.assign({},ins(C),{marginBottom:9})}),
+            h('button',{onClick:function(){var cid=(fbCid||'').trim(),cs2=(fbCsec||'').trim();if(!cid||!cs2){showT('Paste Client ID and Secret first','info');return;}fbConnect(cid,cs2);},style:Object.assign({},btn(true,C.telT),{width:'100%',fontSize:13})},'⌚ Connect Google Health'),
+            h('div',{style:{borderTop:'1px solid '+C.bdr,margin:'13px 0 10px'}}),
+            h('div',{style:{fontSize:11,color:C.dim,marginBottom:7,fontWeight:600}},'Already connected in Safari? Paste the connection code here:'),
+            h('input',{value:fbCode,placeholder:'AQGH1.…',onChange:function(e){setFbCode(e.target.value);},style:Object.assign({},ins(C),{marginBottom:8,fontSize:13})}),
+            h('button',{onClick:function(){if(fbImportCode(fbCode)){setFbConn(true);setFbCode('');showT('⌚ Connected via code ✓','gold');setTimeout(function(){fbSync(true);},400);}else showT('That code didn\u2019t work — copy it again from Safari','red');},style:Object.assign({},btn(false,C.telT),{width:'100%',fontSize:12})},'Apply connection code'),
+            h('div',{style:{fontSize:10,color:C.fnt,marginTop:8,lineHeight:1.5}},'You\u2019ll approve on Google\u2019s page, then return here. Credentials and data stay on your device only.')
           )
       ),
       SH('☁️','Sync & Safety',C.grnT),
