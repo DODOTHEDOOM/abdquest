@@ -3161,6 +3161,16 @@ try{var _mnt=document.getElementById('app');_mnt.removeAttribute('style');ReactD
 catch(err){document.getElementById('app').innerHTML='<div style="padding:20px;background:#0a0a0f;min-height:100vh;color:#e8dcc8;font-family:Georgia,serif;"><div style="color:#ff6666;font-size:16px;margin-bottom:12px;">App crashed: '+err.message+'</div><button onclick="location.reload()" style="background:#ffd700;border:none;padding:10px 20px;border-radius:6px;font-size:13px;cursor:pointer;">Reload</button></div>';console.error(err);}
 })();
 </script>
-<script>(function(){if('serviceWorker' in navigator){try{navigator.serviceWorker.getRegistrations().then(function(rs){var had=rs&&rs.length;rs.forEach(function(r){r.unregister();});if(window.caches&&caches.keys){caches.keys().then(function(ks){var hadC=ks&&ks.length;ks.forEach(function(k){caches.delete(k);});if((had||hadC)&&!sessionStorage.getItem('aq_swclr')){sessionStorage.setItem('aq_swclr','1');location.reload(true);}});}else if(had&&!sessionStorage.getItem('aq_swclr')){sessionStorage.setItem('aq_swclr','1');location.reload(true);}}).catch(function(){});}catch(e){}}})();</script>
+<script>
+// Register the offline service worker. The HTML is network-first (see sw.js), so
+// a new deploy is always picked up on the next online load — no forced reloads,
+// no risk of a stale version getting stuck.
+(function(){
+  if(!('serviceWorker' in navigator))return;
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(){});
+  });
+})();
+</script>
 </body>
 </html>
