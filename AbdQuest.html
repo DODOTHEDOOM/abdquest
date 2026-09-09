@@ -272,20 +272,24 @@ function loadSafe(){
 }
 
 // HELPERS
-function today(){return new Date().toISOString().split('T')[0];}
+// YYYY-MM-DD in LOCAL time. Every day-key in the app must go through this — using
+// toISOString() here formats in UTC, so in the evening (UK during BST) the key
+// jumped to tomorrow's date and streak/rollover logic fired a day early.
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function today(){return ymd(new Date());}
 function getLogicalDay(fajrTime){
   // If before Fajr, still treat as yesterday
   if(!fajrTime)return today();
   var now=new Date();
   var parts=fajrTime.split(':');
   var fajr=new Date();fajr.setHours(parseInt(parts[0]),parseInt(parts[1]),0,0);
-  if(now<fajr){var y=new Date(now);y.setDate(y.getDate()-1);return y.toISOString().split('T')[0];}
+  if(now<fajr){var y=new Date(now);y.setDate(y.getDate()-1);return ymd(y);}
   return today();
 }
 function fmtD(d){var p=d.split('-');return p[2]+'/'+p[1];}
 function getLvl(xp){for(var i=LEVELS.length-1;i>=0;i--)if(xp>=LEVELS[i].minXp)return LEVELS[i];return LEVELS[0];}
 function getNextLvl(xp){var c=getLvl(xp);return LEVELS.find(function(l){return l.level===c.level+1;})||c;}
-function getWeekMon(){var d=new Date(),day=d.getDay(),m=new Date(d);m.setDate(d.getDate()-day+(day===0?-6:1));return m.toISOString().split('T')[0];}
+function getWeekMon(){var d=new Date(),day=d.getDay(),m=new Date(d);m.setDate(d.getDate()-day+(day===0?-6:1));return ymd(m);}
 function getDailyCh(key){var h=0;for(var i=0;i<key.length;i++)h=((h<<5)-h)+key.charCodeAt(i);return DAILY_CH[Math.abs(h)%DAILY_CH.length];}
 function getPenalty(xp,days){if(days<=0)return 0;return Math.round(xp*Math.min(1,0.2+(days-1)*0.13));}
 function getMissColor(d){if(!d)return null;if(d===1)return'#ddaa22';if(d<=2)return'#dd7722';if(d<=4)return'#cc3322';return'#aa1111';}
@@ -603,6 +607,13 @@ function initState(){
   var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},streakFreezes:0,activeEffects:{},badHabits:[{id:'bh1',label:'Junk Food',icon:'🍟',penXp:15,log:{}},{id:'bh2',label:'Missed Sleep',icon:'😴',penXp:10,log:{}},{id:'bh3',label:'Phone Before Bed',icon:'📱',penXp:10,log:{}}],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[],streakMin:0,workoutSessions:{},gymLib:[],customActs:[],wkMigrated:false,coins:0,coinsEarned:0,achievements:[],pdAward:'',bestStreak:0,fbDaily:{}};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
+  // One-time repair for the old UTC-date bug: a previous version could store a
+  // day/week key that is in the FUTURE (calendar rolled over in UTC before local
+  // midnight). Pull those back to the real local values so the rollover below
+  // doesn't run early or twice and wrongly touch the streak.
+  var _cw=getWeekMon();
+  if(saved.lastDay&&saved.lastDay>td){saved.lastDay=td;s.lastDay=td;}
+  if(saved.currentWeek&&saved.currentWeek>_cw){saved.currentWeek=_cw;s.currentWeek=_cw;}
   if(!s.wkMigrated&&s.workouts&&s.workouts.length){
     var msess=Object.assign({},s.workoutSessions||{}),mlib=(s.gymLib||[]).slice();
     s.workouts.forEach(function(w){
@@ -1950,8 +1961,8 @@ function App(){
   function filterLog(log){
     if(!log||!log.length)return[];
     var now=new Date();
-    if(gr==='week'){var d=new Date(now);d.setDate(d.getDate()-7);var c=d.toISOString().split('T')[0];return log.filter(function(en){return en.date>=c;});}
-    if(gr==='month'){var d2=new Date(now);d2.setDate(d2.getDate()-30);var c2=d2.toISOString().split('T')[0];return log.filter(function(en){return en.date>=c2;});}
+    if(gr==='week'){var d=new Date(now);d.setDate(d.getDate()-7);var c=ymd(d);return log.filter(function(en){return en.date>=c;});}
+    if(gr==='month'){var d2=new Date(now);d2.setDate(d2.getDate()-30);var c2=ymd(d2);return log.filter(function(en){return en.date>=c2;});}
     return log;
   }
 
