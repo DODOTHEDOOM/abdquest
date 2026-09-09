@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Abd's Quest">
 <meta name="theme-color" content="#0a0a0f">
 <title>Abd's Quest</title>
+<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -260,10 +261,12 @@ var h=React.createElement,useState=React.useState,useEffect=React.useEffect,useR
 // STORAGE
 var MAIN_KEY='abdquest_v2',BAK_KEY='abdquest_v2_backup';
 function vState(s){return s&&typeof s==='object'&&['xp','streak','done','habits','prayers'].every(function(k){return k in s;});}
+var lastSaveOk=true,lastSaveAt=0;
 function savMain(s){
-  try{localStorage.setItem(MAIN_KEY,JSON.stringify(s));}catch(e){}
+  try{localStorage.setItem(MAIN_KEY,JSON.stringify(s));lastSaveOk=true;lastSaveAt=Date.now();return true;}
+  catch(e){lastSaveOk=false;return false;}
 }
-function savBak(s){try{localStorage.setItem(BAK_KEY,JSON.stringify(s));}catch(e){}}
+function savBak(s){try{localStorage.setItem(BAK_KEY,JSON.stringify(s));return true;}catch(e){return false;}}
 function loadSafe(){
   try{var r=localStorage.getItem(MAIN_KEY);if(r){var p=JSON.parse(r);if(vState(p))return p;}}catch(e){}
   try{var r2=localStorage.getItem(BAK_KEY);if(r2){var p2=JSON.parse(r2);if(vState(p2))return p2;}}catch(e2){}
@@ -271,20 +274,24 @@ function loadSafe(){
 }
 
 // HELPERS
-function today(){return new Date().toISOString().split('T')[0];}
+// YYYY-MM-DD in LOCAL time. Every day-key in the app must go through this — using
+// toISOString() here formats in UTC, so in the evening (UK during BST) the key
+// jumped to tomorrow's date and streak/rollover logic fired a day early.
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function today(){return ymd(new Date());}
 function getLogicalDay(fajrTime){
   // If before Fajr, still treat as yesterday
   if(!fajrTime)return today();
   var now=new Date();
   var parts=fajrTime.split(':');
   var fajr=new Date();fajr.setHours(parseInt(parts[0]),parseInt(parts[1]),0,0);
-  if(now<fajr){var y=new Date(now);y.setDate(y.getDate()-1);return y.toISOString().split('T')[0];}
+  if(now<fajr){var y=new Date(now);y.setDate(y.getDate()-1);return ymd(y);}
   return today();
 }
 function fmtD(d){var p=d.split('-');return p[2]+'/'+p[1];}
 function getLvl(xp){for(var i=LEVELS.length-1;i>=0;i--)if(xp>=LEVELS[i].minXp)return LEVELS[i];return LEVELS[0];}
 function getNextLvl(xp){var c=getLvl(xp);return LEVELS.find(function(l){return l.level===c.level+1;})||c;}
-function getWeekMon(){var d=new Date(),day=d.getDay(),m=new Date(d);m.setDate(d.getDate()-day+(day===0?-6:1));return m.toISOString().split('T')[0];}
+function getWeekMon(){var d=new Date(),day=d.getDay(),m=new Date(d);m.setDate(d.getDate()-day+(day===0?-6:1));return ymd(m);}
 function getDailyCh(key){var h=0;for(var i=0;i<key.length;i++)h=((h<<5)-h)+key.charCodeAt(i);return DAILY_CH[Math.abs(h)%DAILY_CH.length];}
 function getPenalty(xp,days){if(days<=0)return 0;return Math.round(xp*Math.min(1,0.2+(days-1)*0.13));}
 function getMissColor(d){if(!d)return null;if(d===1)return'#ddaa22';if(d<=2)return'#dd7722';if(d<=4)return'#cc3322';return'#aa1111';}
@@ -602,6 +609,13 @@ function initState(){
   var base={xp:0,spent:0,streak:0,titleUnlocked:null,done:{},chores:[],doneChores:{},habitStreaks:{},habitMissed:{},lastDay:td,log:[],unlocked:[],redeemed:[],inventory:[],habits:DEF_HABITS,prayers:DEF_PRAYERS,life:DEF_LIFE,bonus:DEF_BONUS,recurring:DEF_RECURRING,customSections:[],exercises:DEF_EXERCISES,exerciseLogs:{},stepTarget:10000,stepLog:{},streakFreezes:0,activeEffects:{},badHabits:[{id:'bh1',label:'Junk Food',icon:'🍟',penXp:15,log:{}},{id:'bh2',label:'Missed Sleep',icon:'😴',penXp:10,log:{}},{id:'bh3',label:'Phone Before Bed',icon:'📱',penXp:10,log:{}}],shop:DEF_SHOP,calTarget:1900,wtTarget:120,startWt:152,waterTarget:3000,calLog:[],wtLog:[],waterLog:[],sleepLog:[],workouts:[],fajrTime:null,debt:Object.assign({},DEF_DEBT),prayerHist:{},notes:{},dailyChDone:{},waterToday:0,theme:'dark',weeklyChDone:{},weeklyChCustom:[],currentWeek:getWeekMon(),milestonesClaimed:[],reportCards:[],streakMin:0,workoutSessions:{},gymLib:[],customActs:[],wkMigrated:false,coins:0,coinsEarned:0,achievements:[],pdAward:'',bestStreak:0,fbDaily:{}};
   if(!saved)return base;
   var s=Object.assign({},base,saved);
+  // One-time repair for the old UTC-date bug: a previous version could store a
+  // day/week key that is in the FUTURE (calendar rolled over in UTC before local
+  // midnight). Pull those back to the real local values so the rollover below
+  // doesn't run early or twice and wrongly touch the streak.
+  var _cw=getWeekMon();
+  if(saved.lastDay&&saved.lastDay>td){saved.lastDay=td;s.lastDay=td;}
+  if(saved.currentWeek&&saved.currentWeek>_cw){saved.currentWeek=_cw;s.currentWeek=_cw;}
   if(!s.wkMigrated&&s.workouts&&s.workouts.length){
     var msess=Object.assign({},s.workoutSessions||{}),mlib=(s.gymLib||[]).slice();
     s.workouts.forEach(function(w){
@@ -652,7 +666,6 @@ function initState(){
       penXp=0;// No penalty on a frozen day
       // Reduce freeze count
       s.streakFreezes=(saved.streakFreezes||0)-1;
-      console.log('[Streak] Freeze used! '+s.streakFreezes+' remaining');
     } else {
       newStreak=0;
     }
@@ -1585,6 +1598,7 @@ function App(){
   var hvRangeS=useState('month'),hvRange=hvRangeS[0],setHvRange=hvRangeS[1];
   var hvDayS=useState(null),hvDay=hvDayS[0],setHvDay=hvDayS[1];
   var hvAnchorS=useState(today()),hvAnchor=hvAnchorS[0],setHvAnchor=hvAnchorS[1];
+  var saveErrS=useState(false),saveErr=saveErrS[0],setSaveErr=saveErrS[1];
   var nudgeRef=useRef(null);
   var prevLvlRef=useRef(getLvl(st.xp).level);
   var ptData=usePT();var pTimes=ptData.times,nxtP=ptData.nxt,cd=ptData.cd;
@@ -1592,8 +1606,9 @@ function App(){
   var C=TH.pal;
   useEffect(function(){try{window.scrollTo(0,0);}catch(e){}},[tab]);
 
-  // Auto save — localStorage + Firebase
-  useEffect(function(){savMain(st);},[st]);
+  // Auto save — localStorage. If a write fails (device storage full), surface it
+  // instead of silently losing data.
+  useEffect(function(){setSaveErr(!savMain(st));},[st]);
   useEffect(function(){try{
     var t=themeOf(st.theme),P=t.pal,d=document.documentElement.style;
     document.body.className=t.dark?'':'lightmode';
@@ -1930,14 +1945,28 @@ function App(){
     setEdit(null);showT('Saved!','gold');
   }
   function exportData(){var blob=new Blob([JSON.stringify(st,null,2)],{type:'application/json'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='abdquest_backup_'+today()+'.json';a.click();URL.revokeObjectURL(url);showT('Backup downloaded!','gold');}
-  function importData(ev){var f=ev.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(en){try{setSt(JSON.parse(en.target.result));showT('Restored!','gold');}catch(e){showT('Invalid file','red');}};r.readAsText(f);}
+  function importData(ev){
+    var f=ev.target.files[0];ev.target.value='';// reset so re-importing the same file fires onChange
+    if(!f)return;
+    if(f.size>8*1024*1024){showT('That file is too large to be an AbdQuest backup','red');return;}
+    var r=new FileReader();
+    r.onload=function(en){
+      var parsed;
+      try{parsed=JSON.parse(en.target.result);}catch(e){showT('Not a valid JSON file','red');return;}
+      if(!vState(parsed)){showT('That doesn’t look like an AbdQuest backup','red');return;}
+      setSt(parsed);
+      showT('Restored!','gold');
+    };
+    r.onerror=function(){showT('Could not read that file','red');};
+    r.readAsText(f);
+  }
 
   function getUnlockedTiers(){var tiers=[1];if(st.streak>=14)tiers.push(2);if(st.streak>=25)tiers.push(3);if(st.streak>=50)tiers.push(4);return tiers;}
   function filterLog(log){
     if(!log||!log.length)return[];
     var now=new Date();
-    if(gr==='week'){var d=new Date(now);d.setDate(d.getDate()-7);var c=d.toISOString().split('T')[0];return log.filter(function(en){return en.date>=c;});}
-    if(gr==='month'){var d2=new Date(now);d2.setDate(d2.getDate()-30);var c2=d2.toISOString().split('T')[0];return log.filter(function(en){return en.date>=c2;});}
+    if(gr==='week'){var d=new Date(now);d.setDate(d.getDate()-7);var c=ymd(d);return log.filter(function(en){return en.date>=c;});}
+    if(gr==='month'){var d2=new Date(now);d2.setDate(d2.getDate()-30);var c2=ymd(d2);return log.filter(function(en){return en.date>=c2;});}
     return log;
   }
 
@@ -2927,6 +2956,11 @@ function App(){
     lvlUp&&h(LvlUpScreen,{lvl:lvlUp,onClose:function(){setLvlUp(null);}}),
     achQueue.length>0&&h(AchievementUnlock,{ach:achQueue[0],onClose:function(){setAchQueue(function(q){return q.slice(1);});}}),
     nudge&&h('div',{style:{position:'fixed',top:0,left:0,right:0,zIndex:200,background:'linear-gradient(90deg,#8b0000,#600)',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'2px solid #ff4444',animation:'slideDown 0.4s ease'}},h('span',{style:{fontSize:12,color:'#fff'}},'⚠ '+nudge),h('button',{onClick:function(){setNudge(null);},style:{background:'none',border:'none',color:'#ffaaaa',fontSize:20,lineHeight:1}},'×')),
+    saveErr&&h('div',{style:{position:'fixed',top:0,left:0,right:0,zIndex:210,background:'linear-gradient(90deg,#7a2e00,#5c2200)',padding:'calc(9px + env(safe-area-inset-top)) 14px 9px',display:'flex',alignItems:'center',gap:10,borderBottom:'2px solid #ff9a3d',animation:'slideDown 0.4s ease'}},
+      h('span',{style:{fontSize:11.5,color:'#ffe1c4',flex:1,lineHeight:1.4}},'⚠ Couldn’t save — this device’s storage may be full. Export a backup now so nothing is lost.'),
+      h('button',{onClick:exportData,style:{background:'#ffcf9a',border:'none',borderRadius:7,padding:'6px 12px',fontSize:11,fontWeight:800,color:'#3a1c00',cursor:'pointer',flexShrink:0}},'Export'),
+      h('button',{onClick:function(){setSaveErr(false);},style:{background:'none',border:'none',color:'#ffb98a',fontSize:18,lineHeight:1,cursor:'pointer',flexShrink:0}},'×')
+    ),
     toast&&h('div',{style:{position:'fixed',bottom:72,left:'50%',transform:'translateX(-50%)',zIndex:300,background:toast.type==='gold'?C.amb:toast.type==='red'?C.red:C.blu,border:'1px solid '+(toast.type==='gold'?C.gold:toast.type==='red'?C.redT:C.bluT),borderRadius:8,padding:'9px 18px',fontSize:12,color:toast.type==='gold'?C.gold:toast.type==='red'?C.redT:C.bluT,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,0.5)'}},toast.msg),
     loot&&h('div',{onClick:function(){setLoot(null);},style:{position:'fixed',inset:0,zIndex:250,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.9)'}},h('div',{style:{textAlign:'center'},className:'popIn'},loot.isM&&h('div',{style:{fontSize:13,color:C.gold,letterSpacing:'0.2em',marginBottom:8,textTransform:'uppercase'}},'🔥 STREAK MILESTONE'),h('div',{style:{fontSize:13,color:RC[loot.rarity]||C.gold,letterSpacing:'0.3em',marginBottom:10,textTransform:'uppercase'}},(loot.rarity||'reward')+' '+(loot.isR?'unlocked':loot.isM?'reward':'drop')),h('div',{style:{fontSize:68,marginBottom:12}},loot.icon),h('div',{style:{fontSize:20,color:RC[loot.rarity]||C.gold,fontWeight:'bold'}},loot.name||loot.label),h('div',{style:{fontSize:12,color:'#aaa',marginTop:6}},loot.desc||loot.description),loot.isM&&h('div',{style:{fontSize:13,color:C.gold,marginTop:10,fontStyle:'italic'}},loot.msg),loot.bonusXp&&h('div',{style:{fontSize:14,color:C.gold,marginTop:8,fontWeight:'bold'}},'+'+loot.bonusXp+' XP bonus'),h('div',{style:{fontSize:10,color:'#555',marginTop:14}},'tap to dismiss'))),
     edit&&h('div',{style:{position:'fixed',inset:0,zIndex:250,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.88)',padding:20}},h('div',{style:{background:C.card,border:'1px solid '+C.bdr,borderRadius:12,padding:22,width:'100%',maxWidth:380}},h('div',{style:{fontSize:15,color:C.gold,marginBottom:16,fontWeight:'bold'}},'Edit'),[{k:'label',l:'Name',t:'text'},{k:'icon',l:'Icon',t:'text'},{k:edit._s==='s'?'cost':'xp',l:edit._s==='s'?'Coin Cost':'XP Value',t:'number'},{k:'desc',l:'Description',t:'text'}].map(function(f){return h('div',{key:f.k,style:{marginBottom:11}},h('div',{style:{fontSize:10,color:C.dim,letterSpacing:'0.1em',marginBottom:3}},f.l.toUpperCase()),h('input',{type:f.t,value:edit[f.k]||'',onChange:function(ev){setEdit(function(p){var n=Object.assign({},p);n[f.k]=f.t==='number'?Number(ev.target.value):ev.target.value;return n;});},style:ins(C)}));}),h('div',{style:{marginBottom:11}},
@@ -3106,10 +3140,37 @@ function App(){
   );
 }
 
-try{var _mnt=document.getElementById('app');_mnt.removeAttribute('style');ReactDOM.createRoot(_mnt).render(h(App));}
+// Error boundary — catches render/lifecycle errors anywhere in the tree so a bug
+// shows a recoverable screen instead of a white page. Data is untouched.
+class ErrBoundary extends React.Component{
+  constructor(props){super(props);this.state={err:null};}
+  static getDerivedStateFromError(err){return {err:err};}
+  componentDidCatch(err,info){try{console.error('AbdQuest error boundary:',err,info);}catch(e){}}
+  render(){
+    if(!this.state.err)return this.props.children;
+    return h('div',{style:{padding:'26px 22px',minHeight:'100vh',background:'#0a0a0f',color:'#e8dcc8',fontFamily:'Georgia,serif'}},
+      h('div',{style:{color:'#ffd479',fontSize:'18px',fontWeight:'bold',marginBottom:'10px'}},'Something broke — your data is safe.'),
+      h('div',{style:{fontSize:'13px',color:'#9a8f78',marginBottom:'16px',lineHeight:1.55}},'Your progress is stored on this device and was not affected. Reload to carry on. If this keeps happening, open Settings → Export Backup on a device where the app still works.'),
+      h('div',{style:{fontSize:'11px',color:'#6b6152',marginBottom:'18px',whiteSpace:'pre-wrap',wordBreak:'break-word'}},String((this.state.err&&this.state.err.message)||this.state.err||'')),
+      h('button',{onClick:function(){location.reload();},style:{background:'#ffd479',border:'none',padding:'11px 24px',borderRadius:'8px',fontSize:'13px',fontWeight:'bold',cursor:'pointer'}},'Reload')
+    );
+  }
+}
+
+try{var _mnt=document.getElementById('app');_mnt.removeAttribute('style');ReactDOM.createRoot(_mnt).render(h(ErrBoundary,null,h(App)));}
 catch(err){document.getElementById('app').innerHTML='<div style="padding:20px;background:#0a0a0f;min-height:100vh;color:#e8dcc8;font-family:Georgia,serif;"><div style="color:#ff6666;font-size:16px;margin-bottom:12px;">App crashed: '+err.message+'</div><button onclick="location.reload()" style="background:#ffd700;border:none;padding:10px 20px;border-radius:6px;font-size:13px;cursor:pointer;">Reload</button></div>';console.error(err);}
 })();
 </script>
-<script>(function(){if('serviceWorker' in navigator){try{navigator.serviceWorker.getRegistrations().then(function(rs){var had=rs&&rs.length;rs.forEach(function(r){r.unregister();});if(window.caches&&caches.keys){caches.keys().then(function(ks){var hadC=ks&&ks.length;ks.forEach(function(k){caches.delete(k);});if((had||hadC)&&!sessionStorage.getItem('aq_swclr')){sessionStorage.setItem('aq_swclr','1');location.reload(true);}});}else if(had&&!sessionStorage.getItem('aq_swclr')){sessionStorage.setItem('aq_swclr','1');location.reload(true);}}).catch(function(){});}catch(e){}}})();</script>
+<script>
+// Register the offline service worker. The HTML is network-first (see sw.js), so
+// a new deploy is always picked up on the next online load — no forced reloads,
+// no risk of a stale version getting stuck.
+(function(){
+  if(!('serviceWorker' in navigator))return;
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(){});
+  });
+})();
+</script>
 </body>
 </html>
