@@ -1,28 +1,15 @@
 import { useEffect, useState } from "react";
-import {
-  Badge,
-  Button,
-  Card,
-  Field,
-  NavBar,
-  ProgressBar,
-  Ring,
-  SectionHeader,
-  Sheet,
-  Stat,
-  Tabs,
-  TextArea,
-  TextInput,
-  Toast,
-} from "./design/primitives";
+import { Badge, Button, Card, NavBar, SectionHeader, Toast } from "./design/primitives";
+import { BarStrip } from "./design/charts";
+import { Dashboard } from "./screens/Dashboard";
 
 /**
- * Stage 3 — design-language preview.
+ * Stage 3 — design + metrics preview.
  *
- * This is NOT the app yet. It's a gallery of the new primitives so the visual
- * direction can be reviewed before the real screens are built (Onboarding, Today,
- * Progress, Track, Habits, Prayers, Workouts, Journal, Settings). The old app is
- * still `legacy/AbdQuest.html` and still deployed.
+ * The deployed app is still `legacy/AbdQuest.html`. This shell shows the new
+ * visual language and the new metrics engine (`src/lib/metrics`) running on
+ * sample data, so the direction can be reviewed before the remaining screens
+ * are rebuilt.
  */
 export function App() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -32,10 +19,9 @@ export function App() {
       return "light";
     }
   });
-  const [tab, setTab] = useState<"today" | "week">("today");
   const [nav, setNav] = useState<"today" | "habits" | "progress" | "you">("today");
-  const [sheet, setSheet] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [done, setDone] = useState<Record<string, boolean>>({ move: true, junk: true });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -48,213 +34,147 @@ export function App() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2200);
+    const t = setTimeout(() => setToast(null), 2000);
     return () => clearTimeout(t);
   }, [toast]);
 
+  const habits = [
+    { id: "move", name: "Move for 20 minutes" },
+    { id: "junk", name: "No junk food" },
+    { id: "sleep", name: "In bed before 1am" },
+    { id: "water", name: "Drink 3L of water" },
+    { id: "read", name: "Read 20 minutes" },
+  ];
+  const doneCount = habits.filter((h) => done[h.id]).length;
+
   return (
-    <div style={{ minHeight: "100vh", paddingBottom: 96 }}>
+    <div style={{ minHeight: "100vh", paddingBottom: 92 }}>
       <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 16px" }}>
         <header
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "space-between",
-            marginBottom: 20,
+            marginBottom: 24,
           }}
         >
           <div>
-            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-0.02em" }}>
-              Abd&rsquo;s Quest
+            <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
+              {new Date().toLocaleDateString(undefined, {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })}
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-dim)" }}>design preview</div>
+            <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-0.03em", marginTop: 2 }}>
+              Good evening
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <Badge tone="accent">🔥 12-day streak</Badge>
+              <Badge>Level 7</Badge>
+            </div>
           </div>
           <Button sm variant="ghost" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
             {theme === "light" ? "Dark" : "Light"}
           </Button>
         </header>
 
-        <SectionHeader title="Daily summary" action="Details" onAction={() => setSheet(true)} />
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            <Ring value={0.72} size={104}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>72</div>
-                <div
+        <Dashboard />
+
+        <SectionHeader title="Discipline" />
+        <Card flush>
+          <div
+            style={{
+              padding: "14px 16px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Today&rsquo;s habits</span>
+            <span
+              style={{ fontSize: 13, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums" }}
+            >
+              {doneCount} / {habits.length}
+            </span>
+          </div>
+          {habits.map((hbt, i) => {
+            const isDone = !!done[hbt.id];
+            return (
+              <button
+                key={hbt.id}
+                onClick={() => {
+                  setDone((d) => ({ ...d, [hbt.id]: !d[hbt.id] }));
+                  setToast(isDone ? "Unmarked" : "Done — nice");
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "13px 16px",
+                  background: "none",
+                  border: "none",
+                  borderTop: i ? "1px solid var(--border)" : "none",
+                  cursor: "pointer",
+                }}
+              >
+                <span
                   style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: "0.1em",
-                    color: "var(--text-dim)",
+                    width: 22,
+                    height: 22,
+                    borderRadius: 7,
+                    border: "2px solid",
+                    borderColor: isDone ? "var(--m-habits)" : "var(--border-strong)",
+                    background: isDone ? "var(--m-habits)" : "transparent",
+                    color: "#fff",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 13,
+                    flexShrink: 0,
                   }}
                 >
-                  READY
-                </div>
-              </div>
-            </Ring>
-            <div style={{ flex: 1, display: "grid", gap: 12 }}>
-              <Stat label="Streak" value="12 days" sub="best 15" />
-              <Stat label="Level" value="7" sub="240 pts to 8" />
-            </div>
-          </div>
+                  {isDone ? "✓" : ""}
+                </span>
+                <span
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: isDone ? "var(--text-dim)" : "var(--text)",
+                    textDecoration: isDone ? "line-through" : "none",
+                  }}
+                >
+                  {hbt.name}
+                </span>
+              </button>
+            );
+          })}
         </Card>
 
-        <SectionHeader title="Today's habits" />
-        <Card flush>
-          {[
-            ["Move for 20 min", true],
-            ["No junk food", true],
-            ["Sleep before 1am", false],
-            ["Drink 3L water", false],
-          ].map(([name, done], i) => (
-            <button
-              key={i}
-              onClick={() => setToast(done ? "Marked not done" : "Nice — habit done")}
+        <div style={{ marginTop: 12 }}>
+          <Card>
+            <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: 12,
-                width: "100%",
-                textAlign: "left",
-                padding: "14px 16px",
-                background: "none",
-                border: "none",
-                borderTop: i ? "1px solid var(--border)" : "none",
-                cursor: "pointer",
+                justifyContent: "space-between",
+                fontSize: 12,
+                marginBottom: 8,
               }}
             >
-              <span
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 7,
-                  border: "2px solid",
-                  borderColor: done ? "var(--accent)" : "var(--border-strong)",
-                  background: done ? "var(--accent)" : "transparent",
-                  color: "#fff",
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: 13,
-                  flexShrink: 0,
-                }}
-              >
-                {done ? "✓" : ""}
-              </span>
-              <span
-                style={{
-                  fontSize: 15,
-                  fontWeight: 500,
-                  color: done ? "var(--text-dim)" : "var(--text)",
-                  textDecoration: done ? "line-through" : "none",
-                }}
-              >
-                {name}
-              </span>
-            </button>
-          ))}
-        </Card>
-
-        <SectionHeader title="This week" />
-        <div style={{ marginBottom: 12 }}>
-          <Tabs
-            tabs={[
-              { id: "today", label: "Today" },
-              { id: "week", label: "Week" },
-            ]}
-            value={tab}
-            onChange={(id) => setTab(id as typeof tab)}
-          />
+              <span style={{ color: "var(--text-dim)" }}>Habits completed · last 14 days</span>
+              <span style={{ fontWeight: 600 }}>86% consistent</span>
+            </div>
+            <BarStrip
+              values={[5, 4, 5, 3, 5, 5, 2, 4, 5, 5, 5, 3, 4, doneCount]}
+              color="var(--m-habits)"
+              height={44}
+              max={5}
+            />
+          </Card>
         </div>
-        <Card>
-          <div style={{ display: "grid", gap: 14 }}>
-            {[
-              ["Habits", 0.86],
-              ["Sleep target", 0.57],
-              ["Workouts", 0.75],
-              ["Water", 0.4],
-            ].map(([label, v]) => (
-              <div key={label as string}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: 13,
-                    marginBottom: 6,
-                  }}
-                >
-                  <span style={{ color: "var(--text-dim)" }}>{label}</span>
-                  <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-                    {Math.round((v as number) * 100)}%
-                  </span>
-                </div>
-                <ProgressBar value={v as number} ariaLabel={label as string} />
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <SectionHeader title="Components" />
-        <Card>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-            <Badge>neutral</Badge>
-            <Badge tone="accent">on track</Badge>
-            <Badge tone="warn">behind</Badge>
-          </div>
-          <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-            <Button variant="primary" block onClick={() => setToast("Primary tapped")}>
-              Primary action
-            </Button>
-            <Button variant="ghost" block onClick={() => setToast("Ghost tapped")}>
-              Secondary
-            </Button>
-            <Button variant="danger" block onClick={() => setToast("Danger tapped")}>
-              Destructive
-            </Button>
-          </div>
-          <Field label="Display name" hint="Shown on your profile">
-            <TextInput placeholder="e.g. Sam" />
-          </Field>
-          <div style={{ height: 12 }} />
-          <Field label="Journal">
-            <TextArea placeholder="How did today go?" />
-          </Field>
-        </Card>
       </div>
-
-      {sheet && (
-        <Sheet
-          title="Daily summary"
-          sub="How today's number is built"
-          onClose={() => setSheet(false)}
-        >
-          <div style={{ display: "grid", gap: 12 }}>
-            {[
-              ["Sleep", "7h 10m", 0.9],
-              ["Resting HR", "54 bpm", 0.7],
-              ["Yesterday's activity", "8,900 steps", 0.6],
-            ].map(([k, v, p]) => (
-              <div key={k as string}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: 14,
-                    marginBottom: 6,
-                  }}
-                >
-                  <span>{k}</span>
-                  <span style={{ color: "var(--text-dim)" }}>{v}</span>
-                </div>
-                <ProgressBar value={p as number} />
-              </div>
-            ))}
-          </div>
-          <div style={{ height: 16 }} />
-          <Button variant="ghost" block onClick={() => setSheet(false)}>
-            Close
-          </Button>
-        </Sheet>
-      )}
 
       {toast && <Toast>{toast}</Toast>}
 

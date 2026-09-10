@@ -14,10 +14,23 @@
   --text-dim: #6b6b64;
   --text-faint: #9a9a90;
 
-  /* accent — "done / progress" */
-  --accent: #2f9e6e;
-  --accent-weak: #e4f3ec;
-  --accent-text: #1f7c56;
+  /* primary action = ink. Colour is reserved for data, not buttons. */
+  --accent: #1c1c1a;
+  --accent-weak: #ecebe7;
+  --accent-text: #1c1c1a;
+  --accent-on: #ffffff;
+
+  /* metric hues — each metric owns one colour, everywhere it appears */
+  --m-recovery: #0e9f8a;
+  --m-recovery-weak: #dff2ef;
+  --m-strain: #d97438;
+  --m-strain-weak: #fbeade;
+  --m-sleep: #5b5bd6;
+  --m-sleep-weak: #e8e8fa;
+  --m-fitness: #3b6fb0;
+  --m-fitness-weak: #e6eef7;
+  --m-habits: #2f9e6e;
+  --m-habits-weak: #e4f3ec;
 
   /* status */
   --warn: #b8791f;
@@ -78,9 +91,22 @@
     --text-dim: #a6a69e;
     --text-faint: #74746c;
 
-    --accent: #3fb583;
-    --accent-weak: #1c3a2e;
-    --accent-text: #6fd0a6;
+    --accent: #ecece8;
+    --accent-weak: #2a2b28;
+    --accent-text: #ecece8;
+    --accent-on: #121311;
+    --accent-on: #121311;
+
+    --m-recovery: #2ec4ac;
+    --m-recovery-weak: #10302c;
+    --m-strain: #ef8f52;
+    --m-strain-weak: #35251a;
+    --m-sleep: #8b8bf0;
+    --m-sleep-weak: #23233f;
+    --m-fitness: #6aa0da;
+    --m-fitness-weak: #1e2c3d;
+    --m-habits: #3fb583;
+    --m-habits-weak: #1c3a2e;
 
     --warn: #d99a3f;
     --warn-weak: #3a2f1c;
@@ -111,9 +137,20 @@
   --text-dim: #a6a69e;
   --text-faint: #74746c;
 
-  --accent: #3fb583;
-  --accent-weak: #1c3a2e;
-  --accent-text: #6fd0a6;
+  --accent: #ecece8;
+  --accent-weak: #2a2b28;
+  --accent-text: #ecece8;
+
+  --m-recovery: #2ec4ac;
+  --m-recovery-weak: #10302c;
+  --m-strain: #ef8f52;
+  --m-strain-weak: #35251a;
+  --m-sleep: #8b8bf0;
+  --m-sleep-weak: #23233f;
+  --m-fitness: #6aa0da;
+  --m-fitness-weak: #1e2c3d;
+  --m-habits: #3fb583;
+  --m-habits-weak: #1c3a2e;
 
   --warn: #d99a3f;
   --warn-weak: #3a2f1c;
