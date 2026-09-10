@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { tick } from "./charts";
 import "./primitives.css";
 
 // ── Card ────────────────────────────────────────────────────────────────────
@@ -7,16 +8,62 @@ export function Card({
   flush,
   style,
   className = "",
+  onClick,
+  chevron,
+  ariaLabel,
 }: {
   children: ReactNode;
   flush?: boolean;
   style?: CSSProperties;
   className?: string;
+  /** Providing onClick makes the whole card a pressable surface. */
+  onClick?: () => void;
+  /** Show a "there's more behind this" chevron. */
+  chevron?: boolean;
+  ariaLabel?: string;
 }) {
+  const cls =
+    `card${flush ? " card--flush" : ""}${onClick ? " card--interactive" : ""} ${className}`.trim();
+  if (!onClick) {
+    return (
+      <div className={cls} style={style}>
+        {children}
+      </div>
+    );
+  }
   return (
-    <div className={`card${flush ? " card--flush" : ""} ${className}`.trim()} style={style}>
-      {children}
-    </div>
+    <button
+      type="button"
+      className={cls}
+      style={style}
+      aria-label={ariaLabel}
+      onClick={() => {
+        tick();
+        onClick();
+      }}
+    >
+      {chevron ? (
+        <span style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+          <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
+          <svg
+            className="card__chevron"
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </span>
+      ) : (
+        children
+      )}
+    </button>
   );
 }
 
@@ -144,21 +191,34 @@ export function Ring({
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const pct = Math.max(0, Math.min(1, value || 0));
+  const gid = `ring-${size}-${String(color).replace(/[^a-z0-9]/gi, "")}`;
   return (
     <div style={{ position: "relative", width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <defs>
+          {/* A gradient along the arc reads as light falling across a solid
+              object, which is what gives the ring its dimensionality. */}
+          <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.65" />
+            <stop offset="55%" stopColor={color} stopOpacity="1" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.85" />
+          </linearGradient>
+        </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={color}
+          stroke={`url(#${gid})`}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c * (1 - pct)}
-          style={{ transition: "stroke-dashoffset 0.6s cubic-bezier(0.2,0.8,0.3,1)" }}
+          style={{
+            transition: "stroke-dashoffset 0.7s cubic-bezier(0.2,0.8,0.3,1)",
+            filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.16))",
+          }}
         />
       </svg>
       {children != null && (
@@ -286,9 +346,12 @@ export function NavBar<T extends string>({
             key={it.id}
             className="navbar__item"
             aria-current={value === it.id ? "page" : undefined}
-            onClick={() => onChange(it.id)}
+            onClick={() => {
+              tick();
+              onChange(it.id);
+            }}
           >
-            {it.icon}
+            <span className="navbar__icon">{it.icon}</span>
             <span className="navbar__label">{it.label}</span>
           </button>
         ))}

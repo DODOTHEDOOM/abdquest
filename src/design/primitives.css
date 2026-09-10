@@ -1,11 +1,41 @@
 /* Primitive component styles. Paired with primitives.tsx. */
 
 .card {
-  background: var(--surface);
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--sp-4);
-  box-shadow: var(--shadow);
+  box-shadow: var(--elev-2);
+}
+/* Tappable cards feel like physical objects: they lift, then press in. */
+.card--interactive {
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  transition:
+    box-shadow 0.18s,
+    transform 0.12s cubic-bezier(0.2, 0.8, 0.3, 1),
+    border-color 0.18s;
+}
+.card--interactive:hover {
+  box-shadow: var(--elev-3);
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+.card--interactive:active {
+  transform: translateY(0) scale(0.988);
+  box-shadow: var(--elev-1);
+}
+.card__chevron {
+  color: var(--text-faint);
+  transition: transform 0.18s;
+  flex-shrink: 0;
+}
+.card--interactive:hover .card__chevron {
+  transform: translateX(2px);
+  color: var(--text-dim);
 }
 .card--flush {
   padding: 0;
@@ -42,6 +72,10 @@
 .btn--primary {
   background: var(--accent);
   color: var(--accent-on);
+  box-shadow: var(--elev-2);
+}
+.btn--primary:active:not(:disabled) {
+  box-shadow: var(--elev-press);
 }
 .btn--primary:hover:not(:disabled) {
   filter: brightness(1.05);
@@ -186,7 +220,7 @@ textarea.field__control {
 .tabs__tab[aria-selected="true"] {
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow);
+  box-shadow: var(--elev-1);
 }
 
 .badge {
@@ -231,7 +265,7 @@ textarea.field__control {
   border-radius: var(--radius) var(--radius) 0 0;
   border: 1px solid var(--border);
   padding: var(--sp-5) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom));
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--elev-3);
   animation: slideup 0.24s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 .sheet__grab {
@@ -260,34 +294,61 @@ textarea.field__control {
   right: 0;
   bottom: 0;
   z-index: 46;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--border);
+  padding: 0 var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  pointer-events: none;
 }
 .navbar__inner {
-  max-width: 560px;
+  max-width: 420px;
   margin: 0 auto;
   display: flex;
-  padding: var(--sp-2) var(--sp-2) calc(var(--sp-2) + env(safe-area-inset-bottom));
+  gap: 2px;
+  padding: 6px;
+  pointer-events: auto;
+  background: var(--dock);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--elev-3);
 }
 .navbar__item {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 3px;
   background: none;
   border: none;
-  padding: var(--sp-2) 0;
+  border-radius: 16px;
+  padding: 9px 0 7px;
   cursor: pointer;
   color: var(--text-faint);
+  transition:
+    color 0.18s,
+    background 0.18s,
+    transform 0.14s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.navbar__item:active {
+  transform: scale(0.94);
 }
 .navbar__item[aria-current="page"] {
   color: var(--accent-text);
+  background: var(--surface);
+  box-shadow: var(--elev-2);
+}
+.navbar__item[aria-current="page"] .navbar__icon {
+  transform: translateY(-1px) scale(1.06);
+}
+.navbar__icon {
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+  line-height: 0;
 }
 .navbar__label {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .toast {

@@ -47,6 +47,16 @@
   --c4: #8a63c4;
   --c5: #c0567a;
 
+  /* depth — layered shadows give surfaces real dimension */
+  --elev-1: 0 1px 2px rgba(24, 24, 20, 0.05), 0 1px 1px rgba(24, 24, 20, 0.03);
+  --elev-2: 0 2px 4px rgba(24, 24, 20, 0.05), 0 6px 12px -4px rgba(24, 24, 20, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  --elev-3: 0 4px 8px rgba(24, 24, 20, 0.06), 0 18px 36px -12px rgba(24, 24, 20, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  --elev-press: 0 1px 2px rgba(24, 24, 20, 0.08) inset;
+  --surface-raised: linear-gradient(180deg, #ffffff 0%, #fbfbf9 100%);
+  --dock: rgba(255, 255, 255, 0.82);
+
   /* shape + depth */
   --radius: 16px;
   --radius-sm: 10px;
@@ -107,6 +117,24 @@
     --m-fitness-weak: #1e2c3d;
     --m-habits: #3fb583;
     --m-habits-weak: #1c3a2e;
+
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --elev-2: 0 2px 5px rgba(0, 0, 0, 0.5), 0 8px 16px -6px rgba(0, 0, 0, 0.6),
+      0 1px 0 rgba(255, 255, 255, 0.045) inset;
+    --elev-3: 0 6px 14px rgba(0, 0, 0, 0.55), 0 22px 44px -14px rgba(0, 0, 0, 0.75),
+      0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    --elev-press: 0 1px 3px rgba(0, 0, 0, 0.6) inset;
+    --surface-raised: linear-gradient(180deg, #202220 0%, #191a18 100%);
+    --dock: rgba(28, 30, 27, 0.82);
+
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --elev-2: 0 2px 5px rgba(0, 0, 0, 0.5), 0 8px 16px -6px rgba(0, 0, 0, 0.6),
+      0 1px 0 rgba(255, 255, 255, 0.045) inset;
+    --elev-3: 0 6px 14px rgba(0, 0, 0, 0.55), 0 22px 44px -14px rgba(0, 0, 0, 0.75),
+      0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    --elev-press: 0 1px 3px rgba(0, 0, 0, 0.6) inset;
+    --surface-raised: linear-gradient(180deg, #202220 0%, #191a18 100%);
+    --dock: rgba(28, 30, 27, 0.82);
 
     --warn: #d99a3f;
     --warn-weak: #3a2f1c;
@@ -197,5 +225,12 @@ button {
   * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes tabIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
 }
