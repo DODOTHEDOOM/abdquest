@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
-import { Badge, Card, ProgressBar, Ring, SectionHeader, Sheet } from "../design/primitives";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Badge, Card, ProgressBar, SectionHeader, Sheet } from "../design/primitives";
+import { RingStack } from "../design/Ring3D";
+import { CountUp } from "../design/CountUp";
 import { BarStrip, Sparkline, ZoneBar, tick } from "../design/charts";
 import { MetricDetail, shortDate, type MetricSeriesPoint } from "../design/MetricDetail";
 import { DEMO_PROFILE, demoHistory } from "../lib/demoData";
@@ -106,9 +108,17 @@ export function Dashboard() {
     <>
       <SectionHeader title="Today" />
 
-      {/* ── Hero: recovery + strain + sleep, each tappable ───────────────── */}
+      {/* ── Hero: three concentric 3D rings — recovery, effort, sleep ────── */}
       <Card>
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 18,
+            padding: "8px 0 2px",
+          }}
+        >
           <button
             onClick={() => {
               tick();
@@ -117,53 +127,92 @@ export function Dashboard() {
             style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
             aria-label="Recovery details"
           >
-            <Ring value={recPct} size={116} stroke={11} color="var(--m-recovery)">
+            <RingStack
+              size={212}
+              thickness={16}
+              gap={6}
+              rings={[
+                {
+                  label: "Recovery",
+                  value: recPct,
+                  color: "var(--m-recovery)",
+                  color2: "var(--m-recovery-2)",
+                },
+                {
+                  label: "Effort",
+                  value: str.strain / 21,
+                  color: "var(--m-strain)",
+                  color2: "var(--m-strain-2)",
+                },
+                {
+                  label: "Sleep",
+                  value: slp.performance ?? 0,
+                  color: "var(--m-sleep)",
+                  color2: "var(--m-sleep-2)",
+                },
+              ]}
+            >
               <div style={{ textAlign: "center" }}>
                 <div
                   style={{
-                    fontSize: 32,
-                    fontWeight: 700,
+                    fontSize: 25,
+                    fontWeight: 800,
                     lineHeight: 1,
+                    letterSpacing: "-0.03em",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {rec.score ?? "—"}
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-faint)" }}>
+                  <CountUp value={rec.score ?? 0} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)" }}>
                     %
                   </span>
                 </div>
                 <div
                   style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: "0.1em",
+                    fontSize: 7.5,
+                    fontWeight: 800,
+                    letterSpacing: "0.12em",
                     color: "var(--text-dim)",
-                    marginTop: 2,
+                    marginTop: 3,
                   }}
                 >
-                  RECOVERY
+                  {rec.label.toUpperCase()}
                 </div>
               </div>
-            </Ring>
+            </RingStack>
           </button>
-          <div style={{ flex: 1, display: "grid", gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{rec.label}</div>
-            <HeroStat
-              label="Effort today"
-              value={str.strain.toFixed(1)}
-              suffix="/ 21"
-              sub={str.label}
-              color="var(--m-strain)"
-              pct={str.strain / 21}
-              onClick={() => setDetail({ kind: "strain" })}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 8,
+              width: "100%",
+            }}
+          >
+            <RingChip
+              label="Recovery"
+              color="var(--m-recovery)"
+              onClick={() => setDetail({ kind: "recovery" })}
+              value={
+                <>
+                  <CountUp value={rec.score ?? 0} />%
+                </>
+              }
+              sub={rec.label}
             />
-            <HeroStat
+            <RingChip
+              label="Effort"
+              color="var(--m-strain)"
+              onClick={() => setDetail({ kind: "strain" })}
+              value={<CountUp value={str.strain} decimals={1} />}
+              sub={str.label}
+            />
+            <RingChip
               label="Sleep"
-              value={slp.actualHrs ? fmtHrs(slp.actualHrs) : "—"}
-              sub={`${Math.round((slp.performance ?? 0) * 100)}% of ${fmtHrs(slp.needHrs)} need`}
               color="var(--m-sleep)"
-              pct={slp.performance ?? 0}
               onClick={() => setDetail({ kind: "sleep" })}
+              value={slp.actualHrs ? fmtHrs(slp.actualHrs) : "—"}
+              sub={`${Math.round((slp.performance ?? 0) * 100)}% of need`}
             />
           </div>
         </div>
@@ -191,7 +240,7 @@ export function Dashboard() {
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {fit.fitnessAge ?? "—"}
+                {fit.fitnessAge != null ? <CountUp value={fit.fitnessAge} /> : "—"}
               </span>
               <span style={{ fontSize: 14, color: "var(--text-dim)" }}>years</span>
             </div>
@@ -487,57 +536,35 @@ export function Dashboard() {
   );
 }
 
-function HeroStat({
+function RingChip({
   label,
   value,
-  suffix,
   sub,
   color,
-  pct,
   onClick,
 }: {
   label: string;
-  value: string;
-  suffix?: string;
+  value: ReactNode;
   sub: string;
   color: string;
-  pct: number;
   onClick: () => void;
 }) {
   return (
     <button
+      type="button"
+      className="ringchip"
+      style={{ "--pc": color } as CSSProperties}
       onClick={() => {
         tick();
         onClick();
       }}
-      style={{
-        display: "block",
-        width: "100%",
-        textAlign: "left",
-        background: "none",
-        border: "none",
-        padding: 0,
-        cursor: "pointer",
-      }}
     >
-      <div
-        style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)" }}>{label}</span>
-        <span style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-          {value}
-          {suffix && (
-            <span style={{ fontSize: 11, color: "var(--text-faint)", fontWeight: 600 }}>
-              {" "}
-              {suffix}
-            </span>
-          )}
-        </span>
-      </div>
-      <div style={{ margin: "5px 0 3px" }}>
-        <ProgressBar value={pct} color={color} ariaLabel={label} />
-      </div>
-      <div style={{ fontSize: 10.5, color: "var(--text-faint)" }}>{sub}</div>
+      <span className="ringchip__label">
+        <i />
+        {label}
+      </span>
+      <span className="ringchip__value">{value}</span>
+      <span className="ringchip__sub">{sub}</span>
     </button>
   );
 }

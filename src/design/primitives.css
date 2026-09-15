@@ -6,6 +6,9 @@
   border-radius: var(--radius);
   padding: var(--sp-4);
   box-shadow: var(--elev-2);
+  /* Frosted glass: the living background tints every surface through it. */
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
 }
 /* Tappable cards feel like physical objects: they lift, then press in. */
 .card--interactive {
@@ -161,16 +164,32 @@ textarea.field__control {
 }
 
 .bar {
-  height: 8px;
+  height: 10px;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.08)),
+    var(--groove, var(--surface-2));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
   overflow: hidden;
 }
 .bar__fill {
+  position: relative;
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+/* Glossy tube: highlight across the top, shade along the bottom. */
+.bar__fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.52) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(0, 0, 0, 0.16) 100%
+  );
 }
 
 .sectionhead {
@@ -218,7 +237,7 @@ textarea.field__control {
   cursor: pointer;
 }
 .tabs__tab[aria-selected="true"] {
-  background: var(--surface);
+  background: var(--face-hi, var(--surface));
   color: var(--text);
   box-shadow: var(--elev-1);
 }
@@ -261,7 +280,8 @@ textarea.field__control {
   margin: 0 auto;
   max-height: 88vh;
   overflow-y: auto;
-  background: var(--surface);
+  background-color: var(--bg);
+  background-image: var(--surface-raised);
   border-radius: var(--radius) var(--radius) 0 0;
   border: 1px solid var(--border);
   padding: var(--sp-5) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom));
@@ -335,7 +355,7 @@ textarea.field__control {
 }
 .navbar__item[aria-current="page"] {
   color: var(--accent-text);
-  background: var(--surface);
+  background: var(--face-hi, var(--surface));
   box-shadow: var(--elev-2);
 }
 .navbar__item[aria-current="page"] .navbar__icon {
@@ -383,4 +403,174 @@ textarea.field__control {
     opacity: 0;
     transform: translate(-50%, 8px);
   }
+}
+
+/* ── 3D pillar bars ─────────────────────────────────────────────────────── */
+/* A horizontal light/shade band fakes a cylinder; a vertical ramp gives the
+   face a lit top and a shaded base; the coloured shadow grounds it. */
+.pillar {
+  position: relative;
+  width: 100%;
+  border-radius: 8px 8px 3px 3px;
+  background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.24) 0%,
+      rgba(0, 0, 0, 0) 20%,
+      rgba(255, 255, 255, 0.32) 40%,
+      rgba(255, 255, 255, 0) 60%,
+      rgba(0, 0, 0, 0.22) 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--pc) 72%, #fff) 0%,
+      var(--pc) 42%,
+      color-mix(in srgb, var(--pc) 76%, #000) 100%
+    );
+  box-shadow:
+    0 8px 14px -8px color-mix(in srgb, var(--pc) 75%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition:
+    height 0.7s cubic-bezier(0.2, 0.8, 0.3, 1),
+    opacity 0.18s,
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.pillar::before {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 2px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.pillar--empty {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.pillar--empty::before {
+  display: none;
+}
+
+/* ── live dot at the end of a sparkline ─────────────────────────────────── */
+.spark-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--pc);
+  box-shadow:
+    0 0 0 2px var(--face-hi, #fff),
+    0 0 12px var(--pc);
+  pointer-events: none;
+}
+.spark-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--pc);
+  opacity: 0;
+  animation: spark-pulse 2.4s ease-out infinite;
+}
+@keyframes spark-pulse {
+  0% {
+    transform: scale(0.4);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* ── metric chips under the ring stack ──────────────────────────────────── */
+.ringchip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 10px 9px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)),
+    color-mix(in srgb, var(--pc) 11%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    transform 0.14s cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 0.18s;
+}
+.ringchip:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    var(--elev-2);
+}
+.ringchip:active {
+  transform: scale(0.95);
+}
+.ringchip__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+.ringchip__label i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pc);
+  box-shadow: 0 0 8px var(--pc);
+}
+.ringchip__value {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ringchip__sub {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── round icon button with a spectrum rim ──────────────────────────────── */
+.iconbtn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--face-hi, #fff), var(--face-hi, #fff)) padding-box,
+    conic-gradient(
+        var(--m-recovery),
+        var(--m-strain),
+        var(--m-sleep),
+        var(--m-fitness),
+        var(--m-recovery)
+      )
+      border-box;
+  box-shadow: var(--elev-2);
+  color: var(--text);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.iconbtn:active {
+  transform: scale(0.9) rotate(-12deg);
 }

@@ -5,7 +5,7 @@
  * read the exact value for that day.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 
 function hash(s: string): number {
   let h = 0;
@@ -89,6 +89,16 @@ export function Sparkline({
     started = true;
   });
 
+  let lastI = -1;
+  for (let i = values.length - 1; i >= 0; i--) {
+    const v = values[i];
+    if (typeof v === "number" && isFinite(v)) {
+      lastI = i;
+      break;
+    }
+  }
+  const lastV = lastI >= 0 ? (values[lastI] as number) : null;
+
   const area = fill ? `${d}L${width},${height}L0,${height}Z` : "";
   const gid = `sg-${Math.abs(hash(values.join(",") + color)).toString(36)}`;
   const selVal = sel != null ? values[sel] : null;
@@ -137,10 +147,11 @@ export function Sparkline({
           d={d}
           fill="none"
           stroke={color}
-          strokeWidth={1.9}
+          strokeWidth={2.4}
           strokeLinecap="round"
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
+          style={{ filter: `drop-shadow(0 3px 5px color-mix(in srgb, ${color} 55%, transparent))` }}
         />
         {sel != null && typeof selVal === "number" && (
           <>
@@ -165,6 +176,18 @@ export function Sparkline({
           </>
         )}
       </svg>
+      {lastV != null && sel == null && (
+        <span
+          className="spark-dot"
+          style={
+            {
+              left: `${(lastI / (values.length - 1)) * 100}%`,
+              top: `${(y(lastV) / height) * 100}%`,
+              "--pc": color,
+            } as CSSProperties
+          }
+        />
+      )}
       {sel != null && typeof selVal === "number" && (
         <div
           style={{
@@ -248,16 +271,15 @@ export function BarStrip({
             >
               <div style={{ height: barH, width: "100%", display: "flex", alignItems: "flex-end" }}>
                 <div
-                  style={{
-                    width: "100%",
-                    height: `${pct * 100}%`,
-                    background: v == null ? "var(--surface-2)" : color,
-                    opacity: v == null ? 1 : isSel ? 1 : sel == null ? 0.3 + pct * 0.7 : 0.25,
-                    borderRadius: 5,
-                    boxShadow: isSel ? "var(--elev-2)" : undefined,
-                    transform: isSel ? "scaleX(1.08)" : undefined,
-                    transition: "height .5s cubic-bezier(.2,.8,.3,1), opacity .18s, transform .18s",
-                  }}
+                  className={v == null ? "pillar pillar--empty" : "pillar"}
+                  style={
+                    {
+                      height: `${pct * 100}%`,
+                      "--pc": color,
+                      opacity: v == null ? 1 : isSel ? 1 : sel == null ? 0.55 + pct * 0.45 : 0.3,
+                      transform: isSel ? "translateY(-3px) scaleX(1.08)" : undefined,
+                    } as CSSProperties
+                  }
                 />
               </div>
               {labels && (

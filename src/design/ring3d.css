@@ -1,0 +1,121 @@
+/*
+ * 3D ring.
+ *
+ * Layers, bottom to top:
+ *   groove  — the recessed channel (dark top edge, light bottom edge = inset)
+ *   glow    — the arc, blurred, for a soft bloom beneath it
+ *   arc     — a true conic sweep from --c1 to --c2, lit from the top-left
+ *   caps    — rounded start dot + a glossy "bead" riding the end of the arc
+ *   face    — a domed disc in the middle that holds the number
+ *
+ * --p (0..1) is a registered property, so the whole ring animates smoothly
+ * when it changes — sweep, gradient and end bead all move together.
+ */
+
+@property --p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.r3 {
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  flex-shrink: 0;
+  transition: --p 1.3s cubic-bezier(0.2, 0.85, 0.25, 1);
+  --band: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--t)),
+    #000 calc(100% - var(--t) + 0.5px)
+  );
+  --sweep: conic-gradient(#000 calc(var(--p) * 1turn), transparent 0);
+}
+
+.r3 > div {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.r3__groove {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, rgba(255, 255, 255, 0.14) 100%),
+    var(--groove);
+  -webkit-mask: var(--band);
+  mask: var(--band);
+}
+
+.r3__arc,
+.r3__glowInner {
+  background: linear-gradient(
+      150deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0) 40%,
+      rgba(0, 0, 0, 0.2) 100%
+    ),
+    conic-gradient(from 0deg, var(--c1), var(--c2) calc(var(--p) * 1turn), var(--c2));
+  -webkit-mask: var(--band), var(--sweep);
+  -webkit-mask-composite: source-in;
+  mask: var(--band), var(--sweep);
+  mask-composite: intersect;
+}
+
+/* Blur must sit on a wrapper — filters run before masks, so blurring the masked
+   element itself would just get clipped back to a hard edge. */
+.r3__glow {
+  filter: blur(calc(var(--t) * 0.75));
+  opacity: var(--glow-strength, 0.5);
+}
+.r3__glowInner {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.r3__cap {
+  transition: opacity 0.3s ease;
+}
+.r3__cap--end {
+  transform: rotate(calc(var(--p) * 1turn));
+}
+.r3__cap > span {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--t);
+  height: var(--t);
+  margin-left: calc(var(--t) / -2);
+  border-radius: 50%;
+}
+.r3__cap--start > span {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 70%),
+    var(--c1);
+}
+.r3__cap--end > span {
+  background: radial-gradient(
+      circle at 34% 28%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0) 38%
+    ),
+    radial-gradient(circle at 60% 70%, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0) 60%), var(--c2);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.4),
+    0 0 12px color-mix(in srgb, var(--c2) 70%, transparent);
+}
+
+.r3 > .r3__face {
+  inset: calc(var(--t) + 7px);
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 40% 26%, var(--face-hi) 0%, var(--face-lo) 80%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -10px 20px rgba(0, 0, 0, 0.07),
+    0 10px 22px -12px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .r3 {
+    transition: none;
+  }
+}

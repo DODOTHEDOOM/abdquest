@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Card, ProgressBar, Ring, SectionHeader, Tabs } from "../design/primitives";
+import { Card, ProgressBar, SectionHeader, Tabs } from "../design/primitives";
+import { Ring3D } from "../design/Ring3D";
 import { BarStrip, Sparkline } from "../design/charts";
 import { MetricDetail, type MetricSeriesPoint } from "../design/MetricDetail";
 import { DEMO_PROFILE, demoHistory } from "../lib/demoData";
@@ -63,7 +64,13 @@ export function Progress() {
       <SectionHeader title="Headline" />
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <Ring value={(avgRec ?? 0) / 100} size={92} stroke={9} color="var(--m-recovery)">
+          <Ring3D
+            value={(avgRec ?? 0) / 100}
+            size={104}
+            thickness={12}
+            color="var(--m-recovery)"
+            color2="var(--m-recovery-2)"
+          >
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>{avgRec ?? "—"}</div>
               <div
@@ -77,7 +84,7 @@ export function Progress() {
                 AVG
               </div>
             </div>
-          </Ring>
+          </Ring3D>
           <div style={{ flex: 1, display: "grid", gap: 10 }}>
             <Row label="Training days" value={`${trainingDays}`} sub={`of ${n}`} />
             <Row label="Total effort" value={totalStrain.toFixed(0)} sub="TRIMP-weighted" />

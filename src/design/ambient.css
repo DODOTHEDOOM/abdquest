@@ -1,0 +1,68 @@
+/* Living background: three slow-drifting colour fields + film grain.
+   Built from radial gradients (not blur filters) so it stays cheap on phones. */
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg);
+  transition: background 0.5s ease;
+}
+
+.ambient__blob {
+  position: absolute;
+  width: 78vmax;
+  height: 78vmax;
+  border-radius: 50%;
+  opacity: var(--blob-opacity, 0.8);
+  will-change: transform;
+  animation: ambient-drift 28s ease-in-out infinite alternate;
+  transition: background 0.6s ease;
+}
+.ambient__blob--1 {
+  top: -34vmax;
+  left: -30vmax;
+  background: radial-gradient(circle at center, var(--blob-1) 0%, transparent 62%);
+}
+.ambient__blob--2 {
+  top: 18vh;
+  right: -40vmax;
+  background: radial-gradient(circle at center, var(--blob-2) 0%, transparent 62%);
+  animation-duration: 34s;
+  animation-delay: -9s;
+}
+.ambient__blob--3 {
+  bottom: -42vmax;
+  left: -8vmax;
+  background: radial-gradient(circle at center, var(--blob-3) 0%, transparent 62%);
+  animation-duration: 41s;
+  animation-delay: -18s;
+}
+
+.ambient__grain {
+  position: absolute;
+  inset: -50%;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes ambient-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(5vmax, 3vmax, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(-3vmax, 6vmax, 0) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient__blob {
+    animation: none;
+  }
+}

@@ -1,15 +1,33 @@
-import { Badge, Button, Card, Field, SectionHeader, TextInput } from "../design/primitives";
+import { Badge, Card, Field, SectionHeader, TextInput } from "../design/primitives";
+import { ThemePicker } from "../design/ThemePicker";
+import type { Theme } from "../design/themes";
 import { DEMO_PROFILE } from "../lib/demoData";
 
 export function You({
-  theme,
-  onTheme,
+  themeId,
+  level,
+  onPickTheme,
 }: {
-  theme: "light" | "dark";
-  onTheme: (t: "light" | "dark") => void;
+  themeId: string;
+  level: number;
+  onPickTheme: (t: Theme, locked: boolean) => void;
 }) {
   return (
     <>
+      <SectionHeader title="Colourways" />
+      <div
+        style={{
+          fontSize: 12.5,
+          color: "var(--text-dim)",
+          lineHeight: 1.55,
+          margin: "-4px 0 14px",
+        }}
+      >
+        You&rsquo;re Level {level}. New palettes unlock as you level up — tap a locked one to
+        preview it.
+      </div>
+      <ThemePicker value={themeId} level={level} onChange={onPickTheme} />
+
       <SectionHeader title="Profile" />
       <Card>
         <div
@@ -41,21 +59,6 @@ export function You({
           >
             <TextInput type="number" step="0.5" defaultValue={DEMO_PROFILE.sleepNeedHrs} />
           </Field>
-        </div>
-      </Card>
-
-      <SectionHeader title="Appearance" />
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Theme</div>
-            <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
-              Currently {theme}
-            </div>
-          </div>
-          <Button variant="ghost" sm onClick={() => onTheme(theme === "light" ? "dark" : "light")}>
-            Switch to {theme === "light" ? "dark" : "light"}
-          </Button>
         </div>
       </Card>
 
