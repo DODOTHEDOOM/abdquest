@@ -114,10 +114,10 @@ var GH_METRICS={
   azm:{type:'active-zone-minutes',camel:'activeZoneMinutes',snake:'active_zone_minutes',order:['roll','listAll'],min:1},
   rhr:{type:'daily-resting-heart-rate',camel:'dailyRestingHeartRate',snake:'daily_resting_heart_rate',order:['listAll'],min:25,max:200,agg:'avg'},
   hrAvg:{type:'heart-rate',camel:'heartRate',snake:'heart_rate',order:['listS'],min:25,max:230,agg:'avg',cap:1},
-  calIn:{types:['nutrition-log','nutrition-logs','food-logs'],catRe:'nutrition|food',camel:'nutrition',order:['roll','listI','listDR'],min:50},
-  hrv:{type:'heart-rate-variability',camel:'heartRateVariability',snake:'heart_rate_variability',order:['listS1'],min:3,max:250,agg:'avg'},
-  resp:{type:'respiratory-rate-sleep-summary',camel:'respiratoryRateSleepSummary',snake:'respiratory_rate_sleep_summary',order:['listS1','listAll'],min:4,max:40,agg:'avg'},
-  spo2:{type:'oxygen-saturation',camel:'oxygenSaturation',snake:'oxygen_saturation',order:['listS1'],min:70,max:100,agg:'avg'},
+  calIn:{types:['nutrition-log'],camel:'nutrition',order:['roll'],min:50},
+  hrv:{type:'heart-rate-variability',camel:'heartRateVariability',snake:'heart_rate_variability',order:['listS1','listLocal'],min:3,max:250,agg:'avg'},
+  resp:{type:'respiratory-rate-sleep-summary',camel:'respiratoryRateSleepSummary',snake:'respiratory_rate_sleep_summary',order:['listS1','listLocal'],min:4,max:40,agg:'avg'},
+  spo2:{type:'oxygen-saturation',camel:'oxygenSaturation',snake:'oxygen_saturation',order:['listS1','listLocal'],min:70,max:100,agg:'avg'},
   vo2max:{type:'daily-vo2-max',camel:'dailyVo2Max',snake:'daily_vo2_max',order:['listAll'],min:10,max:90,agg:'avg'}
 };
 function ghTypesCached(){try{return JSON.parse(localStorage.getItem('abdquest_gh_types')||'[]');}catch(e){return [];}}
@@ -149,6 +149,7 @@ function ghMetricOne(metric,type,dateKey,at,cb){
     listI:function(done){var f=encodeURIComponent(snake+'.interval.end_time >= "'+R[0]+'" AND '+snake+'.interval.end_time <= "'+R[1]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var sum=0,n=0;(d.dataPoints||[]).forEach(function(dp){var v=ghNum(clean(dp,['interval']),0);if(v>0){sum+=v;n++;}});if(!n)return done(0,'no points');done(metric.agg==='avg'?Math.round(sum/n):sum,'');}catch(e){done(0,'parse');}});},
     listD:function(done){var f=encodeURIComponent(snake+'.date = "'+dateKey+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var dp=(d.dataPoints||[])[0];if(!dp)return done(0,'no points');done(ghNum(clean(dp,['date']),0),'');}catch(e){done(0,'parse');}});},
     listS:function(done){var f=encodeURIComponent(snake+'.sample_time.physical_time >= "'+R[0]+'" AND '+snake+'.sample_time.physical_time <= "'+R[1]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f,at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+err);try{var sum=0,n=0;(d.dataPoints||[]).slice(0,800).forEach(function(dp){var v=ghNum(clean(dp,['sampleTime']),0);if(v>0&&(!metric.max||v<=metric.max)){sum+=v;n++;}});if(!n)return done(0,'no points');done(metric.agg==='avg'?Math.round(sum/n):sum,'');}catch(e){done(0,'parse');}});},
+    listLocal:function(done){ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?pageSize=1000',at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+String(err||'').slice(0,40));try{var vals=[];(d.dataPoints||[]).forEach(function(dp){var c=Object.assign({},dp[camel]||dp);var ts=c.sampleTime;var civ=c.date||(c.interval&&c.interval.civilEndTime&&c.interval.civilEndTime.date);delete c.sampleTime;delete c.date;delete c.interval;var wk=null;if(civ&&civ.year)wk=civ.year+'-'+String(civ.month).padStart(2,'0')+'-'+String(civ.day).padStart(2,'0');else if(ts){try{var when=new Date(ts.physicalTime||ts.endTime||ts);if(!isNaN(when))wk=when.getFullYear()+'-'+String(when.getMonth()+1).padStart(2,'0')+'-'+String(when.getDate()).padStart(2,'0');}catch(e){}}if(wk!==dateKey)return;var v=ghNum(c,0);if(v>0&&(!metric.min||v>=metric.min)&&(!metric.max||v<=metric.max))vals.push(v);});if(!vals.length)return done(0,'no points on this date');done(metric.agg==='sum'?vals.reduce(function(a,b){return a+b;},0):Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length*10)/10,'');}catch(e){done(0,'parse');}});},
     listS1:function(done){var f=encodeURIComponent(snake+'.sample_time.physical_time >= "'+R[0]+'"');ghReqE('GET','/users/me/dataTypes/'+type+'/dataPoints?filter='+f+'&pageSize=1000',at,null,function(ok,d,stt,err){if(!ok)return done(0,stt+' '+String(err||'').slice(0,40));try{var vals=[];(d.dataPoints||[]).forEach(function(dp){var c=Object.assign({},dp[camel]||dp);var ts=c.sampleTime;delete c.sampleTime;var when=null;try{when=new Date((ts&&(ts.physicalTime||ts.endTime))||ts);}catch(e){}if(when&&!isNaN(when)){var wk=when.getFullYear()+'-'+String(when.getMonth()+1).padStart(2,'0')+'-'+String(when.getDate()).padStart(2,'0');if(wk!==dateKey)return;}var v=ghNum(c,0);if(v>0&&(!metric.min||v>=metric.min)&&(!metric.max||v<=metric.max))vals.push(v);});if(!vals.length)return done(0,'no points');done(metric.agg==='sum'?vals.reduce(function(a,b){return a+b;},0):Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length*10)/10,'');}catch(e){done(0,'parse');}});},
   };
   var order=metric.order.slice();
@@ -298,12 +299,13 @@ function ghHeartSeries(dateKey,at,cb){
     'heart_rate.sample_time.physical_time >= "'+R[0]+'" AND heart_rate.sample_time.physical_time <= "'+R[1]+'"',
     ''
   ];
-  (function tryF(fi){
-    if(fi>=filters.length)return cb(null,'all HR filters rejected');
+  (function tryF(fi,notes){
+    notes=notes||[];
+    if(fi>=filters.length)return cb(null,notes.length?notes.join(' | '):'no heart-rate samples returned');
     var f=encodeURIComponent(filters[fi]);
     var url='/users/me/dataTypes/heart-rate/dataPoints?'+(filters[fi]?('filter='+f+'&'):'')+'pageSize=1000';
     ghReqE('GET',url,at,null,function(ok,d,stt,err){
-    if(!ok){if(stt===400)return tryF(fi+1);return cb(null,stt+' '+err);}
+    if(!ok){if(stt===400)return tryF(fi+1,notes.concat([(filters[fi]?'filtered':'unfiltered')+': 400 '+String(err||'').slice(0,40)]));return cb(null,stt+' '+err);}
     try{
       var hourly=[];for(var i=0;i<24;i++)hourly.push({sum:0,n:0,min:999,max:0});
       var all=[],mn=999,mx=0;
@@ -318,10 +320,9 @@ function ghHeartSeries(dateKey,at,cb){
         if(hr>=0&&hr<24){hourly[hr].sum+=bpm;hourly[hr].n++;if(bpm<hourly[hr].min)hourly[hr].min=bpm;if(bpm>hourly[hr].max)hourly[hr].max=bpm;}
         all.push(bpm);if(bpm<mn)mn=bpm;if(bpm>mx)mx=bpm;
       });
-      if(!all.length)return tryF(fi+1);
+      if(!all.length)return tryF(fi+1,notes.concat([(filters[fi]?'filtered':'unfiltered')+': no samples dated this day']));
       var avg=Math.round(all.reduce(function(a,b){return a+b;},0)/all.length);
       var series=hourly.map(function(h){return h.n?{avg:Math.round(h.sum/h.n),min:h.min,max:h.max}:null;});
-      if(!all.length)return tryF(fi+1);
       cb({avg:avg,min:mn,max:mx,series:series,count:all.length},'');
     }catch(e){cb(null,'parse');}
     });
