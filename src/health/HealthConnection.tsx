@@ -95,38 +95,46 @@ export function HealthConnection() {
           </div>
 
           {showDiag && sync.diag && (
-            <div
-              style={{
-                marginTop: 12,
-                padding: 12,
-                borderRadius: 12,
-                background: "var(--surface-2)",
-                display: "grid",
-                gap: 6,
-              }}
-            >
-              {Object.entries(sync.diag).map(([k, v]) => (
+            <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+              {sync.diag.map((day) => (
                 <div
-                  key={k}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    fontSize: 11.5,
-                  }}
+                  key={day.date}
+                  style={{ padding: 12, borderRadius: 12, background: "var(--surface-2)" }}
                 >
-                  <span style={{ color: "var(--text-dim)" }}>{k}</span>
-                  <span
-                    style={{
-                      color: v.startsWith("ok") ? "var(--m-recovery)" : "var(--text-faint)",
-                      textAlign: "right",
-                      maxWidth: "62%",
-                    }}
-                  >
-                    {v}
-                  </span>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 8 }}>
+                    {day.label}
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {Object.entries(day.entries).map(([k, v]) => (
+                      <div
+                        key={k}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          fontSize: 11.5,
+                        }}
+                      >
+                        <span style={{ color: "var(--text-dim)" }}>{k}</span>
+                        <span
+                          style={{
+                            color: v.startsWith("ok") ? "var(--m-recovery)" : "var(--text-faint)",
+                            textAlign: "right",
+                            maxWidth: "62%",
+                          }}
+                        >
+                          {v}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
+              <div style={{ ...dim, fontSize: 11 }}>
+                &ldquo;ok&rdquo; means it came through. Anything else is the reason it did not — a
+                403 is a missing permission, and &ldquo;nothing recorded&rdquo; means Google
+                genuinely holds no data for that day yet.
+              </div>
             </div>
           )}
 

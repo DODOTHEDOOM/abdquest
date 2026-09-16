@@ -60,6 +60,8 @@ export interface RawDay {
   exercises?: RawExercise[];
   /** Per-metric "ok"/"empty"/error notes, for the diagnostics panel. */
   diag?: Record<string, string>;
+  /** True when at least one metric came back with something. */
+  any?: boolean;
 }
 
 // ── Connection ──────────────────────────────────────────────────────────────

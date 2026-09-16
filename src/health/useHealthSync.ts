@@ -47,14 +47,20 @@ function dayKey(offset = 0): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+export interface DayDiagnostics {
+  date: string;
+  label: string;
+  entries: Record<string, string>;
+}
+
 export interface HealthSync {
   connected: boolean;
   busy: boolean;
   lastSync: number;
   /** Human-readable result of the last attempt. */
   status: string | null;
-  /** Per-metric notes from the last sync, for the diagnostics panel. */
-  diag: Record<string, string> | null;
+  /** Per-metric notes from the last sync, newest day first. */
+  diag: DayDiagnostics[] | null;
   syncNow: () => void;
   forget: () => void;
   refresh: () => void;
@@ -66,12 +72,14 @@ export function useHealthSync(): HealthSync {
   const [busy, setBusy] = useState(false);
   const [lastSync, setLastSync] = useState(readLast);
   const [status, setStatus] = useState<string | null>(null);
-  const [diag, setDiag] = useState<Record<string, string> | null>(null);
+  const [diag, setDiag] = useState<DayDiagnostics[] | null>(null);
   const running = useRef(false);
 
   const apply = useCallback(
     (date: string, raw: RawDay | null) => {
-      if (!raw) return false;
+      // A day with no readings still carries its diagnostics, so the caller
+      // reads `any` rather than treating the whole result as nothing.
+      if (!raw || !raw.any) return false;
       const day = toDailyHealth(date, raw);
       const sessions = sessionsFromDay(date, raw);
       const mins = sessions.reduce((a, s) => a + (s.kind === "gym" ? 0 : s.minutes), 0);
@@ -108,7 +116,13 @@ export function useHealthSync(): HealthSync {
         const rt = await fetchDay(today, true);
         const okY = apply(yesterday, ry);
         const okT = apply(today, rt);
-        setDiag(rt?.diag ?? ry?.diag ?? null);
+        // Both days, because a night the watch has not uploaded yet is absent
+        // from today but present in yesterday — and that difference is the
+        // answer to "why is my sleep missing".
+        const days: DayDiagnostics[] = [];
+        if (rt?.diag) days.push({ date: today, label: "Today", entries: rt.diag });
+        if (ry?.diag) days.push({ date: yesterday, label: "Yesterday", entries: ry.diag });
+        setDiag(days.length ? days : null);
 
         if (!okY && !okT) {
           setStatus(

@@ -23,6 +23,16 @@
  * his university account with no way to pick his personal one. It changes which
  * account you are offered, nothing about the token exchange or the data calls.
  *
+ * Further deviations, all of them about DIAGNOSIS rather than data. No URL, body
+ * or parsing rule is changed:
+ *   - sleep and steps went through `ghReq`, which discards the HTTP status, so
+ *     they could only ever report "empty" while every other metric gave a real
+ *     reason. They now use `ghReqE` and pass that reason back.
+ *   - `fbFetchDay` returned null when nothing succeeded, throwing away `out.diag`
+ *     — the notes were discarded in precisely the case you need them. It now
+ *     always returns the object and sets `out.any`, so the caller decides whether
+ *     there was data while still seeing why there was not.
+ *
  * `@ts-nocheck` is deliberate: the typed boundary lives in ./index.ts, so the
  * rest of the app is type-safe without a single line of this being rewritten.
  */
@@ -79,8 +89,9 @@ function ghReq(method,path,at,body,cb){
 function ghCivil(dateKey,hh,mm,ss){var p=dateKey.split('-');return {date:{year:+p[0],month:+p[1],day:+p[2]},time:{hours:hh,minutes:mm,seconds:ss,nanos:0}};}
 function ghNum(o,depth){if(o==null||depth>4)return 0;if(typeof o==='number')return o;if(typeof o==='string'){var f=parseFloat(o);return isNaN(f)?0:f;}if(typeof o==='object'){for(var k in o){if(!o.hasOwnProperty(k))continue;if(k==='civilStartTime'||k==='civilEndTime'||k==='startTime'||k==='endTime')continue;var v=ghNum(o[k],(depth||0)+1);if(v)return v;}}return 0;}
 function ghDailySum(type,dateKey,at,cb){
-  ghReq('POST','/users/me/dataTypes/'+type+'/dataPoints:dailyRollUp',at,{range:{start:ghCivil(dateKey,0,0,0),end:ghCivil(dateKey,23,59,59)},windowSizeDays:1},function(d){
-    try{var rp=d.rollupDataPoints[0];var c=Object.assign({},rp);delete c.civilStartTime;delete c.civilEndTime;cb(ghNum(c,0));}catch(e){cb(0);}
+  ghReqE('POST','/users/me/dataTypes/'+type+'/dataPoints:dailyRollUp',at,{range:{start:ghCivil(dateKey,0,0,0),end:ghCivil(dateKey,23,59,59)},windowSizeDays:1},function(ok,d,stt,err){
+    if(!ok)return cb(0,stt+' '+String(err||'').slice(0,60));
+    try{var rp=d.rollupDataPoints[0];var c=Object.assign({},rp);delete c.civilStartTime;delete c.civilEndTime;var v=ghNum(c,0);cb(v,v>0?'':'nothing recorded for this date');}catch(e){cb(0,'no rollup returned');}
   });
 }
 function ghReqE(method,path,at,body,cb){
@@ -178,8 +189,10 @@ function ghMetric(key,dateKey,at,cb){
 }
 function ghSleepDay(dateKey,at,cb){
   var filter=encodeURIComponent('sleep.interval.civil_end_time >= "'+dateKey+'"');
-  ghReq('GET','/users/me/dataTypes/sleep/dataPoints?filter='+filter,at,null,function(d){
+  ghReqE('GET','/users/me/dataTypes/sleep/dataPoints?filter='+filter,at,null,function(ok,d,stt,err){
+    if(!ok)return cb(null,stt+' '+String(err||'').slice(0,60));
     try{
+      var seen=(d&&d.dataPoints||[]).length;
       var best=null;
       function hmC(ct){try{var t=ct.time||{};return String(t.hours||0).padStart(2,'0')+':'+String(t.minutes||0).padStart(2,'0');}catch(e){return null;}}
       function hmP(iso){try{var dt=new Date(iso);if(isNaN(dt))return null;return String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');}catch(e){return null;}}
@@ -218,8 +231,9 @@ function ghSleepDay(dateKey,at,cb){
         }catch(e){}
         if(isMain||!best||mins>best.mins){best={mins:mins,start:start,end:end,stages:Object.keys(stages).length?stages:null,seq:seq,main:!!isMain};}
       });
-      if(best&&best.mins>0)cb({hrs:Math.round(best.mins/6)/10,start:best.start,end:best.end,stages:best.stages,seq:best.seq});else cb(null);
-    }catch(e){cb(null);}
+      if(best&&best.mins>0)cb({hrs:Math.round(best.mins/6)/10,start:best.start,end:best.end,stages:best.stages,seq:best.seq},'');
+      else cb(null,seen?(seen+' record(s), none ending on this date'):'no sleep records returned');
+    }catch(e){cb(null,'could not read the sleep record');}
   });
 }
 function ghRhrDay(dateKey,at,cb){
@@ -328,9 +342,9 @@ function fbFetchDay(dateKey,cb,full){
   fbEnsureToken(function(at){
     if(!at)return cb(null);
     var out={diag:{}},pend=full?13:11,any=false;
-    function done(ok){if(ok)any=true;if(--pend===0)cb(any?out:null);}
-    ghDailySum('steps',dateKey,at,function(v){out.diag.steps=v>0?'ok':'empty';if(v>0){out.steps=Math.round(v);}done(v>0);});
-    ghSleepDay(dateKey,at,function(s){out.diag.sleep=s?'ok':'empty';if(s&&s.hrs>0){out.sleepHrs=s.hrs;out.sleepStart=s.start;out.sleepEnd=s.end;out.sleepStages=s.stages;out.sleepSeq=s.seq;}done(!!s);});
+    function done(ok){if(ok)any=true;if(--pend===0){out.any=any;cb(out);}}
+    ghDailySum('steps',dateKey,at,function(v,note){out.diag.steps=v>0?'ok':(note||'empty');if(v>0){out.steps=Math.round(v);}done(v>0);});
+    ghSleepDay(dateKey,at,function(s,note){out.diag.sleep=s?'ok':(note||'empty');if(s&&s.hrs>0){out.sleepHrs=s.hrs;out.sleepStart=s.start;out.sleepEnd=s.end;out.sleepStages=s.stages;out.sleepSeq=s.seq;}done(!!s);});
     ghMetric('rhr',dateKey,at,function(v,note){out.diag.rhr=v>0?('ok ('+note+')'):note;if(v>0)out.rhr=v;done(v>0);});
     ghMetric('calOut',dateKey,at,function(v,note){if(v>0){out.diag.calOut='ok ('+note+')';out.calOut=v;done(true);}else ghMetric('calOut2',dateKey,at,function(v2,note2){out.diag.calOut=v2>0?('ok active ('+note2+')'):(note+' || '+note2);if(v2>0)out.calOut=v2;done(v2>0);});});
     ghMetric('calIn',dateKey,at,function(v,note){out.diag.calIn=v>0?('ok ('+note+')'):note;if(v>0)out.calIn=v;done(v>0);});
