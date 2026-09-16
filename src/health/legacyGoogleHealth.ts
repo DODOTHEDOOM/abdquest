@@ -114,7 +114,7 @@ var GH_METRICS={
   azm:{type:'active-zone-minutes',camel:'activeZoneMinutes',snake:'active_zone_minutes',order:['roll','listAll'],min:1},
   rhr:{type:'daily-resting-heart-rate',camel:'dailyRestingHeartRate',snake:'daily_resting_heart_rate',order:['listAll'],min:25,max:200,agg:'avg'},
   hrAvg:{type:'heart-rate',camel:'heartRate',snake:'heart_rate',order:['listS'],min:25,max:230,agg:'avg',cap:1},
-  calIn:{types:['nutrition-logs','food-logs','nutrition-log','food-log','nutrition-summary','foods'],catRe:'nutrition|food',camel:'nutrition',order:['roll','listI','listDR'],min:50},
+  calIn:{types:['nutrition-log','nutrition-logs','food-logs'],catRe:'nutrition|food',camel:'nutrition',order:['roll','listI','listDR'],min:50},
   hrv:{type:'heart-rate-variability',camel:'heartRateVariability',snake:'heart_rate_variability',order:['listS1'],min:3,max:250,agg:'avg'},
   resp:{type:'respiratory-rate-sleep-summary',camel:'respiratoryRateSleepSummary',snake:'respiratory_rate_sleep_summary',order:['listS1','listAll'],min:4,max:40,agg:'avg'},
   spo2:{type:'oxygen-saturation',camel:'oxygenSaturation',snake:'oxygen_saturation',order:['listS1'],min:70,max:100,agg:'avg'},
@@ -189,8 +189,16 @@ function ghMetric(key,dateKey,at,cb){
 }
 function ghSleepDay(dateKey,at,cb){
   var filter=encodeURIComponent('sleep.interval.civil_end_time >= "'+dateKey+'"');
-  ghReqE('GET','/users/me/dataTypes/sleep/dataPoints?filter='+filter,at,null,function(ok,d,stt,err){
-    if(!ok)return cb(null,stt+' '+String(err||'').slice(0,60));
+  // Attempt 1 is the original filtered query. Attempt 2 simply lists recent
+  // sleep records and matches the date here — the same unfiltered shape that
+  // resting HR, zone minutes and VO2max all use successfully. If the filter is
+  // the problem this recovers the night; if attempt 2 is also empty, Google
+  // genuinely holds no sleep for that date and the metric is honestly missing.
+  var urls=['/users/me/dataTypes/sleep/dataPoints?filter='+filter,'/users/me/dataTypes/sleep/dataPoints?pageSize=14'];
+  (function attempt(ai,prevNote){
+  if(ai>=urls.length)return cb(null,prevNote||'no sleep records returned');
+  ghReqE('GET',urls[ai],at,null,function(ok,d,stt,err){
+    if(!ok)return attempt(ai+1,stt+' '+String(err||'').slice(0,60));
     try{
       var seen=(d&&d.dataPoints||[]).length;
       var best=null;
@@ -231,10 +239,11 @@ function ghSleepDay(dateKey,at,cb){
         }catch(e){}
         if(isMain||!best||mins>best.mins){best={mins:mins,start:start,end:end,stages:Object.keys(stages).length?stages:null,seq:seq,main:!!isMain};}
       });
-      if(best&&best.mins>0)cb({hrs:Math.round(best.mins/6)/10,start:best.start,end:best.end,stages:best.stages,seq:best.seq},'');
-      else cb(null,seen?(seen+' record(s), none ending on this date'):'no sleep records returned');
-    }catch(e){cb(null,'could not read the sleep record');}
+      if(best&&best.mins>0)return cb({hrs:Math.round(best.mins/6)/10,start:best.start,end:best.end,stages:best.stages,seq:best.seq},ai?'unfiltered':'');
+      return attempt(ai+1,seen?(seen+' record(s), none ending on this date'):'no sleep records returned');
+    }catch(e){return attempt(ai+1,'could not read the sleep record');}
   });
+  })(0);
 }
 function ghRhrDay(dateKey,at,cb){
   var filter=encodeURIComponent('daily_resting_heart_rate.date = "'+dateKey+'"');
