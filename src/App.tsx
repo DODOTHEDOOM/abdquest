@@ -5,6 +5,7 @@ import { Badge, NavBar, Sheet, Toast } from "./design/primitives";
 import { ThemePicker } from "./design/ThemePicker";
 import { applyTheme, themeById, type Theme } from "./design/themes";
 import { ymd } from "./lib/dates";
+import { Body } from "./screens/Body";
 import { Dashboard } from "./screens/Dashboard";
 import { Habits } from "./screens/Habits";
 import { Progress } from "./screens/Progress";
@@ -13,11 +14,12 @@ import { You } from "./screens/You";
 import { habitsDoneOn, levelProgress } from "./state/schema";
 import { useStore } from "./state/store";
 
-type Tab = "today" | "habits" | "training" | "progress" | "you";
+type Tab = "today" | "habits" | "training" | "body" | "progress" | "you";
 
 const TITLES: Record<Exclude<Tab, "today">, string> = {
   habits: "Habits",
   training: "Training",
+  body: "Body",
   progress: "Progress",
   you: "You",
 };
@@ -139,6 +141,7 @@ export function App() {
             {tab === "today" && <Dashboard />}
             {tab === "habits" && <Habits />}
             {tab === "training" && <Training />}
+            {tab === "body" && <Body />}
             {tab === "progress" && <Progress />}
             {tab === "you" && (
               <You themeId={state.themeId} level={level.level} onPickTheme={pickTheme} />
@@ -175,6 +178,13 @@ export function App() {
             id: "training",
             label: "Training",
             icon: <NavIcon d="M6.5 6.8v10.4M3.4 9.2v5.6M17.5 6.8v10.4M20.6 9.2v5.6M6.5 12h11" />,
+          },
+          {
+            id: "body",
+            label: "Body",
+            icon: (
+              <NavIcon d="M12 4.4a1.9 1.9 0 1 0 0-.1M8 20.5v-4.2l-1.6-3V9.4h11.2v3.9l-1.6 3v4.2M9.2 9.4 12 7l2.8 2.4" />
+            ),
           },
           {
             id: "progress",

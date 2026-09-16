@@ -29,6 +29,11 @@ export interface Profile {
   heightCm?: number;
   weightKg?: number;
   sleepNeedHrs?: number;
+  /** Daily targets. Undefined means "not set" — nothing is assumed for you. */
+  weightTargetKg?: number;
+  waterTargetMl?: number;
+  kcalTarget?: number;
+  proteinTargetG?: number;
 }
 
 export interface WeightEntry {
