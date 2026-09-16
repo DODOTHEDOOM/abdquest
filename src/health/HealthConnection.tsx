@@ -160,26 +160,56 @@ export function HealthConnection() {
           )}
 
           <div style={{ ...dim, marginTop: 12 }}>
-            One-time setup in Google Cloud Console: enable the <strong>Google Health API</strong>,
-            create an <strong>OAuth client (Web application)</strong>, then add this exact redirect
-            URI to it:
+            One-time setup in Google Cloud Console: enable the <strong>Google Health API</strong>
+            and create an <strong>OAuth client (Web application)</strong>.
           </div>
+
           <div
             style={{
-              marginTop: 8,
-              padding: "9px 11px",
-              borderRadius: 10,
+              marginTop: 12,
+              padding: "12px 13px",
+              borderRadius: 12,
               background: "var(--surface-2)",
-              fontSize: 11,
-              fontFamily: "ui-monospace, monospace",
-              wordBreak: "break-all",
+              border: "1px solid color-mix(in srgb, var(--danger) 35%, transparent)",
             }}
           >
-            {uri}
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6 }}>
+              This page&rsquo;s redirect URI
+            </div>
+            <div style={{ ...dim, marginBottom: 8, fontSize: 11.5 }}>
+              Paste this into your OAuth client under <strong>Authorized redirect URIs</strong>.
+              Google matches it character for character — a different page of the same app is a
+              different URI, and a mismatch is the{" "}
+              <strong>&ldquo;Access blocked: redirect_uri_mismatch&rdquo;</strong> error.
+            </div>
+            <div
+              style={{
+                padding: "9px 11px",
+                borderRadius: 10,
+                background: "var(--surface)",
+                fontSize: 11,
+                fontFamily: "ui-monospace, monospace",
+                wordBreak: "break-all",
+              }}
+            >
+              {uri}
+            </div>
+            <Button
+              variant="primary"
+              sm
+              onClick={() => copy(uri, "Redirect URI")}
+              style={{ marginTop: 10 }}
+            >
+              Copy redirect URI
+            </Button>
           </div>
-          <Button sm onClick={() => copy(uri, "Redirect URI")} style={{ marginTop: 8 }}>
-            Copy redirect URI
-          </Button>
+
+          <div style={{ ...dim, marginTop: 12, fontSize: 11.5 }}>
+            Sign in with the Google account that holds your health data. If the OAuth consent screen
+            is still in <strong>Testing</strong>, that account also has to be listed as a test user,
+            and a university or work account may be blocked from third-party apps by its
+            administrator.
+          </div>
 
           <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
             <Field label="Client ID">

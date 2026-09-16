@@ -16,6 +16,13 @@
  * made in either app therefore works in both, and nothing here ever clears them
  * except `disconnect()`, which only runs when the user taps Disconnect.
  *
+ * ONE deliberate deviation from the original, recorded here so the "verbatim"
+ * claim above stays honest: the auth URL asks for `prompt=select_account consent`
+ * rather than `prompt=consent`. Without select_account, a browser already signed
+ * into a Google account uses it silently with no chooser — which sent Abd into
+ * his university account with no way to pick his personal one. It changes which
+ * account you are offered, nothing about the token exchange or the data calls.
+ *
  * `@ts-nocheck` is deliberate: the typed boundary lives in ./index.ts, so the
  * rest of the app is type-safe without a single line of this being rewritten.
  */
@@ -31,7 +38,7 @@ function fbConnect(clientId,clientSecret){
     sessionStorage.setItem('gh_state',stt);sessionStorage.setItem('gh_cid',clientId);sessionStorage.setItem('gh_csec',clientSecret);
     try{localStorage.setItem('abdquest_gh_cid',clientId);localStorage.setItem('abdquest_gh_csec',clientSecret);}catch(e){}
     var scopes=['https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly','https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly','https://www.googleapis.com/auth/googlehealth.sleep.readonly','https://www.googleapis.com/auth/googlehealth.nutrition.readonly'];
-    location.href='https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id='+encodeURIComponent(clientId)+'&redirect_uri='+encodeURIComponent(fbRedirectUri())+'&scope='+encodeURIComponent(scopes.join(' '))+'&access_type=offline&prompt=consent&state='+stt;
+    location.href='https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id='+encodeURIComponent(clientId)+'&redirect_uri='+encodeURIComponent(fbRedirectUri())+'&scope='+encodeURIComponent(scopes.join(' '))+'&access_type=offline&prompt=select_account%20consent&state='+stt;
   }catch(e){alert('Could not start Google Health connect: '+e.message);}
 }
 function fbToken(params,cb){
