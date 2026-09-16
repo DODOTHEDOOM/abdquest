@@ -2,6 +2,16 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Badge, Card, ProgressBar, SectionHeader, Sheet } from "../design/primitives";
 import { RingStack } from "../design/Ring3D";
 import { CountUp } from "../design/CountUp";
+import { MotivationBanner } from "../design/MotivationCard";
+import { demoSessions } from "../lib/demoTraining";
+import { motivation } from "../lib/motivation";
+import {
+  libraryFromSessions,
+  previousBest,
+  sessionsOn,
+  weekStartOf,
+  weekStats,
+} from "../lib/training";
 import { BarStrip, Sparkline, ZoneBar, tick } from "../design/charts";
 import { MetricDetail, shortDate, type MetricSeriesPoint } from "../design/MetricDetail";
 import { DEMO_PROFILE, demoHistory } from "../lib/demoData";
@@ -96,16 +106,19 @@ export function Dashboard() {
       fit: fitnessAge(today, history, DEMO_PROFILE),
       last14: all.slice(-14),
       last7: all.slice(-7),
+      ...trainingContext(today.date, recovery(today, history, DEMO_PROFILE).score),
     };
   }, []);
 
-  const { all, today, rec, str, slp, fit, last14, last7 } = m;
+  const { all, today, rec, str, slp, fit, last14, last7, motiv } = m;
   const recPct = rec.score != null ? rec.score / 100 : 0;
   const seriesFor = (pick: (d: DailyHealth) => number | undefined): MetricSeriesPoint[] =>
     all.map((d) => ({ date: d.date, value: pick(d) ?? null }));
 
   return (
     <>
+      <MotivationBanner card={motiv} />
+
       <SectionHeader title="Today" />
 
       {/* ── Hero: three concentric 3D rings — recovery, effort, sleep ────── */}
@@ -661,3 +674,57 @@ function MiniRow({ label, value }: { label: string; value: string }) {
 }
 
 export { shortDate };
+
+/**
+ * Everything the motivation engine needs, derived from the sample training
+ * history. Swapped for live data when the store lands.
+ */
+function trainingContext(todayKey: string, recoveryScore: number | null) {
+  const sessions = demoSessions(45);
+  const library = libraryFromSessions(sessions);
+  const thisWeek = weekStats(sessions, weekStartOf(todayKey));
+  const prevStart = (() => {
+    const [y, mo, d] = weekStartOf(todayKey).split("-").map(Number);
+    const dt = new Date(y, mo - 1, d);
+    dt.setDate(dt.getDate() - 7);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  })();
+  const lastWeek = weekStats(sessions, prevStart);
+
+  // The most recent record across every movement.
+  let recentPR: {
+    exercise: string;
+    kind: "weight" | "reps";
+    previous: number;
+    next: number;
+    date: string;
+  } | null = null;
+  for (const ex of library) {
+    if (!ex.pr.date) continue;
+    if (recentPR && ex.pr.date <= recentPR.date) continue;
+    const isBw = ex.metric === "bodyweight";
+    recentPR = {
+      exercise: ex.name,
+      kind: isBw ? "reps" : "weight",
+      previous: previousBest(ex),
+      next: isBw ? ex.pr.reps : ex.pr.weight,
+      date: ex.pr.date,
+    };
+  }
+
+  const motiv = motivation({
+    todayKey,
+    hour: new Date().getHours(),
+    streak: 12,
+    bestStreak: 15,
+    habitsDone: 2,
+    habitsTotal: 5,
+    recovery: recoveryScore,
+    trainedToday: sessionsOn(sessions, todayKey).length > 0,
+    recentPR,
+    thisWeekSessions: thisWeek.sessions,
+    lastWeekSessions: lastWeek.sessions,
+    fitnessAgeDelta: -2,
+  });
+  return { motiv, sessions, library };
+}
