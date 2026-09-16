@@ -3,7 +3,6 @@ import { Badge, Card, ProgressBar, SectionHeader, Sheet } from "../design/primit
 import { RingStack } from "../design/Ring3D";
 import { CountUp } from "../design/CountUp";
 import { MotivationBanner } from "../design/MotivationCard";
-import { demoSessions } from "../lib/demoTraining";
 import { motivation } from "../lib/motivation";
 import {
   libraryFromSessions,
@@ -14,7 +13,9 @@ import {
 } from "../lib/training";
 import { BarStrip, Sparkline, ZoneBar, tick } from "../design/charts";
 import { MetricDetail, shortDate, type MetricSeriesPoint } from "../design/MetricDetail";
-import { DEMO_PROFILE, demoHistory } from "../lib/demoData";
+import { ymd } from "../lib/dates";
+import { useStore } from "../state/store";
+import { habitsDoneOn, type AppState } from "../state/schema";
 import { fitnessAge } from "../lib/metrics/fitnessAge";
 import { fmtHrs, recovery } from "../lib/metrics/recovery";
 import { sleep as sleepMetric } from "../lib/metrics/sleep";
@@ -91,26 +92,31 @@ const VITALS: {
 export function Dashboard() {
   const [detail, setDetail] = useState<Detail>(null);
 
+  const { state } = useStore();
+  const profile = state.profile;
+
   const m = useMemo(() => {
-    const all = demoHistory(45);
-    const today = all[all.length - 1];
-    const history = all.slice(0, -1);
-    const str = strainMetric(today, DEMO_PROFILE);
+    const todayKey = ymd(new Date());
+    const all = Object.values(state.health).sort((a, b) => a.date.localeCompare(b.date));
+    const today = all.find((d) => d.date === todayKey) ?? { date: todayKey };
+    const history = all.filter((d) => d.date < todayKey);
+    const str = strainMetric(today, profile);
     return {
       all,
       today,
       history,
-      rec: recovery(today, history, DEMO_PROFILE),
+      rec: recovery(today, history, profile),
       str,
-      slp: sleepMetric(today, history, DEMO_PROFILE, str.strain),
-      fit: fitnessAge(today, history, DEMO_PROFILE),
+      slp: sleepMetric(today, history, profile, str.strain),
+      fit: fitnessAge(today, history, profile),
       last14: all.slice(-14),
       last7: all.slice(-7),
-      ...trainingContext(today.date, recovery(today, history, DEMO_PROFILE).score),
+      hasHealth: all.length > 0,
+      ...trainingContext(state, today.date, recovery(today, history, state.profile).score),
     };
-  }, []);
+  }, [state]);
 
-  const { all, today, rec, str, slp, fit, last14, last7, motiv } = m;
+  const { all, today, rec, str, slp, fit, last14, last7, motiv, hasHealth } = m;
   const recPct = rec.score != null ? rec.score / 100 : 0;
   const seriesFor = (pick: (d: DailyHealth) => number | undefined): MetricSeriesPoint[] =>
     all.map((d) => ({ date: d.date, value: pick(d) ?? null }));
@@ -230,6 +236,13 @@ export function Dashboard() {
           </div>
         </div>
       </Card>
+
+      {!hasHealth && (
+        <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 10, lineHeight: 1.5 }}>
+          No watch readings yet — recovery, effort and sleep fill in once Google Health data comes
+          through.
+        </div>
+      )}
 
       {/* ── Fitness age ─────────────────────────────────────────────────── */}
       <SectionHeader title="Fitness age" />
@@ -456,7 +469,7 @@ export function Dashboard() {
           onClose={() => setDetail(null)}
           series={all.map((d) => ({
             date: d.date,
-            value: strainMetric(d, DEMO_PROFILE).strain,
+            value: strainMetric(d, profile).strain,
           }))}
           extra={
             str.zoneMins && str.zoneMins.some((z) => z > 0) ? (
@@ -495,7 +508,7 @@ export function Dashboard() {
               />
             </div>
           }
-          explanation={`Your baseline need is ${fmtHrs(DEMO_PROFILE.sleepNeedHrs ?? 8)}, topped up by a slice of outstanding debt (capped at one extra hour so the target stays reachable) and by up to 45 minutes after a hard day. Debt is a decayed rolling shortfall over the last 14 nights. Consistency measures how tightly your bedtimes cluster — regularity matters about as much as duration.`}
+          explanation={`Your baseline need is ${fmtHrs(profile.sleepNeedHrs ?? 8)}, topped up by a slice of outstanding debt (capped at one extra hour so the target stays reachable) and by up to 45 minutes after a hard day. Debt is a decayed rolling shortfall over the last 14 nights. Consistency measures how tightly your bedtimes cluster — regularity matters about as much as duration.`}
         />
       )}
 
@@ -512,7 +525,7 @@ export function Dashboard() {
             value: fitnessAge(
               d,
               all.filter((x) => x.date < d.date),
-              DEMO_PROFILE,
+              profile,
             ).fitnessAge,
           }))}
           extra={
@@ -522,10 +535,10 @@ export function Dashboard() {
                 label="Source"
                 value={fit.vo2Source === "device" ? "Your watch" : "Estimated from your data"}
               />
-              <MiniRow label="Your actual age" value={`${DEMO_PROFILE.age}`} />
+              <MiniRow label="Your actual age" value={`${profile.age}`} />
             </div>
           }
-          explanation={`Your VO₂max is compared against published population medians for your age and sex. Your fitness age is the age at which your VO₂max would be typical (Nes et al., the HUNT fitness-age study). The median VO₂max for a ${DEMO_PROFILE.sex === "female" ? "woman" : "man"} of ${DEMO_PROFILE.age} is about ${DEMO_PROFILE.sex === "female" ? (47.1 - 0.294 * (DEMO_PROFILE.age ?? 22)).toFixed(1) : (57.8 - 0.372 * (DEMO_PROFILE.age ?? 22)).toFixed(1)} — the gap between that and yours is what moves this number. Cardio training is the fastest way to move it.`}
+          explanation={`Your VO₂max is compared against published population medians for your age and sex. Your fitness age is the age at which your VO₂max would be typical (Nes et al., the HUNT fitness-age study). The median VO₂max for a ${profile.sex === "female" ? "woman" : "man"} of ${profile.age} is about ${profile.sex === "female" ? (47.1 - 0.294 * (profile.age ?? 22)).toFixed(1) : (57.8 - 0.372 * (profile.age ?? 22)).toFixed(1)} — the gap between that and yours is what moves this number. Cardio training is the fastest way to move it.`}
         />
       )}
 
@@ -679,8 +692,8 @@ export { shortDate };
  * Everything the motivation engine needs, derived from the sample training
  * history. Swapped for live data when the store lands.
  */
-function trainingContext(todayKey: string, recoveryScore: number | null) {
-  const sessions = demoSessions(45);
+function trainingContext(state: AppState, todayKey: string, recoveryScore: number | null) {
+  const sessions = state.sessions;
   const library = libraryFromSessions(sessions);
   const thisWeek = weekStats(sessions, weekStartOf(todayKey));
   const prevStart = (() => {
@@ -715,16 +728,16 @@ function trainingContext(todayKey: string, recoveryScore: number | null) {
   const motiv = motivation({
     todayKey,
     hour: new Date().getHours(),
-    streak: 12,
-    bestStreak: 15,
-    habitsDone: 2,
-    habitsTotal: 5,
+    streak: state.streak.current,
+    bestStreak: state.streak.best,
+    habitsDone: habitsDoneOn(state, todayKey),
+    habitsTotal: state.habits.length,
     recovery: recoveryScore,
     trainedToday: sessionsOn(sessions, todayKey).length > 0,
     recentPR,
     thisWeekSessions: thisWeek.sessions,
     lastWeekSessions: lastWeek.sessions,
-    fitnessAgeDelta: -2,
+    fitnessAgeDelta: null,
   });
   return { motiv, sessions, library };
 }

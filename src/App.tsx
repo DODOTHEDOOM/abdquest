@@ -4,11 +4,14 @@ import { tick } from "./design/charts";
 import { Badge, NavBar, Sheet, Toast } from "./design/primitives";
 import { ThemePicker } from "./design/ThemePicker";
 import { applyTheme, themeById, type Theme } from "./design/themes";
+import { ymd } from "./lib/dates";
 import { Dashboard } from "./screens/Dashboard";
 import { Habits } from "./screens/Habits";
 import { Progress } from "./screens/Progress";
 import { Training } from "./screens/Training";
 import { You } from "./screens/You";
+import { habitsDoneOn, levelProgress } from "./state/schema";
+import { useStore } from "./state/store";
 
 type Tab = "today" | "habits" | "training" | "progress" | "you";
 
@@ -19,20 +22,6 @@ const TITLES: Record<Exclude<Tab, "today">, string> = {
   you: "You",
 };
 
-/** Preview level — decides which colourways are unlocked until real XP is wired in. */
-const LEVEL = 7;
-
-function initialTheme(): string {
-  try {
-    const saved = localStorage.getItem("aq_theme");
-    if (saved) return saved;
-    // Carry over the old light/dark preview choice.
-    return localStorage.getItem("aq_demo_theme") === "dark" ? "midnight" : "daylight";
-  } catch {
-    return "daylight";
-  }
-}
-
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 5) return "Still up?";
@@ -41,46 +30,51 @@ function greeting(): string {
   return "Good evening";
 }
 
-/**
- * Stage 3 preview shell.
- *
- * The deployed app is still `legacy/AbdQuest.html`. This runs the new design
- * system and metrics engine on sample data so the direction can be reviewed.
- */
 export function App() {
-  const [themeId, setThemeId] = useState(initialTheme);
+  const { state, dispatch, saveFailed, source } = useStore();
   const [tab, setTab] = useState<Tab>("today");
   const [picker, setPicker] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    applyTheme(themeById(themeId));
-    try {
-      localStorage.setItem("aq_theme", themeId);
-    } catch {
-      /* ignore */
-    }
-  }, [themeId]);
+  const today = ymd(new Date());
+  const level = levelProgress(state.xp);
+  const doneToday = habitsDoneOn(state, today);
 
-  // Each screen starts at its head.
+  useEffect(() => {
+    applyTheme(themeById(state.themeId));
+  }, [state.themeId]);
+
+  // One-time note when their old data has just been brought across.
+  useEffect(() => {
+    if (source === "v2") {
+      setToast("Your data moved across — nothing was changed in the old app");
+    }
+  }, [source]);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [tab]);
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2600);
+    const t = setTimeout(() => setToast(null), 3200);
     return () => clearTimeout(t);
   }, [toast]);
 
   const pickTheme = (t: Theme, locked: boolean) => {
-    setThemeId(t.id);
+    dispatch({ type: "setTheme", themeId: t.id });
     setToast(locked ? `Previewing ${t.name} — unlocks at Level ${t.unlockLevel}` : `${t.name} on`);
   };
 
   return (
     <>
       <Ambient />
+
+      {saveFailed && (
+        <div className="savefail">
+          Could not save — this device may be out of storage. Export a backup from the You tab.
+        </div>
+      )}
 
       <div style={{ position: "relative", zIndex: 1, minHeight: "100vh", paddingBottom: 124 }}>
         <div style={{ maxWidth: 560, margin: "0 auto", padding: "22px 16px" }}>
@@ -106,9 +100,16 @@ export function App() {
                 {tab === "today" ? greeting() : TITLES[tab]}
               </div>
               {tab === "today" && (
-                <div style={{ display: "flex", gap: 6, marginTop: 9 }}>
-                  <Badge tone="accent">🔥 12-day streak</Badge>
-                  <Badge>Level {LEVEL}</Badge>
+                <div style={{ display: "flex", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+                  {state.streak.current > 0 && (
+                    <Badge tone="accent">{state.streak.current}-day streak</Badge>
+                  )}
+                  <Badge>Level {level.level}</Badge>
+                  {state.habits.length > 0 && (
+                    <Badge>
+                      {doneToday}/{state.habits.length} today
+                    </Badge>
+                  )}
                 </div>
               )}
             </div>
@@ -139,7 +140,9 @@ export function App() {
             {tab === "habits" && <Habits />}
             {tab === "training" && <Training />}
             {tab === "progress" && <Progress />}
-            {tab === "you" && <You themeId={themeId} level={LEVEL} onPickTheme={pickTheme} />}
+            {tab === "you" && (
+              <You themeId={state.themeId} level={level.level} onPickTheme={pickTheme} />
+            )}
           </div>
         </div>
       </div>
@@ -149,10 +152,10 @@ export function App() {
       {picker && (
         <Sheet
           title="Colourways"
-          sub={`You're Level ${LEVEL} — bolder palettes unlock as you climb`}
+          sub={`You are Level ${level.level} — bolder palettes unlock as you climb`}
           onClose={() => setPicker(false)}
         >
-          <ThemePicker value={themeId} level={LEVEL} onChange={pickTheme} />
+          <ThemePicker value={state.themeId} level={level.level} onChange={pickTheme} />
         </Sheet>
       )}
 

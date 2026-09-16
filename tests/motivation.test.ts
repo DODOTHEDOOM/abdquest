@@ -76,6 +76,24 @@ describe("motivation picks the most important true thing", () => {
     expect(m.detail).toContain("up 5kg");
   });
 
+  it("phrases a first-ever record as a first record, not a gain over zero", () => {
+    const m = motivation({
+      ...base,
+      recentPR: {
+        exercise: "Back squat",
+        kind: "weight",
+        previous: 0, // nothing logged before today
+        next: 110,
+        date: "2026-03-04",
+      },
+    });
+    expect(m.tone).toBe("celebrate");
+    expect(m.headline).toContain("First record");
+    expect(m.detail).toContain("110kg");
+    expect(m.detail).not.toContain("up 110kg");
+    expect(m.detail).not.toContain("on your best");
+  });
+
   it("ignores a record from a previous day", () => {
     const m = motivation({
       ...base,

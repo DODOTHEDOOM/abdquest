@@ -1,7 +1,7 @@
 import { Badge, Card, Field, SectionHeader, TextInput } from "../design/primitives";
 import { ThemePicker } from "../design/ThemePicker";
 import type { Theme } from "../design/themes";
-import { DEMO_PROFILE } from "../lib/demoData";
+import { useStore } from "../state/store";
 
 export function You({
   themeId,
@@ -12,6 +12,9 @@ export function You({
   level: number;
   onPickTheme: (t: Theme, locked: boolean) => void;
 }) {
+  const { state, dispatch } = useStore();
+  const profile = state.profile;
+
   return (
     <>
       <SectionHeader title="Colourways" />
@@ -39,25 +42,74 @@ export function You({
         <div style={{ display: "grid", gap: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Age">
-              <TextInput type="number" defaultValue={DEMO_PROFILE.age} inputMode="numeric" />
+              <TextInput
+                type="number"
+                inputMode="numeric"
+                value={profile.age ?? ""}
+                onChange={(e) =>
+                  dispatch({
+                    type: "setProfile",
+                    patch: { age: Number(e.target.value) || undefined },
+                  })
+                }
+              />
             </Field>
             <Field label="Sex">
-              <TextInput defaultValue={DEMO_PROFILE.sex} />
+              <TextInput
+                placeholder="male / female"
+                value={profile.sex ?? ""}
+                onChange={(e) =>
+                  dispatch({
+                    type: "setProfile",
+                    patch: { sex: e.target.value as "male" | "female" | "other" },
+                  })
+                }
+              />
             </Field>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Height (cm)">
-              <TextInput type="number" defaultValue={DEMO_PROFILE.heightCm} inputMode="numeric" />
+              <TextInput
+                type="number"
+                inputMode="numeric"
+                value={profile.heightCm ?? ""}
+                onChange={(e) =>
+                  dispatch({
+                    type: "setProfile",
+                    patch: { heightCm: Number(e.target.value) || undefined },
+                  })
+                }
+              />
             </Field>
             <Field label="Weight (kg)">
-              <TextInput type="number" defaultValue={DEMO_PROFILE.weightKg} inputMode="numeric" />
+              <TextInput
+                type="number"
+                inputMode="numeric"
+                value={profile.weightKg ?? ""}
+                onChange={(e) =>
+                  dispatch({
+                    type: "setProfile",
+                    patch: { weightKg: Number(e.target.value) || undefined },
+                  })
+                }
+              />
             </Field>
           </div>
           <Field
             label="Sleep need (hours)"
             hint="Your personal baseline — most adults sit between 7 and 9."
           >
-            <TextInput type="number" step="0.5" defaultValue={DEMO_PROFILE.sleepNeedHrs} />
+            <TextInput
+              type="number"
+              step="0.5"
+              value={profile.sleepNeedHrs ?? ""}
+              onChange={(e) =>
+                dispatch({
+                  type: "setProfile",
+                  patch: { sleepNeedHrs: Number(e.target.value) || undefined },
+                })
+              }
+            />
           </Field>
         </div>
       </Card>

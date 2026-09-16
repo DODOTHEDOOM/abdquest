@@ -1,92 +1,108 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge, Card, ProgressBar, SectionHeader, Sheet } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
+import { ymd } from "../lib/dates";
+import { isPerfectDay, type AppState, type Habit } from "../state/schema";
+import { useStore } from "../state/store";
 
-interface Habit {
-  id: string;
-  name: string;
-  detail: string;
-  streak: number;
-  history: number[]; // 1 = done, 0 = missed, per day (oldest first)
+function shift(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
 
-const HABITS: Habit[] = [
-  {
-    id: "move",
-    name: "Move for 20 minutes",
-    detail: "Walk, gym, anything that raises your heart rate.",
-    streak: 12,
-    history: [1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1],
-  },
-  {
-    id: "junk",
-    name: "No junk food",
-    detail: "No crisps, takeaway or binge snacking.",
-    streak: 5,
-    history: [1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1],
-  },
-  {
-    id: "sleep",
-    name: "In bed before 1am",
-    detail: "Lights out — being in bed scrolling doesn't count.",
-    streak: 0,
-    history: [1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0],
-  },
-  {
-    id: "water",
-    name: "Drink 3L of water",
-    detail: "Roughly six large glasses across the day.",
-    streak: 2,
-    history: [0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1],
-  },
-  {
-    id: "read",
-    name: "Read 20 minutes",
-    detail: "Book, article, anything that isn't a feed.",
-    streak: 8,
-    history: [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  },
-];
+/** 1 for done, 0 for missed, oldest first. */
+function historyFor(state: AppState, habitId: string, today: string, days: number): number[] {
+  const out: number[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    out.push(state.done[shift(today, -i)]?.[habitId] ? 1 : 0);
+  }
+  return out;
+}
+
+/** Consecutive days ending today, or ending yesterday while today is still open. */
+function streakFor(state: AppState, habitId: string, today: string): number {
+  let cursor = state.done[today]?.[habitId] ? today : shift(today, -1);
+  let n = 0;
+  while (state.done[cursor]?.[habitId]) {
+    n++;
+    cursor = shift(cursor, -1);
+    if (n > 3650) break;
+  }
+  return n;
+}
 
 export function Habits() {
-  const [done, setDone] = useState<Record<string, boolean>>({ move: true, junk: true });
+  const { state, dispatch } = useStore();
+  const today = ymd(new Date());
   const [open, setOpen] = useState<Habit | null>(null);
-  const doneCount = HABITS.filter((h) => done[h.id]).length;
-  const pct = doneCount / HABITS.length;
+
+  const doneMap = state.done[today] ?? {};
+  const required = state.habits.filter((h) => !h.bonus);
+  const doneCount = state.habits.filter((h) => doneMap[h.id]).length;
+  const requiredDone = required.filter((h) => doneMap[h.id]).length;
+  const pct = required.length ? requiredDone / required.length : 0;
+  const perfect = isPerfectDay(state, today);
+
+  const rows = useMemo(
+    () =>
+      state.habits.map((h) => ({
+        habit: h,
+        streak: streakFor(state, h.id, today),
+        history: historyFor(state, h.id, today, 14),
+      })),
+    [state, today],
+  );
+
+  if (!state.habits.length) {
+    return (
+      <Card>
+        <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>
+          No habits yet. Once your habits come across from the old app they will appear here.
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <>
       <SectionHeader title="Today" />
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <span style={{ fontSize: 26, fontWeight: 700 }}>
+          <span style={{ fontSize: 26, fontWeight: 800 }}>
             {doneCount}
             <span style={{ fontSize: 15, color: "var(--text-dim)", fontWeight: 600 }}>
               {" "}
-              of {HABITS.length}
+              of {state.habits.length}
             </span>
           </span>
-          <Badge tone={pct === 1 ? "accent" : "neutral"}>
-            {pct === 1 ? "Perfect day" : `${Math.round(pct * 100)}%`}
+          <Badge tone={perfect ? "accent" : "neutral"}>
+            {perfect ? "Perfect day" : `${Math.round(pct * 100)}%`}
           </Badge>
         </div>
         <div style={{ marginTop: 12 }}>
           <ProgressBar value={pct} color="var(--m-habits)" ariaLabel="Habits complete" />
         </div>
+        {state.streak.current > 0 && (
+          <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 10 }}>
+            {state.streak.current}-day streak · best {state.streak.best}
+          </div>
+        )}
       </Card>
 
       <SectionHeader title="Your habits" />
       <div style={{ display: "grid", gap: 10 }}>
-        {HABITS.map((hbt) => {
-          const isDone = !!done[hbt.id];
+        {rows.map(({ habit, streak, history }) => {
+          const isDone = !!doneMap[habit.id];
           return (
-            <Card key={hbt.id}>
+            <Card key={habit.id}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <button
-                  aria-label={isDone ? `Mark ${hbt.name} not done` : `Mark ${hbt.name} done`}
+                  aria-label={isDone ? `Mark ${habit.name} not done` : `Mark ${habit.name} done`}
                   onClick={() => {
                     tick(12);
-                    setDone((d) => ({ ...d, [hbt.id]: !d[hbt.id] }));
+                    dispatch({ type: "toggleHabit", date: today, habitId: habit.id });
                   }}
                   style={{
                     width: 30,
@@ -110,7 +126,7 @@ export function Habits() {
                 <button
                   onClick={() => {
                     tick();
-                    setOpen(hbt);
+                    setOpen(habit);
                   }}
                   style={{
                     flex: 1,
@@ -130,17 +146,20 @@ export function Habits() {
                       textDecoration: isDone ? "line-through" : "none",
                     }}
                   >
-                    {hbt.name}
+                    {habit.icon ? `${habit.icon} ` : ""}
+                    {habit.name}
                   </div>
                   <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
-                    {hbt.streak > 0
-                      ? `🔥 ${hbt.streak}-day streak`
-                      : "Streak broken — restart today"}
+                    {habit.bonus
+                      ? "Bonus — does not break a perfect day"
+                      : streak > 0
+                        ? `${streak}-day streak`
+                        : "Start a streak today"}
                   </div>
                 </button>
                 <div style={{ width: 76, flexShrink: 0 }}>
                   <BarStrip
-                    values={hbt.history.slice(-7)}
+                    values={history.slice(-7)}
                     color="var(--m-habits)"
                     height={26}
                     max={1}
@@ -155,36 +174,44 @@ export function Habits() {
 
       {open && (
         <Sheet title={open.name} sub={open.detail} onClose={() => setOpen(null)}>
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}
-          >
-            <Card>
-              <div style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 600 }}>
-                Current streak
-              </div>
-              <div style={{ fontSize: 26, fontWeight: 700 }}>{open.streak}</div>
-            </Card>
-            <Card>
-              <div style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 600 }}>
-                Last 14 days
-              </div>
-              <div style={{ fontSize: 26, fontWeight: 700 }}>
-                {Math.round((open.history.filter(Boolean).length / open.history.length) * 100)}%
-              </div>
-            </Card>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }}>
-            Completion · 14 days — tap a day
-          </div>
-          <BarStrip
-            values={open.history}
-            color="var(--m-habits)"
-            height={52}
-            max={1}
-            format={(v) => (v ? "Done" : "Missed")}
-          />
+          <HabitDetail state={state} habit={open} today={today} />
         </Sheet>
       )}
+    </>
+  );
+}
+
+function HabitDetail({ state, habit, today }: { state: AppState; habit: Habit; today: string }) {
+  const history = historyFor(state, habit.id, today, 14);
+  const hit = history.filter(Boolean).length;
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+        <Card>
+          <div style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 600 }}>
+            Current streak
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>{streakFor(state, habit.id, today)}</div>
+        </Card>
+        <Card>
+          <div style={{ fontSize: 11, color: "var(--text-dim)", fontWeight: 600 }}>
+            Last 14 days
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 800 }}>
+            {Math.round((hit / history.length) * 100)}%
+          </div>
+        </Card>
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }}>
+        Completion · 14 days — tap a day
+      </div>
+      <BarStrip
+        values={history}
+        color="var(--m-habits)"
+        height={52}
+        max={1}
+        format={(v) => (v ? "Done" : "Missed")}
+      />
     </>
   );
 }

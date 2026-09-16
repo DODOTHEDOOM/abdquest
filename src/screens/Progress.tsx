@@ -3,7 +3,8 @@ import { Card, ProgressBar, SectionHeader, Tabs } from "../design/primitives";
 import { Ring3D } from "../design/Ring3D";
 import { BarStrip, Sparkline } from "../design/charts";
 import { MetricDetail, type MetricSeriesPoint } from "../design/MetricDetail";
-import { DEMO_PROFILE, demoHistory } from "../lib/demoData";
+import { ymd } from "../lib/dates";
+import { useStore } from "../state/store";
 import { fitnessAge } from "../lib/metrics/fitnessAge";
 import { recovery } from "../lib/metrics/recovery";
 import { strain as strainMetric } from "../lib/metrics/strain";
@@ -14,15 +15,21 @@ export function Progress() {
   const [range, setRange] = useState<"14" | "30" | "45">("30");
   const [open, setOpen] = useState<null | "recovery" | "strain">(null);
 
+  const { state } = useStore();
+  const profile = state.profile;
+
   const data = useMemo(() => {
-    const all = demoHistory(45);
+    const todayKey = ymd(new Date());
+    const all = Object.values(state.health)
+      .filter((d) => d.date <= todayKey)
+      .sort((a, b) => a.date.localeCompare(b.date));
     const rec = all.map((d, i) => ({
       date: d.date,
-      value: recovery(d, all.slice(0, i), DEMO_PROFILE).score,
+      value: recovery(d, all.slice(0, i), profile).score,
     }));
-    const str = all.map((d) => ({ date: d.date, value: strainMetric(d, DEMO_PROFILE).strain }));
+    const str = all.map((d) => ({ date: d.date, value: strainMetric(d, profile).strain }));
     return { all, rec, str };
-  }, []);
+  }, [state, profile]);
 
   const n = parseInt(range, 10);
   const all = data.all.slice(-n);
@@ -40,10 +47,14 @@ export function Progress() {
     const v = all.map((d) => d.sleepHrs).filter((x): x is number => typeof x === "number");
     return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
   })();
-  const fitNow = fitnessAge(data.all[data.all.length - 1], data.all.slice(0, -1), DEMO_PROFILE);
-  const fitThen = fitnessAge(all[0], data.all.slice(0, data.all.length - n), DEMO_PROFILE);
+  const fitNow = data.all.length
+    ? fitnessAge(data.all[data.all.length - 1], data.all.slice(0, -1), profile)
+    : null;
+  const fitThen = all.length
+    ? fitnessAge(all[0], data.all.slice(0, data.all.length - n), profile)
+    : null;
   const fitDelta =
-    fitNow.fitnessAge != null && fitThen.fitnessAge != null
+    fitNow?.fitnessAge != null && fitThen?.fitnessAge != null
       ? fitNow.fitnessAge - fitThen.fitnessAge
       : null;
 
@@ -90,7 +101,7 @@ export function Progress() {
             <Row label="Total effort" value={totalStrain.toFixed(0)} sub="TRIMP-weighted" />
             <Row
               label="Fitness age"
-              value={fitNow.fitnessAge != null ? `${fitNow.fitnessAge}` : "—"}
+              value={fitNow?.fitnessAge != null ? `${fitNow.fitnessAge}` : "—"}
               sub={
                 fitDelta != null
                   ? fitDelta <= 0

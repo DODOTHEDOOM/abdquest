@@ -124,12 +124,19 @@ export function motivation(ctx: MotivationContext): MotivationCard {
   // 1. A record broken today.
   if (recentPR && recentPR.date === ctx.todayKey) {
     const unit = recentPR.kind === "weight" ? "kg" : " reps";
+    // A first-ever record has nothing to beat. Measuring it against zero reads
+    // as "110kg, up 110kg on your best", which is nonsense.
+    const first = recentPR.previous <= 0;
     const gain = Math.round((recentPR.next - recentPR.previous) * 10) / 10;
     return {
       tone: "celebrate",
       icon: "🏆",
-      headline: `New PR — ${recentPR.exercise}`,
-      detail: `${recentPR.next}${unit}, up ${gain}${unit} on your best. That is the whole point.`,
+      headline: first
+        ? `First record — ${recentPR.exercise}`
+        : `New PR — ${recentPR.exercise}`,
+      detail: first
+        ? `${recentPR.next}${unit} on the board. Now there is a number to beat.`
+        : `${recentPR.next}${unit}, up ${gain}${unit} on your best. That is the whole point.`,
     };
   }
 

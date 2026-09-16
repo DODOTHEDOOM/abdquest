@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Badge, Button, Card, Field, SectionHeader, Sheet, TextInput } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
 import { ymd } from "../lib/dates";
-import { demoSessions } from "../lib/demoTraining";
+import { useStore } from "../state/store";
 import {
   ACTIVITIES,
   activityById,
@@ -33,7 +33,8 @@ type SheetState =
 
 export function Training() {
   const today = ymd(new Date());
-  const [sessions, setSessions] = useState<Session[]>(() => demoSessions(45));
+  const { state, dispatch } = useStore();
+  const sessions = state.sessions;
   const [sheet, setSheet] = useState<SheetState>(null);
   const [pr, setPr] = useState<{ name: string; kind: string; next: number } | null>(null);
 
@@ -44,7 +45,7 @@ export function Training() {
   const todays = sessionsOn(sessions, today);
 
   function addSession(s: Session) {
-    setSessions((prev) => [...prev, s]);
+    dispatch({ type: "addSession", session: s });
     setSheet(null);
   }
 
