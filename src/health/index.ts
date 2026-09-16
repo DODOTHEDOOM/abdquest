@@ -121,6 +121,21 @@ export function fetchDay(dateKey: string, full = false): Promise<RawDay | null> 
 }
 
 /** Warms the data-type catalogue the metric fallbacks search through. */
+/**
+ * A usable access token, refreshing if needed — or null when the connection
+ * can no longer be renewed.
+ *
+ * This is what separates "your watch has not synced yet" from "your sign-in has
+ * expired". While a Google consent screen is in Testing, refresh tokens expire
+ * after seven days, so this is a weekly event rather than a rare one, and
+ * reporting it as missing data would send you to look at the wrong thing.
+ */
+export function ensureToken(): Promise<string | null> {
+  return new Promise((resolve) => {
+    fbEnsureToken((at: string | null) => resolve(at ?? null));
+  });
+}
+
 export function primeCatalog(): void {
   if (ghTypesCached().length > 0) return;
   fbEnsureToken((at: string | null) => {

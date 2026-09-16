@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "../state/store";
 import {
   disconnect as ghDisconnect,
+  ensureToken,
   fetchDay,
   handleRedirect,
   isConnected,
@@ -88,8 +89,17 @@ export function useHealthSync(): HealthSync {
       running.current = true;
       setBusy(true);
       if (manual) setStatus("Syncing…");
-      primeCatalog();
       try {
+        // Check the sign-in first, so an expired token is never reported as
+        // "no data". They need completely different things from you.
+        if (isConnected() && !(await ensureToken())) {
+          setStatus(
+            "Your Google sign-in has expired. Reconnect below — while the consent screen is in Testing, Google ends the session every 7 days.",
+          );
+          setConnected(false);
+          return;
+        }
+        primeCatalog();
         const today = dayKey(0);
         const yesterday = dayKey(-1);
         // Yesterday first (cheap), then today with the full hourly detail —
