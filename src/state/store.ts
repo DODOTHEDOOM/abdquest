@@ -149,8 +149,14 @@ export function reducer(state: AppState, action: Action): AppState {
         }),
       };
 
-    case "setNote":
-      return { ...state, notes: { ...state.notes, [action.date]: action.note } };
+    case "setNote": {
+      // An entry cleared of both text and mood is deleted rather than left as
+      // an empty husk cluttering the history.
+      const notes = { ...state.notes };
+      if (!action.note.text.trim() && !action.note.mood) delete notes[action.date];
+      else notes[action.date] = { ...action.note, text: action.note.text.trim() };
+      return { ...state, notes };
+    }
 
     case "togglePrayer": {
       const day = { ...(state.prayers.done[action.date] ?? {}) };

@@ -121,6 +121,9 @@
 .field__control {
   width: 100%;
   min-height: var(--tap);
+  /* Without this, inputs take the browser default and textareas render
+     monospace — the journal looked like a code editor. */
+  font-family: inherit;
   padding: var(--sp-3);
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -859,4 +862,85 @@ button.motiv:active {
   border-color: transparent;
   background: var(--m-recovery);
   color: var(--surface);
+}
+
+/* ── Mood chips ──────────────────────────────────────────────────────────── */
+.moodchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+.moodchip.is-on {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface-2));
+  color: var(--text);
+}
+
+/* ── Tick box (challenges) ───────────────────────────────────────────────── */
+.tickbox {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 7px;
+  border: 1.5px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: transparent;
+}
+.tickbox.is-done {
+  border-color: transparent;
+  background: var(--m-recovery);
+  color: var(--surface);
+}
+
+/* ── Badge tiles ─────────────────────────────────────────────────────────── */
+.badgetile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  text-align: center;
+}
+.badgetile.is-earned {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+}
+.badgetile__icon {
+  font-size: 22px;
+  line-height: 1.2;
+  filter: grayscale(1);
+  opacity: 0.4;
+}
+.badgetile.is-earned .badgetile__icon {
+  filter: none;
+  opacity: 1;
+}
+.badgetile__name {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.badgetile__meta {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
 }

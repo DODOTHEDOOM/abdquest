@@ -320,6 +320,25 @@ describe("reducer", () => {
     expect(off.prayers).toEqual(withData.prayers);
   });
 
+  it("clearing a journal entry removes it rather than storing an empty one", () => {
+    let s = act(oneHabitState(), {
+      type: "setNote",
+      date: "2026-03-04",
+      note: { text: "Rough one", mood: "low" },
+    });
+    s = act(s, { type: "setNote", date: "2026-03-04", note: { text: "   " } });
+    expect(s.notes["2026-03-04"]).toBeUndefined();
+  });
+
+  it("keeps an entry that has only a mood", () => {
+    const s = act(oneHabitState(), {
+      type: "setNote",
+      date: "2026-03-04",
+      note: { text: "", mood: "tired" },
+    });
+    expect(s.notes["2026-03-04"]).toEqual({ text: "", mood: "tired" });
+  });
+
   it("stores profile patches, theme, onboarding and notes", () => {
     let s = act(oneHabitState(), { type: "setProfile", patch: { age: 22 } });
     s = act(s, { type: "setProfile", patch: { heightCm: 178 } });
