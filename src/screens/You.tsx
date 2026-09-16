@@ -1,6 +1,7 @@
-import { Badge, Card, Field, SectionHeader, TextInput } from "../design/primitives";
+import { Card, Field, SectionHeader, TextInput } from "../design/primitives";
 import { ThemePicker } from "../design/ThemePicker";
 import type { Theme } from "../design/themes";
+import { HealthConnection } from "../health/HealthConnection";
 import { useStore } from "../state/store";
 
 export function You({
@@ -115,25 +116,14 @@ export function You({
       </Card>
 
       <SectionHeader title="Connections" />
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>Google Health</div>
-            <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 2 }}>
-              Steps, sleep, heart rate, VO₂max
-            </div>
-          </div>
-          <Badge tone="warn">Not wired up yet</Badge>
-        </div>
-      </Card>
+      <HealthConnection />
 
       <SectionHeader title="About" />
       <Card>
         <p style={{ fontSize: 12.5, color: "var(--text-dim)", lineHeight: 1.65, margin: 0 }}>
-          This is a preview of the rebuilt app. The numbers you see are sample data running through
-          the real metrics engine — recovery, effort, sleep and fitness age are all computed with
-          published methods, and each has a &ldquo;how it&rsquo;s measured&rdquo; explanation.
-          Nothing here is medical advice.
+          Everything here runs on your own data, stored on this device. Recovery, effort, sleep and
+          fitness age are computed with published methods, and each one shows you how it was
+          measured. Nothing here is medical advice.
         </p>
       </Card>
     </>

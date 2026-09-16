@@ -45,4 +45,18 @@ export default tseslint.config(
       globals: { localStorage: "readonly", Storage: "readonly", DOMException: "readonly" },
     },
   },
+  // A verbatim port of the working Google Health module. It is deliberately not
+  // modernised — see the header in that file — so the rules it predates are off
+  // for it alone rather than for the whole codebase.
+  {
+    files: ["src/health/legacyGoogleHealth.ts"],
+    rules: {
+      "no-prototype-builtins": "off",
+      "no-var": "off",
+      "prefer-const": "off",
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-unused-vars": "off",
+    },
+  },
 );

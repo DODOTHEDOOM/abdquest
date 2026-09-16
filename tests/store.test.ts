@@ -16,7 +16,7 @@ import {
   STORAGE_KEY,
   type AppState,
 } from "../src/state/schema";
-import type { GymSession } from "../src/lib/training";
+import type { GymSession, Session } from "../src/lib/training";
 
 beforeEach(() => localStorage.clear());
 
@@ -207,6 +207,81 @@ describe("reducer", () => {
       { date: "2026-03-01", kg: 97 },
       { date: "2026-03-04", kg: 95.5 },
     ]);
+  });
+
+  it("merging a synced day fills gaps without blanking what is already there", () => {
+    let s = act(oneHabitState(), {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", rhr: 54, hrv: 61, steps: 9000 },
+    });
+    // A later sync that only managed to read steps must not wipe HRV or RHR.
+    s = act(s, {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", steps: 11200 },
+    });
+    expect(s.health["2026-03-04"]).toEqual({
+      date: "2026-03-04",
+      rhr: 54,
+      hrv: 61,
+      steps: 11200,
+    });
+  });
+
+  it("re-syncing replaces imported sessions but never hand-logged ones", () => {
+    const imported = (id: string, minutes: number): Session => ({
+      id,
+      date: "2026-03-04",
+      activityId: "run",
+      kind: "cardio",
+      minutes,
+      auto: true,
+    });
+    const byHand: Session = {
+      id: "mine",
+      date: "2026-03-04",
+      activityId: "padel",
+      kind: "sport",
+      minutes: 90,
+    };
+
+    let s = act(oneHabitState(), { type: "addSession", session: byHand });
+    s = act(s, {
+      type: "syncAutoSessions",
+      date: "2026-03-04",
+      sessions: [imported("gh_2026-03-04_0730", 30)],
+    });
+    // Second sync of the same day: the import is refreshed, mine is untouched.
+    s = act(s, {
+      type: "syncAutoSessions",
+      date: "2026-03-04",
+      sessions: [imported("gh_2026-03-04_0730", 34)],
+    });
+
+    expect(s.sessions).toHaveLength(2);
+    expect(s.sessions.find((x) => x.id === "mine")).toEqual(byHand);
+    const auto = s.sessions.find((x) => x.id === "gh_2026-03-04_0730");
+    expect(auto).toMatchObject({ minutes: 34 });
+  });
+
+  it("a sync for one day leaves other days alone", () => {
+    let s = act(oneHabitState(), {
+      type: "syncAutoSessions",
+      date: "2026-03-03",
+      sessions: [
+        {
+          id: "gh_2026-03-03_0800",
+          date: "2026-03-03",
+          activityId: "walk",
+          kind: "cardio",
+          minutes: 20,
+          auto: true,
+        },
+      ],
+    });
+    s = act(s, { type: "syncAutoSessions", date: "2026-03-04", sessions: [] });
+    expect(s.sessions.map((x) => x.date)).toEqual(["2026-03-03"]);
   });
 
   it("stores profile patches, theme, onboarding and notes", () => {

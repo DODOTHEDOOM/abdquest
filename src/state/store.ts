@@ -6,6 +6,7 @@
  */
 
 import { createContext, useContext, useEffect, useReducer, useState } from "react";
+import type { DailyHealth } from "../lib/metrics/types";
 import type { Session } from "../lib/training";
 import { looksLikeV2, migrateV2 } from "./migrate";
 import {
@@ -61,6 +62,8 @@ export type Action =
   | { type: "addWater"; date: string; ml: number }
   | { type: "addCalories"; date: string; kcal: number; protein?: number }
   | { type: "setNote"; date: string; note: Note }
+  | { type: "mergeHealth"; date: string; day: DailyHealth }
+  | { type: "syncAutoSessions"; date: string; sessions: Session[] }
   | { type: "replace"; state: AppState };
 
 function upsertByDate<T extends { date: string }>(list: T[], entry: T): T[] {
@@ -136,6 +139,30 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case "setNote":
       return { ...state, notes: { ...state.notes, [action.date]: action.note } };
+
+    case "mergeHealth": {
+      // Fill gaps only. A reading that is already stored is never overwritten
+      // with undefined, so a partial sync cannot blank a good day.
+      const existing = state.health[action.date] ?? { date: action.date };
+      const merged: DailyHealth = { ...existing };
+      for (const [k, v] of Object.entries(action.day)) {
+        if (v === undefined || v === null || v === "") continue;
+        (merged as unknown as Record<string, unknown>)[k] = v;
+      }
+      return { ...state, health: { ...state.health, [action.date]: merged } };
+    }
+
+    case "syncAutoSessions": {
+      // Replace only what a previous sync imported for this day. Anything
+      // logged by hand stays exactly where it is.
+      const kept = state.sessions.filter(
+        (s) => !(s.date === action.date && s.auto && s.id.startsWith("gh_")),
+      );
+      return {
+        ...state,
+        sessions: [...kept, ...action.sessions].sort((a, b) => a.date.localeCompare(b.date)),
+      };
+    }
 
     case "replace":
       return action.state;
