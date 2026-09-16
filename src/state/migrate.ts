@@ -11,7 +11,14 @@
 
 import type { DailyHealth, HourHR } from "../lib/metrics/types";
 import { activityById, type GymSet, type Session } from "../lib/training";
-import { emptyState, type AppState, type Habit, type Note } from "./schema";
+import {
+  emptyState,
+  PRAYERS,
+  type AppState,
+  type Habit,
+  type Note,
+  type PrayerState,
+} from "./schema";
 
 /** The old colourways, mapped onto the closest new one. */
 const THEME_MAP: Record<string, string> = {
@@ -198,6 +205,36 @@ function healthFrom(v2: Record<string, unknown>, sessions: Session[]): Record<st
   return out;
 }
 
+/**
+ * v2 kept prayers in `prayerHist` (history), `done` (today, mixed in with the
+ * habits) and `debt` (missed prayers owed). All three come across.
+ */
+function prayersFrom(v2: Record<string, unknown>): PrayerState {
+  const done: Record<string, Record<string, boolean>> = {};
+  for (const [date, raw] of Object.entries(obj(v2.prayerHist))) {
+    if (!isDate(date)) continue;
+    const day: Record<string, boolean> = {};
+    for (const p of PRAYERS) if (obj(raw)[p.id]) day[p.id] = true;
+    if (Object.keys(day).length) done[date] = day;
+  }
+
+  // Today's prayers sat in the same `done` map as the habits.
+  const lastDay = str(v2.lastDay);
+  if (lastDay && isDate(lastDay)) {
+    const day: Record<string, boolean> = { ...(done[lastDay] ?? {}) };
+    for (const p of PRAYERS) if (obj(v2.done)[p.id]) day[p.id] = true;
+    if (Object.keys(day).length) done[lastDay] = day;
+  }
+
+  const debt: Record<string, number> = {};
+  for (const p of PRAYERS) {
+    const owed = num(obj(v2.debt)[p.id]);
+    if (owed && owed > 0) debt[p.id] = Math.round(owed);
+  }
+
+  return { done, debt };
+}
+
 function notesFrom(v2: Record<string, unknown>): Record<string, Note> {
   const out: Record<string, Note> = {};
   for (const [date, raw] of Object.entries(obj(v2.notes))) {
@@ -245,6 +282,12 @@ export function migrateV2(value: unknown): AppState {
     .filter((e) => isDate(e.date) && e.ml > 0);
 
   const latestWeight = weight.length ? weight[weight.length - 1].kg : num(v2.startWt);
+  const prayers = prayersFrom(v2);
+  // Only show the prayers section to someone who was actually using it.
+  const usedPrayers =
+    Object.keys(prayers.done).length > 0 ||
+    Object.keys(prayers.debt).length > 0 ||
+    arr(v2.prayers).length > 0;
 
   return {
     ...base,
@@ -269,6 +312,8 @@ export function migrateV2(value: unknown): AppState {
     calories,
     water,
     notes: notesFrom(v2),
+    modules: { prayers: usedPrayers },
+    prayers,
     migratedFrom: "v2",
   };
 }

@@ -242,10 +242,13 @@ export function SectionHeader({
   title,
   action,
   onAction,
+  right,
 }: {
   title: string;
   action?: string;
   onAction?: () => void;
+  /** Anything to sit at the end of the row — a count, a badge, a status. */
+  right?: ReactNode;
 }) {
   return (
     <div className="sectionhead">
@@ -255,6 +258,7 @@ export function SectionHeader({
           {action}
         </button>
       )}
+      {right}
     </div>
   );
 }

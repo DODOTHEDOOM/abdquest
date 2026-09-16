@@ -15,7 +15,9 @@ import {
   LEGACY_KEY,
   STORAGE_KEY,
   type AppState,
+  PRAYERS,
   type Note,
+  type Place,
   type Profile,
 } from "./schema";
 
@@ -24,6 +26,11 @@ import {
 export const XP_PER_HABIT = 20;
 export const XP_PERFECT_DAY = 60;
 export const XP_PER_SESSION = 40;
+export const XP_PER_PRAYER = 15;
+/** All five in one day, on top of the five individual awards. */
+export const XP_ALL_PRAYERS = 40;
+/** One prayer repaid from the debt ledger. */
+export const XP_PER_DEBT_PRAYER = 10;
 
 // ── Streak ──────────────────────────────────────────────────────────────────
 
@@ -62,6 +69,11 @@ export type Action =
   | { type: "addWater"; date: string; ml: number }
   | { type: "addCalories"; date: string; kcal: number; protein?: number }
   | { type: "setNote"; date: string; note: Note }
+  | { type: "togglePrayer"; date: string; prayerId: string }
+  | { type: "payPrayerDebt"; prayerId: string; count: number }
+  | { type: "setPrayerDebt"; prayerId: string; count: number }
+  | { type: "setModule"; key: "prayers"; on: boolean }
+  | { type: "setPlace"; place: Place }
   | { type: "mergeHealth"; date: string; day: DailyHealth }
   | { type: "syncAutoSessions"; date: string; sessions: Session[] }
   | { type: "replace"; state: AppState };
@@ -139,6 +151,63 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case "setNote":
       return { ...state, notes: { ...state.notes, [action.date]: action.note } };
+
+    case "togglePrayer": {
+      const day = { ...(state.prayers.done[action.date] ?? {}) };
+      const was = !!day[action.prayerId];
+      if (was) delete day[action.prayerId];
+      else day[action.prayerId] = true;
+
+      const countBefore = PRAYERS.filter((p) => state.prayers.done[action.date]?.[p.id]).length;
+      const countAfter = PRAYERS.filter((p) => day[p.id]).length;
+      let xp = state.xp + (was ? -XP_PER_PRAYER : XP_PER_PRAYER);
+      const full = PRAYERS.length;
+      if (countBefore < full && countAfter === full) xp += XP_ALL_PRAYERS;
+      if (countBefore === full && countAfter < full) xp -= XP_ALL_PRAYERS;
+
+      return {
+        ...state,
+        xp: Math.max(0, xp),
+        prayers: {
+          ...state.prayers,
+          done: { ...state.prayers.done, [action.date]: day },
+        },
+      };
+    }
+
+    case "payPrayerDebt": {
+      const owed = Math.max(0, state.prayers.debt[action.prayerId] ?? 0);
+      // Never repay more than is actually owed, however many times it is tapped.
+      const paid = Math.min(Math.max(0, action.count), owed);
+      if (!paid) return state;
+      return {
+        ...state,
+        xp: state.xp + paid * XP_PER_DEBT_PRAYER,
+        prayers: {
+          ...state.prayers,
+          debt: { ...state.prayers.debt, [action.prayerId]: owed - paid },
+        },
+      };
+    }
+
+    case "setPrayerDebt":
+      return {
+        ...state,
+        prayers: {
+          ...state.prayers,
+          debt: {
+            ...state.prayers.debt,
+            [action.prayerId]: Math.max(0, Math.round(action.count) || 0),
+          },
+        },
+      };
+
+    case "setModule":
+      // Turning a module off hides it. It never deletes what it recorded.
+      return { ...state, modules: { ...state.modules, [action.key]: action.on } };
+
+    case "setPlace":
+      return { ...state, place: action.place };
 
     case "mergeHealth": {
       // Fill gaps only. A reading that is already stored is never overwritten

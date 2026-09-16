@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Badge, Card, ProgressBar, SectionHeader, Sheet } from "../design/primitives";
+import { Badge, Card, ProgressBar, SectionHeader, Sheet, Tabs } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
 import { ymd } from "../lib/dates";
 import { isPerfectDay, type AppState, type Habit } from "../state/schema";
 import { useStore } from "../state/store";
+import { Prayers } from "./Prayers";
 
 function shift(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -33,7 +34,7 @@ function streakFor(state: AppState, habitId: string, today: string): number {
   return n;
 }
 
-export function Habits() {
+function HabitsList() {
   const { state, dispatch } = useStore();
   const today = ymd(new Date());
   const [open, setOpen] = useState<Habit | null>(null);
@@ -212,6 +213,32 @@ function HabitDetail({ state, habit, today }: { state: AppState; habit: Habit; t
         max={1}
         format={(v) => (v ? "Done" : "Missed")}
       />
+    </>
+  );
+}
+
+/**
+ * Habits and prayers are both daily practice, so they share a screen. The
+ * prayers half only appears for someone who uses it — the section is optional
+ * and can be switched off in You.
+ */
+export function Habits() {
+  const { state } = useStore();
+  const [sub, setSub] = useState<"habits" | "prayers">("habits");
+
+  if (!state.modules.prayers) return <HabitsList />;
+
+  return (
+    <>
+      <Tabs<"habits" | "prayers">
+        tabs={[
+          { id: "habits", label: "Habits" },
+          { id: "prayers", label: "Prayers" },
+        ]}
+        value={sub}
+        onChange={setSub}
+      />
+      {sub === "habits" ? <HabitsList /> : <Prayers />}
     </>
   );
 }

@@ -796,3 +796,67 @@ button.motiv:active {
   background: var(--danger);
   box-shadow: var(--elev-2);
 }
+
+/* ── Prayer rows ─────────────────────────────────────────────────────────── */
+.prayerrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease;
+}
+.prayerrow:active {
+  transform: scale(0.985);
+}
+.prayerrow[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--m-recovery) 45%, transparent);
+  background: color-mix(in srgb, var(--m-recovery) 12%, var(--surface-2));
+}
+.prayerrow__icon {
+  font-size: 18px;
+  line-height: 1;
+}
+.prayerrow__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prayerrow__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.prayerrow__detail {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.prayerrow__check {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: transparent;
+}
+.prayerrow__check.is-done {
+  border-color: transparent;
+  background: var(--m-recovery);
+  color: var(--surface);
+}

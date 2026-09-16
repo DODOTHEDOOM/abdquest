@@ -7,6 +7,9 @@ import {
   XP_PERFECT_DAY,
   XP_PER_HABIT,
   XP_PER_SESSION,
+  XP_PER_PRAYER,
+  XP_ALL_PRAYERS,
+  XP_PER_DEBT_PRAYER,
   type Action,
 } from "../src/state/store";
 import {
@@ -282,6 +285,39 @@ describe("reducer", () => {
     });
     s = act(s, { type: "syncAutoSessions", date: "2026-03-04", sessions: [] });
     expect(s.sessions.map((x) => x.date)).toEqual(["2026-03-03"]);
+  });
+
+  it("awards a bonus for the full five and takes it back if one is undone", () => {
+    const ids = ["fajr", "duhr", "asr", "maghrib", "isha"];
+    let s = oneHabitState();
+    for (const id of ids) s = act(s, { type: "togglePrayer", date: "2026-03-04", prayerId: id });
+    expect(s.xp).toBe(XP_PER_PRAYER * 5 + XP_ALL_PRAYERS);
+
+    s = act(s, { type: "togglePrayer", date: "2026-03-04", prayerId: "asr" });
+    expect(s.xp).toBe(XP_PER_PRAYER * 4);
+    expect(s.prayers.done["2026-03-04"].asr).toBeUndefined();
+  });
+
+  it("never repays more prayer debt than is owed", () => {
+    let s: AppState = { ...oneHabitState(), prayers: { done: {}, debt: { fajr: 2 } } };
+    s = act(s, { type: "payPrayerDebt", prayerId: "fajr", count: 5 });
+    expect(s.prayers.debt.fajr).toBe(0);
+    expect(s.xp).toBe(XP_PER_DEBT_PRAYER * 2);
+
+    // Nothing owed: no XP, and the state is returned unchanged.
+    const after = act(s, { type: "payPrayerDebt", prayerId: "fajr", count: 3 });
+    expect(after).toBe(s);
+  });
+
+  it("turning a module off hides it without deleting what it recorded", () => {
+    const withData: AppState = {
+      ...oneHabitState(),
+      modules: { prayers: true },
+      prayers: { done: { "2026-03-04": { fajr: true } }, debt: { fajr: 4 } },
+    };
+    const off = act(withData, { type: "setModule", key: "prayers", on: false });
+    expect(off.modules.prayers).toBe(false);
+    expect(off.prayers).toEqual(withData.prayers);
   });
 
   it("stores profile patches, theme, onboarding and notes", () => {

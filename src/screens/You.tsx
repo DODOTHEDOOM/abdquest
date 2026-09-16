@@ -115,6 +115,41 @@ export function You({
         </div>
       </Card>
 
+      <SectionHeader title="Sections" />
+      <Card>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 14,
+            cursor: "pointer",
+          }}
+        >
+          <span>
+            <span style={{ fontSize: 14, fontWeight: 600, display: "block" }}>Prayers</span>
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--text-dim)",
+                lineHeight: 1.55,
+                display: "block",
+                marginTop: 2,
+              }}
+            >
+              The five daily prayers, times for your location, and a ledger for missed ones. Turning
+              this off only hides it — nothing you have recorded is deleted.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={state.modules.prayers}
+            onChange={(e) => dispatch({ type: "setModule", key: "prayers", on: e.target.checked })}
+            style={{ width: 20, height: 20, flex: "none", accentColor: "var(--accent)" }}
+          />
+        </label>
+      </Card>
+
       <SectionHeader title="Connections" />
       <HealthConnection />
 

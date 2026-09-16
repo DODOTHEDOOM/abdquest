@@ -18,6 +18,11 @@ const V2 = {
   life: [{ id: "emails", label: "Work Emails", icon: "📧", xp: 15, desc: "Clear the inbox" }],
   bonus: [{ id: "readbook", label: "Read Something", icon: "📖", xp: 20, desc: "Anything" }],
   prayers: [{ id: "fajr", label: "Fajr", icon: "🌅", xp: 30 }],
+  prayerHist: {
+    "2026-03-02": { fajr: true, duhr: true, asr: true, maghrib: true, isha: true },
+    "2026-03-03": { fajr: true, duhr: true },
+  },
+  debt: { fajr: 12, duhr: 0, asr: 3, maghrib: 0, isha: 0 },
   log: [
     { date: "2026-03-02", done: { nojunk: true, workout: true, emails: true }, allDone: true },
     { date: "2026-03-03", done: { nojunk: true }, allDone: false },
@@ -160,6 +165,27 @@ describe("migrateV2", () => {
     expect(s.themeId).toBe("ember");
     expect(migrateV2({ ...V2, theme: "dark" }).themeId).toBe("midnight");
     expect(migrateV2({ ...V2, theme: "wat" }).themeId).toBe("daylight");
+  });
+
+  it("brings prayer history, today's prayers and the debt ledger across", () => {
+    expect(s.prayers.done["2026-03-02"]).toEqual({
+      fajr: true,
+      duhr: true,
+      asr: true,
+      maghrib: true,
+      isha: true,
+    });
+    expect(s.prayers.done["2026-03-03"]).toEqual({ fajr: true, duhr: true });
+    // Only prayers that are actually owed are carried — zeroes are not debt.
+    expect(s.prayers.debt).toEqual({ fajr: 12, asr: 3 });
+    // Someone who used prayers keeps the section.
+    expect(s.modules.prayers).toBe(true);
+  });
+
+  it("leaves the prayers section off for someone who never used it", () => {
+    const noPrayers = migrateV2({ ...V2, prayers: [], prayerHist: {}, debt: {} });
+    expect(noPrayers.modules.prayers).toBe(false);
+    expect(noPrayers.prayers.done).toEqual({});
   });
 
   it("treats an existing user as already set up", () => {

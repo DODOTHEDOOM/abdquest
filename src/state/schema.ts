@@ -49,6 +49,34 @@ export interface Note {
   mood?: string;
 }
 
+/**
+ * The five daily prayers. `apiKey` is the name the Aladhan timings API uses,
+ * which does not always match the spelling shown in the app.
+ */
+export const PRAYERS = [
+  { id: "fajr", name: "Fajr", icon: "🌅", apiKey: "Fajr", detail: "Dawn" },
+  { id: "duhr", name: "Duhr", icon: "☀️", apiKey: "Dhuhr", detail: "Midday" },
+  { id: "asr", name: "Asr", icon: "🌤️", apiKey: "Asr", detail: "Afternoon" },
+  { id: "maghrib", name: "Maghrib", icon: "🌇", apiKey: "Maghrib", detail: "Sunset" },
+  { id: "isha", name: "Isha", icon: "🌙", apiKey: "Isha", detail: "Night" },
+] as const;
+
+export type PrayerId = (typeof PRAYERS)[number]["id"];
+
+export interface PrayerState {
+  /** date -> prayer id -> prayed. */
+  done: Record<string, Record<string, boolean>>;
+  /** Missed prayers still owed, per prayer. */
+  debt: Record<string, number>;
+}
+
+/** Where to compute prayer times for. Set once, from the device or by hand. */
+export interface Place {
+  lat: number;
+  lon: number;
+  label?: string;
+}
+
 export interface AppState {
   version: 3;
   profile: Profile;
@@ -66,6 +94,10 @@ export interface AppState {
   calories: CalorieEntry[];
   water: WaterEntry[];
   notes: Record<string, Note>;
+  /** Optional sections. Off means the tab and its data are simply not shown. */
+  modules: { prayers: boolean };
+  prayers: PrayerState;
+  place?: Place;
   /** Where this state came from, for the one-time "your data moved across" notice. */
   migratedFrom?: "v2" | null;
 }
@@ -119,6 +151,8 @@ export function emptyState(): AppState {
     calories: [],
     water: [],
     notes: {},
+    modules: { prayers: false },
+    prayers: { done: {}, debt: {} },
     migratedFrom: null,
   };
 }
@@ -136,6 +170,20 @@ export function isPerfectDay(state: AppState, date: string): boolean {
   if (!required.length) return false;
   const day = state.done[date] ?? {};
   return required.every((h) => day[h.id]);
+}
+
+export function prayersDoneOn(state: AppState, date: string): number {
+  const day = state.prayers.done[date];
+  if (!day) return 0;
+  return PRAYERS.filter((p) => day[p.id]).length;
+}
+
+export function allPrayersOn(state: AppState, date: string): boolean {
+  return prayersDoneOn(state, date) === PRAYERS.length;
+}
+
+export function prayerDebtTotal(state: AppState): number {
+  return Object.values(state.prayers.debt).reduce((a, b) => a + Math.max(0, b), 0);
 }
 
 /** Library is always derived from sessions, so the two can never disagree. */
