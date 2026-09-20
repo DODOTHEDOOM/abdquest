@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Steady — a habit and health tracker that does not lie to you</title>
+    <meta
+      name="description"
+      content="Steady tracks habits, training, sleep and recovery entirely on your phone. No account, no cloud, no invented numbers. Free and open."
+    />
+    <meta name="theme-color" content="#0f1115" />
+    <meta property="og:title" content="Steady" />
+    <meta
+      property="og:description"
+      content="A habit and health tracker that keeps everything on your device and never shows you a number it cannot justify."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0f1115;
+        --surface: #171a21;
+        --surface-2: #1e222b;
+        --border: #272c37;
+        --text: #eef1f6;
+        --dim: #a4adbd;
+        --faint: #6f7889;
+        --accent: #6ee7b7;
+        --accent-2: #7dd3fc;
+        --warn: #fbbf24;
+        --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      a {
+        color: inherit;
+      }
+
+      /* Hero */
+      header.hero {
+        position: relative;
+        overflow: hidden;
+        padding: 88px 0 72px;
+        border-bottom: 1px solid var(--border);
+      }
+      header.hero::before {
+        content: "";
+        position: absolute;
+        inset: -40% 20% auto -20%;
+        height: 520px;
+        background:
+          radial-gradient(closest-side, rgba(110, 231, 183, 0.18), transparent),
+          radial-gradient(closest-side, rgba(125, 211, 252, 0.14), transparent) 60% 30%;
+        filter: blur(20px);
+        pointer-events: none;
+      }
+      .hero__inner {
+        position: relative;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 20px;
+      }
+      h1 {
+        font-size: clamp(34px, 7vw, 60px);
+        line-height: 1.05;
+        letter-spacing: -0.035em;
+        font-weight: 800;
+        margin: 0 0 18px;
+        max-width: 16ch;
+      }
+      .lede {
+        font-size: clamp(16px, 2.4vw, 19px);
+        color: var(--dim);
+        max-width: 60ch;
+        margin: 0 0 32px;
+      }
+      .cta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 22px;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 15px;
+        text-decoration: none;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+        color: var(--text);
+        transition:
+          transform 0.15s ease,
+          background 0.15s ease;
+      }
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+      .btn--go {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #06231a;
+        border-color: transparent;
+      }
+      .note {
+        font-size: 13px;
+        color: var(--faint);
+        margin-top: 16px;
+      }
+
+      /* Sections */
+      section {
+        padding: 72px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      h2 {
+        font-size: clamp(24px, 4vw, 34px);
+        letter-spacing: -0.02em;
+        margin: 0 0 12px;
+        font-weight: 700;
+      }
+      .sub {
+        color: var(--dim);
+        max-width: 62ch;
+        margin: 0 0 36px;
+      }
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 22px;
+      }
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .card p {
+        margin: 0;
+        color: var(--dim);
+        font-size: 14px;
+      }
+      .card .ic {
+        font-size: 22px;
+        display: block;
+        margin-bottom: 12px;
+      }
+
+      /* Honesty block */
+      .honest {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 14px;
+        padding: 22px 24px;
+        margin-top: 20px;
+      }
+      .honest p {
+        margin: 0 0 12px;
+        color: var(--dim);
+        font-size: 15px;
+      }
+      .honest p:last-child {
+        margin-bottom: 0;
+      }
+      .honest strong {
+        color: var(--text);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        color: var(--faint);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      td:first-child {
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .scroller {
+        overflow-x: auto;
+      }
+
+      footer {
+        padding: 48px 0 64px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      footer a {
+        color: var(--dim);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap hero__inner">
+        <span class="eyebrow">Free · No account · Works offline</span>
+        <h1>A tracker that does not lie to you about your own data.</h1>
+        <p class="lede">
+          Steady follows your habits, training, sleep and recovery, and keeps every bit of it on
+          your phone. No sign-up, no server, nothing uploaded. When it does not know something, it
+          says so rather than filling the gap with a number that looks convincing.
+        </p>
+        <div class="cta">
+          <a class="btn btn--go" href="../preview-public.html">Open the app</a>
+          <a class="btn" href="https://github.com/DODOTHEDOOM/abdquest">See the code</a>
+        </div>
+        <p class="note">
+          Add it to your home screen and it behaves like any other app, including with no signal.
+        </p>
+      </div>
+    </header>
+
+    <section>
+      <div class="wrap">
+        <h2>What it actually does</h2>
+        <p class="sub">
+          Six screens, no clutter, and every section can be switched off if you do not want it.
+        </p>
+        <div class="grid">
+          <div class="card">
+            <span class="ic">📊</span>
+            <h3>Today</h3>
+            <p>
+              Recovery, effort and sleep as three readable rings, with the reasoning behind each one
+              a tap away.
+            </p>
+          </div>
+          <div class="card">
+            <span class="ic">✅</span>
+            <h3>Habits</h3>
+            <p>
+              Your own habits, your own words. Streaks that do not break just because the day is not
+              over yet.
+            </p>
+          </div>
+          <div class="card">
+            <span class="ic">🏋️</span>
+            <h3>Training</h3>
+            <p>
+              Gym sets with real personal records, plus running, swimming, rope, football, padel,
+              climbing and anything else.
+            </p>
+          </div>
+          <div class="card">
+            <span class="ic">⚖️</span>
+            <h3>Body</h3>
+            <p>
+              Weight with a smoothed trend that survives a heavy morning, plus water, food and
+              sleep.
+            </p>
+          </div>
+          <div class="card">
+            <span class="ic">📈</span>
+            <h3>Progress</h3>
+            <p>
+              A weekly review that judges the days that have happened, badges you cannot fake, and a
+              journal.
+            </p>
+          </div>
+          <div class="card">
+            <span class="ic">🕌</span>
+            <h3>Prayers</h3>
+            <p>
+              Optional. The five daily prayers with times for your location and a ledger for missed
+              ones.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Where the numbers come from</h2>
+        <p class="sub">
+          Every score is an estimate built from published, citable method. None of it copies a
+          vendor's private algorithm, and none of it is medical advice.
+        </p>
+        <div class="scroller">
+          <table>
+            <thead>
+              <tr>
+                <th>Score</th>
+                <th>Method</th>
+                <th>What it uses</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Recovery</td>
+                <td>HRV-guided readiness, after Plews and Buchheit</td>
+                <td>Your own 30-day baselines for HRV and resting heart rate, plus sleep</td>
+              </tr>
+              <tr>
+                <td>Effort</td>
+                <td>Banister TRIMP</td>
+                <td>Time spent in each heart-rate zone against your heart-rate reserve</td>
+              </tr>
+              <tr>
+                <td>Fitness age</td>
+                <td>Nes and the HUNT study norms</td>
+                <td>Measured VO₂max, or the Jackson non-exercise estimate</td>
+              </tr>
+              <tr>
+                <td>Sleep need</td>
+                <td>Your own baseline plus accumulated debt</td>
+                <td>Nightly duration, capped so one bad week cannot distort it</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="honest">
+          <p>
+            <strong>A missing input is never counted as zero.</strong> If a component has no data
+            behind it, it is dropped and the rest are re-weighted, so a score is always built from
+            things that actually happened.
+          </p>
+          <p>
+            <strong>A day in progress is not a day you failed.</strong> The weekly review measures
+            the days that have happened, not a full seven, so Tuesday does not grade you as if you
+            had already lost the week.
+          </p>
+          <p>
+            <strong>A gap in a chart is a gap.</strong> A day you did not weigh yourself is not a
+            day you weighed nothing, and the chart will not draw a cliff that never happened.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Your data stays yours</h2>
+        <p class="sub">
+          There is no account because there is no server. Everything is stored in your browser, on
+          your device.
+        </p>
+        <div class="grid">
+          <div class="card">
+            <span class="ic">🔒</span>
+            <h3>Nothing is uploaded</h3>
+            <p>No analytics, no tracking, no third party receives anything you enter.</p>
+          </div>
+          <div class="card">
+            <span class="ic">💾</span>
+            <h3>Export whenever</h3>
+            <p>
+              One tap writes a JSON file you own. Restoring shows you what is in it before replacing
+              anything, and keeps an undo.
+            </p>
+          </div>
+          <div class="card">
+            <span class="ic">✈️</span>
+            <h3>Works with no signal</h3>
+            <p>
+              The whole app is one file. Nothing needs a connection except optional prayer times.
+            </p>
+          </div>
+        </div>
+        <p class="note">
+          The flip side of storing nothing on a server: clearing your browser data, or losing the
+          phone, loses your history. Export a backup now and then.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <p>
+          Steady is free and open source.
+          <a href="https://github.com/DODOTHEDOOM/abdquest">Read the code</a>, or take it and run
+          your own copy.
+        </p>
+        <p>
+          Not a medical device and not medical advice. Talk to a doctor about anything that matters.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
