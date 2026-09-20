@@ -282,3 +282,30 @@ describe("fitness age", () => {
     expect(activityRating(active, "2026-02-01")).toBe(7);
   });
 });
+
+describe("fitness age refuses to guess", () => {
+  const day = { date: "2026-03-04", vo2max: 45.3 };
+
+  it("reports nothing when sex is unknown, because the norms are sex-specific", () => {
+    // Averaging the male and female curves produces a median for a person who
+    // does not exist, and the number looks just as confident as a real one.
+    const r = fitnessAge(day, [day], { age: 22 });
+    expect(r.fitnessAge).toBeNull();
+    expect(r.label).toContain("sex");
+    // The VO2max itself is still real and still reported.
+    expect(r.vo2max).toBe(45.3);
+  });
+
+  it("reports a fitness age once sex is known", () => {
+    const r = fitnessAge(day, [day], { age: 22, sex: "male" });
+    expect(r.fitnessAge).not.toBeNull();
+    expect(r.delta).toBe((r.fitnessAge as number) - 22);
+  });
+
+  it("still asks for an age before claiming you are younger or older", () => {
+    const r = fitnessAge(day, [day], { sex: "male" });
+    expect(r.fitnessAge).not.toBeNull();
+    expect(r.delta).toBeNull();
+    expect(r.label).toContain("age");
+  });
+});

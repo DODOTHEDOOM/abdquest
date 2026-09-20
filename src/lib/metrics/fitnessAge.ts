@@ -32,14 +32,18 @@ const NORMS = {
   female: { intercept: 47.1, slope: 0.294 },
 };
 
+/**
+ * Null when sex is unknown, and deliberately so.
+ *
+ * The HUNT norms are reported separately for men and women because the curves
+ * genuinely differ. Averaging them produces a median for a person who does not
+ * exist, and a fitness age computed off that blend is a confident number with
+ * nothing real behind it. Better to ask than to invent.
+ */
 function normsFor(sex: Profile["sex"]) {
   if (sex === "male") return NORMS.male;
   if (sex === "female") return NORMS.female;
-  // Unspecified: average the two curves.
-  return {
-    intercept: (NORMS.male.intercept + NORMS.female.intercept) / 2,
-    slope: (NORMS.male.slope + NORMS.female.slope) / 2,
-  };
+  return null;
 }
 
 /**
@@ -134,7 +138,17 @@ export function fitnessAge(
       label: "Needs VO₂max or your height, weight and age",
     };
   }
-  const { intercept, slope } = normsFor(profile.sex);
+  const norms = normsFor(profile.sex);
+  if (!norms) {
+    return {
+      fitnessAge: null,
+      delta: null,
+      vo2max: v.vo2max,
+      vo2Source: v.source,
+      label: "Add your sex in You — the norms differ for men and women",
+    };
+  }
+  const { intercept, slope } = norms;
   const raw = (intercept - v.vo2max) / slope;
   const fa = Math.round(clamp(raw, 18, 80));
   const delta = profile.age ? fa - profile.age : null;
