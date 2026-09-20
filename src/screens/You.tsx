@@ -2,6 +2,7 @@ import { Card, Field, SectionHeader, TextInput } from "../design/primitives";
 import { ThemePicker } from "../design/ThemePicker";
 import type { Theme } from "../design/themes";
 import { HealthConnection } from "../health/HealthConnection";
+import { DataPanel } from "./DataPanel";
 import { useStore } from "../state/store";
 
 export function You({
@@ -152,6 +153,8 @@ export function You({
 
       <SectionHeader title="Connections" />
       <HealthConnection />
+
+      <DataPanel />
 
       <SectionHeader title="About" />
       <Card>

@@ -5,9 +5,10 @@
  * fresh. The v2 blob is only ever read.
  */
 
-import { createContext, useContext, useEffect, useReducer, useState } from "react";
+import { createContext, useContext, useEffect, useReducer, useRef, useState } from "react";
 import type { DailyHealth } from "../lib/metrics/types";
 import type { Session } from "../lib/training";
+import { readRollingBackup, saveRollingBackup } from "../lib/backup";
 import { looksLikeV2, migrateV2 } from "./migrate";
 import {
   emptyState,
@@ -249,7 +250,7 @@ export function reducer(state: AppState, action: Action): AppState {
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
-export type StateSource = "v3" | "v2" | "new";
+export type StateSource = "v3" | "v3-backup" | "v2" | "new";
 
 export function loadState(): { state: AppState; source: StateSource } {
   try {
@@ -259,6 +260,15 @@ export function loadState(): { state: AppState; source: StateSource } {
       if (parsed && parsed.version === 3)
         return { state: { ...emptyState(), ...parsed }, source: "v3" };
     }
+  } catch {
+    /* fall through to the legacy blob */
+  }
+
+  // The main slot was unreadable. Before falling back to the old app's data and
+  // losing everything since the migration, try the rolling copy.
+  try {
+    const backup = readRollingBackup();
+    if (backup) return { state: { ...emptyState(), ...backup }, source: "v3-backup" };
   } catch {
     /* fall through to the legacy blob */
   }
@@ -306,13 +316,23 @@ export function useStore(): Store {
 }
 
 /** Hook that owns the state; StoreProvider renders the context around it. */
+/** How often the second copy is refreshed. Every save would double the writes. */
+const ROLLING_BACKUP_EVERY_MS = 60_000;
+
 export function useCreateStore(): Store {
   const [{ state: initial, source }] = useState(loadState);
   const [state, dispatch] = useReducer(reducer, initial);
   const [saveFailed, setSaveFailed] = useState(false);
+  const lastBackup = useRef(0);
 
   useEffect(() => {
-    setSaveFailed(!saveState(state));
+    const ok = saveState(state);
+    setSaveFailed(!ok);
+    // A second copy, so a single corrupted write cannot take the lot.
+    if (ok && Date.now() - lastBackup.current > ROLLING_BACKUP_EVERY_MS) {
+      lastBackup.current = Date.now();
+      saveRollingBackup(state);
+    }
   }, [state]);
 
   return { state, dispatch, saveFailed, source };

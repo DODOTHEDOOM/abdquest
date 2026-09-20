@@ -20,6 +20,7 @@ import {
   type AppState,
 } from "../src/state/schema";
 import type { GymSession, Session } from "../src/lib/training";
+import { saveRollingBackup } from "../src/lib/backup";
 
 beforeEach(() => localStorage.clear());
 
@@ -72,6 +73,18 @@ describe("loading", () => {
     loadState();
     saveState(oneHabitState());
     expect(localStorage.getItem(LEGACY_KEY)).toBe(raw);
+  });
+
+  it("falls back to the rolling backup before reaching for the old app's data", () => {
+    // The nightmare: the main slot is damaged. Everything since the migration
+    // lives only in the second copy, so that must be tried before v2.
+    localStorage.setItem(STORAGE_KEY, "{corrupted");
+    localStorage.setItem(LEGACY_KEY, JSON.stringify(V2_BLOB));
+    saveRollingBackup({ ...emptyState(), xp: 9999 });
+
+    const { state, source } = loadState();
+    expect(source).toBe("v3-backup");
+    expect(state.xp).toBe(9999);
   });
 
   it("falls back rather than throwing on corrupt stored data", () => {
