@@ -17,6 +17,7 @@ import {
   STORAGE_KEY,
   type AppState,
   PRAYERS,
+  type Habit,
   type Note,
   type Place,
   type Profile,
@@ -70,6 +71,10 @@ export type Action =
   | { type: "addWater"; date: string; ml: number }
   | { type: "addCalories"; date: string; kcal: number; protein?: number }
   | { type: "setNote"; date: string; note: Note }
+  | { type: "addHabit"; habit: Habit }
+  | { type: "updateHabit"; id: string; patch: Partial<Habit> }
+  | { type: "removeHabit"; id: string }
+  | { type: "setHabits"; habits: Habit[] }
   | { type: "togglePrayer"; date: string; prayerId: string }
   | { type: "payPrayerDebt"; prayerId: string; count: number }
   | { type: "setPrayerDebt"; prayerId: string; count: number }
@@ -158,6 +163,28 @@ export function reducer(state: AppState, action: Action): AppState {
       else notes[action.date] = { ...action.note, text: action.note.text.trim() };
       return { ...state, notes };
     }
+
+    case "addHabit": {
+      if (state.habits.some((h) => h.id === action.habit.id)) return state;
+      return { ...state, habits: [...state.habits, action.habit] };
+    }
+
+    case "updateHabit":
+      return {
+        ...state,
+        habits: state.habits.map((h) => (h.id === action.id ? { ...h, ...action.patch } : h)),
+      };
+
+    case "removeHabit": {
+      // The habit stops being tracked, but every day it was ticked stays in
+      // `done`. History is never rewritten because a habit was retired.
+      const habits = state.habits.filter((h) => h.id !== action.id);
+      if (habits.length === state.habits.length) return state;
+      return { ...state, habits };
+    }
+
+    case "setHabits":
+      return { ...state, habits: action.habits };
 
     case "togglePrayer": {
       const day = { ...(state.prayers.done[action.date] ?? {}) };

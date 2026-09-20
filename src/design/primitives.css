@@ -944,3 +944,64 @@ button.motiv:active {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Onboarding ──────────────────────────────────────────────────────────── */
+.onboard {
+  min-height: 100dvh;
+  padding: max(28px, env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.onboard__bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 26px;
+}
+.onboard__seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  transition: background 0.3s ease;
+}
+.onboard__seg.is-on {
+  background: var(--accent);
+}
+.onboard__title {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+.onboard__step {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+.onboard__lede {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+  margin: 0 0 18px;
+}
+.onboard__actions {
+  margin-top: auto;
+  padding-top: 24px;
+}
+.onboard__link {
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  padding: 10px 4px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.onboard__link:hover {
+  color: var(--text);
+}

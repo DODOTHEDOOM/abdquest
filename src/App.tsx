@@ -8,6 +8,7 @@ import { ymd } from "./lib/dates";
 import { Body } from "./screens/Body";
 import { Dashboard } from "./screens/Dashboard";
 import { Habits } from "./screens/Habits";
+import { Onboarding } from "./screens/Onboarding";
 import { Progress } from "./screens/Progress";
 import { Training } from "./screens/Training";
 import { You } from "./screens/You";
@@ -40,6 +41,7 @@ export function App() {
 
   const today = ymd(new Date());
   const level = levelProgress(state.xp);
+
   const doneToday = habitsDoneOn(state, today);
 
   useEffect(() => {
@@ -67,6 +69,12 @@ export function App() {
     dispatch({ type: "setTheme", themeId: t.id });
     setToast(locked ? `Previewing ${t.name} — unlocks at Level ${t.unlockLevel}` : `${t.name} on`);
   };
+
+  // Setup runs first for anyone arriving with no data. This sits AFTER every
+  // hook above on purpose: returning early from the middle of a component
+  // changes the number of hooks React sees between renders, and finishing
+  // onboarding then crashes the app with "rendered more hooks than expected".
+  if (!state.onboarded) return <Onboarding onDone={() => setTab("today")} />;
 
   return (
     <>

@@ -352,6 +352,31 @@ describe("reducer", () => {
     expect(s.notes["2026-03-04"]).toEqual({ text: "", mood: "tired" });
   });
 
+  it("adds a habit, edits it, and refuses a duplicate id", () => {
+    let s = act(oneHabitState(), { type: "addHabit", habit: { id: "h2", name: "Read" } });
+    expect(s.habits.map((h) => h.id)).toEqual(["h1", "h2"]);
+
+    const again = act(s, { type: "addHabit", habit: { id: "h2", name: "Something else" } });
+    expect(again).toBe(s);
+
+    s = act(s, { type: "updateHabit", id: "h2", patch: { name: "Read 20 min", bonus: true } });
+    expect(s.habits[1]).toEqual({ id: "h2", name: "Read 20 min", bonus: true });
+  });
+
+  it("removing a habit never rewrites the days it was already ticked", () => {
+    const start: AppState = {
+      ...oneHabitState({ "2026-03-04": { h1: true, h2: true } }),
+      habits: [
+        { id: "h1", name: "Move" },
+        { id: "h2", name: "Read" },
+      ],
+    };
+    const s = act(start, { type: "removeHabit", id: "h2" });
+    expect(s.habits.map((h) => h.id)).toEqual(["h1"]);
+    // The history is untouched: h2 is still recorded as done that day.
+    expect(s.done["2026-03-04"]).toEqual({ h1: true, h2: true });
+  });
+
   it("stores profile patches, theme, onboarding and notes", () => {
     let s = act(oneHabitState(), { type: "setProfile", patch: { age: 22 } });
     s = act(s, { type: "setProfile", patch: { heightCm: 178 } });

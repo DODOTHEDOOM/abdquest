@@ -4,6 +4,7 @@ import { BarStrip, tick } from "../design/charts";
 import { ymd } from "../lib/dates";
 import { isPerfectDay, type AppState, type Habit } from "../state/schema";
 import { useStore } from "../state/store";
+import { HabitEditor } from "./HabitEditor";
 import { Prayers } from "./Prayers";
 
 function shift(dateKey: string, days: number): string {
@@ -35,6 +36,7 @@ function streakFor(state: AppState, habitId: string, today: string): number {
 }
 
 function HabitsList() {
+  const [editing, setEditing] = useState(false);
   const { state, dispatch } = useStore();
   const today = ymd(new Date());
   const [open, setOpen] = useState<Habit | null>(null);
@@ -56,6 +58,15 @@ function HabitsList() {
     [state, today],
   );
 
+  if (editing) {
+    return (
+      <>
+        <SectionHeader title="Your habits" />
+        <HabitEditor onClose={() => setEditing(false)} />
+      </>
+    );
+  }
+
   if (!state.habits.length) {
     return (
       <Card>
@@ -68,7 +79,7 @@ function HabitsList() {
 
   return (
     <>
-      <SectionHeader title="Today" />
+      <SectionHeader title="Today" action="Edit habits" onAction={() => setEditing(true)} />
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <span style={{ fontSize: 26, fontWeight: 800 }}>
