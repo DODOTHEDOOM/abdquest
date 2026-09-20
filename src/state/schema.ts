@@ -103,6 +103,11 @@ export interface AppState {
   modules: { prayers: boolean };
   prayers: PrayerState;
   place?: Place;
+  /**
+   * True when this is generated example data rather than the user's own.
+   * Every screen that can show it says so, and it can be cleared in one tap.
+   */
+  isSample?: boolean;
   /** Where this state came from, for the one-time "your data moved across" notice. */
   migratedFrom?: "v2" | null;
 }

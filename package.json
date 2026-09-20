@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Abd's Quest — personal RPG habit / prayer / fitness tracker",
+  "description": "Abd's Quest \u2014 personal RPG habit / prayer / fitness tracker",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:public": "vite build --mode public",
+    "build:all": "npm run build && npm run build:public"
   },
   "dependencies": {
     "react": "18.3.1",

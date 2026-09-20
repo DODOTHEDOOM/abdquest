@@ -8,6 +8,7 @@
 import { createContext, useContext, useEffect, useReducer, useRef, useState } from "react";
 import type { DailyHealth } from "../lib/metrics/types";
 import type { Session } from "../lib/training";
+import { EDITION } from "../edition";
 import { readRollingBackup, saveRollingBackup } from "../lib/backup";
 import { looksLikeV2, migrateV2 } from "./migrate";
 import {
@@ -301,7 +302,8 @@ export function loadState(): { state: AppState; source: StateSource } {
   }
 
   try {
-    const legacy = localStorage.getItem(LEGACY_KEY);
+    // There is no old app on a public user's device, so never go looking.
+    const legacy = EDITION.migrateLegacy ? localStorage.getItem(LEGACY_KEY) : null;
     if (legacy) {
       const parsed = JSON.parse(legacy);
       if (looksLikeV2(parsed)) return { state: migrateV2(parsed), source: "v2" };

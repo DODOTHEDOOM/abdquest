@@ -11,6 +11,9 @@
 import { useState } from "react";
 import { tick } from "../design/charts";
 import { Button, Card, Field, TextInput } from "../design/primitives";
+import { EDITION } from "../edition";
+import { ymd } from "../lib/dates";
+import { sampleState } from "../lib/sampleData";
 import { DEFAULT_HABITS, type Habit } from "../state/schema";
 import { useStore } from "../state/store";
 
@@ -122,10 +125,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
       {step === 0 && (
         <>
-          <h1 className="onboard__title">Abd&rsquo;s Quest</h1>
+          <h1 className="onboard__title">{EDITION.name}</h1>
           <p className="onboard__lede">
-            A habit and health tracker that keeps everything on your phone, works with no signal,
-            and never shows you a number it cannot actually justify.
+            {EDITION.tagline} Everything stays on this device, it works with no signal, and it never
+            shows you a number it cannot actually justify.
           </p>
           <Card>
             <Field label="What should it call you?" hint="Optional. It is only used to say hello.">
@@ -137,6 +140,31 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               />
             </Field>
           </Card>
+
+          {EDITION.offerSampleData && (
+            <Card>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Not sure yet?</div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-dim)",
+                  lineHeight: 1.6,
+                  margin: "6px 0 12px",
+                }}
+              >
+                Fill it with two months of example data and look around properly. It is clearly
+                labelled throughout and you can clear it in one tap.
+              </div>
+              <Button
+                onClick={() => {
+                  dispatch({ type: "replace", state: sampleState(ymd(new Date())) });
+                  onDone();
+                }}
+              >
+                Show me an example
+              </Button>
+            </Card>
+          )}
         </>
       )}
 

@@ -12,7 +12,7 @@ import { Onboarding } from "./screens/Onboarding";
 import { Progress } from "./screens/Progress";
 import { Training } from "./screens/Training";
 import { You } from "./screens/You";
-import { habitsDoneOn, levelProgress } from "./state/schema";
+import { emptyState, habitsDoneOn, levelProgress } from "./state/schema";
 import { useStore } from "./state/store";
 
 type Tab = "today" | "habits" | "training" | "body" | "progress" | "you";
@@ -80,22 +80,29 @@ export function App() {
     <>
       <Ambient />
 
+      {state.isSample && (
+        <div className="samplebar">
+          <span>You are looking at example data, not your own.</span>
+          <button
+            onClick={() => {
+              dispatch({ type: "replace", state: { ...emptyState(), onboarded: false } });
+              setTab("today");
+            }}
+          >
+            Clear it
+          </button>
+        </div>
+      )}
+
       {saveFailed && (
         <div className="savefail">
           Could not save — this device may be out of storage. Export a backup from the You tab.
         </div>
       )}
 
-      <div style={{ position: "relative", zIndex: 1, minHeight: "100vh", paddingBottom: 124 }}>
-        <div style={{ maxWidth: 560, margin: "0 auto", padding: "22px 16px" }}>
-          <header
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              marginBottom: 24,
-            }}
-          >
+      <div className="shell">
+        <div className="shell__inner">
+          <header className="shell__header">
             <div>
               <div style={{ fontSize: 12, color: "var(--text-dim)", fontWeight: 600 }}>
                 {new Date().toLocaleDateString(undefined, {

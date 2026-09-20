@@ -1,6 +1,8 @@
 import { Card, Field, SectionHeader, TextInput } from "../design/primitives";
 import { ThemePicker } from "../design/ThemePicker";
 import type { Theme } from "../design/themes";
+import { useState } from "react";
+import { EDITION } from "../edition";
 import { HealthConnection } from "../health/HealthConnection";
 import { DataPanel } from "./DataPanel";
 import { useStore } from "../state/store";
@@ -16,6 +18,7 @@ export function You({
 }) {
   const { state, dispatch } = useStore();
   const profile = state.profile;
+  const [showHealth, setShowHealth] = useState(false);
 
   return (
     <>
@@ -152,7 +155,30 @@ export function You({
       </Card>
 
       <SectionHeader title="Connections" />
-      <HealthConnection />
+      {EDITION.healthProminent ? (
+        <HealthConnection />
+      ) : (
+        <Card>
+          <button
+            className="onboard__link"
+            style={{ padding: 0, minHeight: 0 }}
+            onClick={() => setShowHealth((v) => !v)}
+          >
+            {showHealth ? "Hide advanced" : "Connect a wearable (advanced)"}
+          </button>
+          {!showHealth && (
+            <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6, marginTop: 8 }}>
+              Syncing from Google Health needs your own Google Cloud project and API credentials. It
+              is genuinely fiddly, and everything in the app works without it.
+            </div>
+          )}
+          {showHealth && (
+            <div style={{ marginTop: 12 }}>
+              <HealthConnection />
+            </div>
+          )}
+        </Card>
+      )}
 
       <DataPanel />
 
