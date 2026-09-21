@@ -20,6 +20,7 @@ import {
   type DatedValue,
 } from "../lib/body";
 import { fmtHrs } from "../lib/metrics/recovery";
+import type { SleepStages } from "../lib/metrics/types";
 import { useStore } from "../state/store";
 import { useToday } from "../state/useToday";
 
@@ -32,6 +33,54 @@ function signed(n: number, unit: string, decimals = 1): string {
 function parsed(raw: string, min: number, max: number): number | undefined {
   const n = Number(raw);
   return raw.trim() && isFinite(n) && n >= min && n <= max ? n : undefined;
+}
+
+/** Minutes per stage as one proportional bar, in the order sleep moves through. */
+const STAGE_ORDER = [
+  { key: "deep", label: "Deep", color: "var(--m-fitness)" },
+  { key: "rem", label: "REM", color: "var(--m-sleep)" },
+  { key: "light", label: "Light", color: "var(--m-recovery)" },
+  { key: "restless", label: "Restless", color: "var(--m-strain)" },
+  { key: "awake", label: "Awake", color: "var(--text-faint)" },
+] as const;
+
+function SleepStageBar({ stages }: { stages: SleepStages }) {
+  const parts = STAGE_ORDER.map((s) => ({ ...s, mins: stages[s.key] ?? 0 })).filter(
+    (s) => s.mins > 0,
+  );
+  const total = parts.reduce((a, b) => a + b.mins, 0);
+  if (!total) return null;
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div
+        style={{ display: "flex", height: 12, borderRadius: 999, overflow: "hidden", gap: 2 }}
+        role="img"
+        aria-label={parts.map((p) => `${p.label} ${p.mins} minutes`).join(", ")}
+      >
+        {parts.map((p) => (
+          <span key={p.key} style={{ flex: p.mins, background: p.color }} />
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10 }}>
+        {parts.map((p) => (
+          <span
+            key={p.key}
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}
+          >
+            <span
+              aria-hidden
+              style={{ width: 8, height: 8, borderRadius: 3, background: p.color }}
+            />
+            <span style={{ color: "var(--text-dim)" }}>{p.label}</span>
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>
+              {Math.floor(p.mins / 60)}h {String(p.mins % 60).padStart(2, "0")}m
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function Body() {
@@ -88,6 +137,15 @@ export function Body() {
   const sleepSeries = useMemo(() => seriesFor(sleepVals, today, 14), [sleepVals, today]);
   const sleepAvg = averageOf(sleepSeries);
   const lastNight = sleepVals.find((e) => e.date === today)?.value ?? null;
+  // Last night's breakdown if the watch recorded one, else the most recent.
+  const lastStages = useMemo(() => {
+    const dates = Object.keys(state.health).sort().reverse();
+    for (const d of dates) {
+      const st = state.health[d]?.sleepStages;
+      if (st && Object.keys(st).length) return st;
+    }
+    return null;
+  }, [state.health]);
 
   const addWater = (ml: number) => {
     tick();
@@ -334,6 +392,8 @@ export function Body() {
             {sleepAvg !== null ? `${fmtHrs(sleepAvg)} average` : "no nights yet"}
           </div>
         </div>
+        {lastStages && <SleepStageBar stages={lastStages} />}
+
         {sleepSeries.some((x) => x !== null) && (
           <div style={{ marginTop: 14 }}>
             <BarStrip

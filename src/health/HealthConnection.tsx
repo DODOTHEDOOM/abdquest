@@ -94,6 +94,36 @@ export function HealthConnection() {
             </Button>
           </div>
 
+          {/* History. Recovery is meaningless until the baselines have a month
+              behind them, and a normal sync only ever fetches two days. */}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Fill in your history</div>
+            <div style={{ ...dim, margin: "6px 0 10px", fontSize: 11.5 }}>
+              Recovery compares today against your own 30-day baseline, and a normal sync only
+              fetches today and yesterday. Run this once after connecting, or after changing phone.
+              It takes a couple of minutes and you can stop it at any point.
+            </div>
+            {sync.progress.running ? (
+              <>
+                <div style={{ fontSize: 12, marginBottom: 8 }}>
+                  Day {sync.progress.done} of {sync.progress.total}
+                  {sync.progress.filled > 0 && ` · ${sync.progress.filled} with readings`}
+                </div>
+                <Button sm onClick={sync.cancelBackfill}>
+                  Stop
+                </Button>
+              </>
+            ) : (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {[30, 90].map((d) => (
+                  <Button key={d} sm disabled={sync.busy} onClick={() => sync.backfill(d)}>
+                    Last {d} days
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {showDiag && sync.diag && (
             <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
               {sync.diag.map((day) => (

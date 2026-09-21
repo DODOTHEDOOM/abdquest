@@ -13,6 +13,15 @@ export interface HourHR {
   max: number;
 }
 
+/** Minutes per sleep stage. A device that does not track stages reports none. */
+export interface SleepStages {
+  deep?: number;
+  rem?: number;
+  light?: number;
+  awake?: number;
+  restless?: number;
+}
+
 /** A single day of health data, as stored in `fbDaily[date]` + the day logs. */
 export interface DailyHealth {
   date: string; // YYYY-MM-DD (local)
@@ -29,6 +38,8 @@ export interface DailyHealth {
   sleepHrs?: number;
   sleepStart?: string | null; // "HH:MM" local
   sleepEnd?: string | null; // "HH:MM" local
+  /** Minutes in each stage, as the device reported them. Any subset may exist. */
+  sleepStages?: SleepStages | null;
   steps?: number;
   azm?: number; // active zone minutes
   calOut?: number;

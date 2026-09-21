@@ -53,6 +53,14 @@ export interface DayDiagnostics {
   entries: Record<string, string>;
 }
 
+export interface BackfillProgress {
+  running: boolean;
+  done: number;
+  total: number;
+  /** Days that came back with at least one reading. */
+  filled: number;
+}
+
 export interface HealthSync {
   connected: boolean;
   busy: boolean;
@@ -64,6 +72,10 @@ export interface HealthSync {
   syncNow: () => void;
   forget: () => void;
   refresh: () => void;
+  /** Fetch history so the 30-day baselines have something to work from. */
+  backfill: (days: number) => void;
+  cancelBackfill: () => void;
+  progress: BackfillProgress;
 }
 
 export function useHealthSync(): HealthSync {
@@ -74,6 +86,13 @@ export function useHealthSync(): HealthSync {
   const [status, setStatus] = useState<string | null>(null);
   const [diag, setDiag] = useState<DayDiagnostics[] | null>(null);
   const running = useRef(false);
+  const cancelled = useRef(false);
+  const [progress, setProgress] = useState<BackfillProgress>({
+    running: false,
+    done: 0,
+    total: 0,
+    filled: 0,
+  });
 
   const apply = useCallback(
     (date: string, raw: RawDay | null) => {
@@ -172,12 +191,69 @@ export function useHealthSync(): HealthSync {
     };
   }, [run]);
 
+  /**
+   * Walk backwards a day at a time, filling in history.
+   *
+   * Recovery compares today against your own 30-day baseline, so a fresh
+   * install or a new phone shows "no data yet" for a month before any of it
+   * means anything. This is the fix, and it only needs running once.
+   *
+   * Days are fetched one at a time rather than in parallel: this is roughly
+   * eleven requests per day and firing hundreds at once is how you get rate
+   * limited. Historical days skip the hourly detail, which is the expensive part
+   * and is not used for baselines anyway.
+   */
+  const backfill = useCallback(
+    async (days: number) => {
+      if (running.current) return;
+      if (!isConnected()) {
+        setStatus("Connect first, then history can be filled in.");
+        return;
+      }
+      running.current = true;
+      cancelled.current = false;
+      setBusy(true);
+      setProgress({ running: true, done: 0, total: days, filled: 0 });
+
+      let filled = 0;
+      try {
+        // Start at yesterday: today is handled by the ordinary sync.
+        for (let i = 1; i <= days; i++) {
+          if (cancelled.current) break;
+          const date = dayKey(-i);
+          const raw = await fetchDay(date, false);
+          if (apply(date, raw)) filled++;
+          setProgress({ running: true, done: i, total: days, filled });
+          // Be polite to the API between days.
+          await new Promise((r) => setTimeout(r, 120));
+        }
+        setStatus(
+          cancelled.current
+            ? `Stopped. ${filled} day${filled === 1 ? "" : "s"} filled in.`
+            : `History filled in: ${filled} of ${days} days had readings.`,
+        );
+      } catch (e) {
+        setStatus(`History failed: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        running.current = false;
+        setBusy(false);
+        setProgress((p) => ({ ...p, running: false }));
+      }
+    },
+    [apply],
+  );
+
   return {
     connected,
     busy,
     lastSync,
     status,
     diag,
+    backfill: (days: number) => void backfill(days),
+    cancelBackfill: () => {
+      cancelled.current = true;
+    },
+    progress,
     syncNow: () => void run(true),
     forget: () => {
       ghDisconnect();

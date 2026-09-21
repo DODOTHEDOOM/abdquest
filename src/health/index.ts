@@ -6,7 +6,7 @@
  * and the mapping into v3 shapes — it adds no new API behaviour.
  */
 
-import type { DailyHealth, HourHR } from "../lib/metrics/types";
+import type { DailyHealth, HourHR, SleepStages } from "../lib/metrics/types";
 import { activityById, type Session } from "../lib/training";
 import {
   fbConnect,
@@ -170,8 +170,22 @@ export function toDailyHealth(dateKey: string, raw: RawDay): DailyHealth {
   put("sleepHrs", raw.sleepHrs);
   if (raw.sleepStart) d.sleepStart = raw.sleepStart;
   if (raw.sleepEnd) d.sleepEnd = raw.sleepEnd;
+  // The API returns a deep/REM/light/awake breakdown. It used to be dropped here.
+  const stages = cleanStages(raw.sleepStages);
+  if (stages) d.sleepStages = stages;
   if (raw.hrSeries && raw.hrSeries.some(Boolean)) d.hrSeries = raw.hrSeries;
   return d;
+}
+
+/** Only the stages that came back with a sensible number of minutes. */
+function cleanStages(raw: Record<string, number> | null | undefined): SleepStages | null {
+  if (!raw) return null;
+  const out: SleepStages = {};
+  for (const key of ["deep", "rem", "light", "awake", "restless"] as const) {
+    const v = raw[key];
+    if (typeof v === "number" && isFinite(v) && v > 0) out[key] = Math.round(v);
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /** The old app's name-to-activity guess, kept so imports land where they used to. */
