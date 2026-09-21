@@ -195,3 +195,102 @@ In rough priority order.
 3. **A service worker** for the new app, once you decide where it is deployed.
 4. **A real domain** if you want to publish the public edition properly. The
    landing page in `site/` is ready for it.
+
+---
+
+# Second round — 21 September 2026
+
+Everything from the "what's left" list, built. Same branch.
+
+## Installable apps, in their own directories
+
+| | |
+| --- | --- |
+| **Yours** | https://dodothedoom.github.io/abdquest/app/ |
+| **Public** | https://dodothedoom.github.io/abdquest/steady/ |
+
+These replace the preview links for real use: each carries its own service
+worker and manifest and can be added to the Home Screen. The preview URLs still
+work for a quick look.
+
+## Prayers
+
+**The day resets at Fajr again** (`27d9fd9`). `getLogicalDay` existed in the
+codebase but nothing ever called it, and it formatted in UTC so it was wrong on
+BST evenings anyway. The replacement is pure, local-time and tested at the
+boundary. It also fixed a latent bug: every screen computed the date once at
+render and kept it forever, so the app left open overnight carried on writing to
+the previous day.
+
+**Calculation method and Asr school are now settings.** Times were hardcoded to
+ISNA with no school at all, so anyone following Hanafi was being shown an Asr up
+to an hour early every day. The default stays ISNA so nothing moves without you
+choosing it. The times cache keys on the method and school, so changing it
+recomputes rather than serving the old answer.
+
+Also: on-time versus late per prayer using the real window (Fajr ends at
+sunrise, not Duhr), Jumu'ah on Fridays, the Hijri date, debt you can type in
+rather than tap up one at a time, and a location you can update when you travel.
+
+**Reminders** (`a032855` onward) are a calendar file, not notifications. A web
+app cannot fire a notification while it is closed, and there is no push server
+behind this one. Rather than shipping reminders that silently never arrive, it
+writes the next 30 days into an .ics file and your phone does the alarms
+natively, offline. Re-importing updates the same entries instead of duplicating
+them.
+
+## Health
+
+**A 30 or 90 day backfill.** A normal sync only ever fetched today and
+yesterday, but Recovery compares you against your own 30-day baseline, so a new
+phone meant a month of "no data yet". Walks backwards one day at a time rather
+than firing hundreds of requests at once, reports progress, and can be stopped.
+
+**Sleep stages are no longer thrown away.** The API returns deep, REM, light,
+awake and restless minutes and the mapping layer was keeping only the total.
+Now shown as a proportional bar on Body.
+
+## Offline
+
+A service worker, registered **only** from a page served as a directory index.
+That is the whole reason for the `/app/` and `/steady/` directories: two workers
+cannot share a scope, so registering from `/abdquest/preview.html` would have
+claimed `/abdquest/` and taken over `AbdQuest.html`, serving your live app from
+this app's cache.
+
+The manifest being served was also the old app's, with `start_url` pointing at
+`AbdQuest.html`, so installing the rebuilt app would have launched the old one.
+Each edition now emits its own.
+
+## A crash I introduced and then caught (`4365cb1`)
+
+Switching every screen to the shared day hook was done with a blind
+find-and-replace. In two files the expression sat inside a `useMemo` callback,
+so the replacement put a React hook inside another hook. Blank white screen,
+and it only reproduced on the fresh-migration path, which is the path your
+device takes.
+
+Neither TypeScript nor ESLint flags this. It was caught by walking the app in a
+browser, which is the argument for doing that every time.
+
+## Still not done
+
+**Heart-rate series.** Unchanged. Not the filter problem the others were: the
+unfiltered attempt already runs and returns no samples dated that day, most
+likely paging. I will not guess at data-fetching code I cannot test against your
+account.
+
+**Cloud sync.** Still the only real answer to "lost phone, lost history".
+
+**The switchover.** `AbdQuest.html` is still your daily app and is untouched.
+
+## Test on your phone
+
+1. Open `/app/`, check your data, then **Add to Home Screen** and reopen.
+2. Turn on airplane mode and reopen it. It should still load.
+3. Habits → Prayers → **Change**: set your real calculation method and Asr
+   school. Check the times against your mosque.
+4. Prayers → Reminders → **Add to my calendar**, then confirm the alarms appear.
+5. You → Connections → **Fill in your history**, last 30 days. Then check
+   Recovery on Today is a real number.
+6. Body: check the sleep stage bar appears once a night with stages has synced.
