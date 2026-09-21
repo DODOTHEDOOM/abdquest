@@ -21,6 +21,7 @@ import {
   prayerStreak,
   type PrayerTimes,
 } from "../lib/prayer";
+import { buildPrayerCalendar, calendarFilename, type DayTimes } from "../lib/calendar";
 import {
   ASR_SCHOOLS,
   DEFAULT_ASR_SCHOOL,
@@ -69,6 +70,9 @@ export function Prayers() {
   const [timesError, setTimesError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [debtEdit, setDebtEdit] = useState<Record<string, string>>({});
+  const [lead, setLead] = useState(10);
+  const [reminderState, setReminderState] = useState<string | null>(null);
+  const [buildingReminders, setBuildingReminders] = useState(false);
   const [nowMin, setNowMin] = useState(() => {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
@@ -137,6 +141,48 @@ export function Prayers() {
       );
   };
 
+  /**
+   * Prayer times for the next month as a calendar file.
+   *
+   * A web app cannot fire a notification while it is closed, and there is no
+   * push server behind this one, so rather than shipping reminders that
+   * silently never arrive, the phone's own calendar does the alarms.
+   */
+  const makeReminders = async () => {
+    if (!place) return;
+    setBuildingReminders(true);
+    setReminderState("Working out the next 30 days…");
+    try {
+      const days: DayTimes[] = [];
+      for (let i = 0; i < 30; i++) {
+        const date = shift(today, i);
+        const r = cachedTimes(date, place, calc) ?? (await fetchPrayerTimes(date, place, calc));
+        if (r) days.push({ date, times: r.times });
+      }
+      if (!days.length) {
+        setReminderState("Could not get the times. Try again when you have a connection.");
+        return;
+      }
+
+      const ics = buildPrayerCalendar(days, { minutesBefore: lead });
+      const blob = new Blob([ics], { type: "text/calendar" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = calendarFilename();
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setReminderState(`${days.length} days ready. Open the file to add them to your calendar.`);
+    } catch (e) {
+      setReminderState(`Could not build the file: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBuildingReminders(false);
+    }
+  };
+
   const toggle = (id: string) => {
     tick();
     // Unknown times mean on-time is left unrecorded, never recorded as late.
@@ -182,7 +228,12 @@ export function Prayers() {
           </div>
           {data?.hijri && (
             <div
-              style={{ ...dim, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}
+              style={{
+                ...dim,
+                marginTop: 12,
+                paddingTop: 10,
+                borderTop: "1px solid var(--border)",
+              }}
             >
               {data.hijri}
             </div>
@@ -304,8 +355,8 @@ export function Prayers() {
       />
       <Card>
         <div style={{ ...dim, marginBottom: 14 }}>
-          Prayers you owe, repaid by praying extras on top of the five. Tap Edit to set the count
-          in one go, then knock it down as you go.
+          Prayers you owe, repaid by praying extras on top of the five. Tap Edit to set the count in
+          one go, then knock it down as you go.
         </div>
         <div style={{ display: "grid", gap: 10 }}>
           {PRAYERS.map((p) => {
@@ -395,6 +446,52 @@ export function Prayers() {
         </div>
       </Card>
 
+      {/* Reminders */}
+      <SectionHeader title="Reminders" />
+      <Card>
+        <div style={dim}>
+          This app cannot buzz your phone on its own: a web app only runs while it is open, and
+          there is no server behind this one to push to. Instead it writes the next 30 days of times
+          into a calendar file, and your phone handles the alarms natively.
+        </div>
+        {place ? (
+          <>
+            <div style={{ marginTop: 14 }}>
+              <Field label="Alarm" hint="How long before each prayer.">
+                <select
+                  className="field__control"
+                  value={lead}
+                  onChange={(e) => setLead(Number(e.target.value))}
+                >
+                  <option value={0}>At the time</option>
+                  <option value={5}>5 minutes before</option>
+                  <option value={10}>10 minutes before</option>
+                  <option value={15}>15 minutes before</option>
+                  <option value={30}>30 minutes before</option>
+                </select>
+              </Field>
+            </div>
+            <Button
+              variant="primary"
+              style={{ marginTop: 12 }}
+              disabled={buildingReminders}
+              onClick={makeReminders}
+            >
+              {buildingReminders ? "Working…" : "Add to my calendar"}
+            </Button>
+            {reminderState && (
+              <div style={{ ...dim, marginTop: 10, color: "var(--text)" }}>{reminderState}</div>
+            )}
+            <div style={{ ...dim, marginTop: 10, fontSize: 11.5 }}>
+              Run this again every few weeks. Prayer times drift through the year, and re-importing
+              updates the same entries rather than duplicating them.
+            </div>
+          </>
+        ) : (
+          <div style={{ ...dim, marginTop: 10 }}>Set your location first.</div>
+        )}
+      </Card>
+
       {/* Settings */}
       <SectionHeader
         title="Prayer settings"
@@ -411,7 +508,9 @@ export function Prayers() {
               <select
                 className="field__control"
                 value={calc.method}
-                onChange={(e) => dispatch({ type: "setPrayerCalc", method: Number(e.target.value) })}
+                onChange={(e) =>
+                  dispatch({ type: "setPrayerCalc", method: Number(e.target.value) })
+                }
               >
                 {PRAYER_METHODS.map((m) => (
                   <option key={m.id} value={m.id}>
