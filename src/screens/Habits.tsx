@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { Badge, Card, ProgressBar, SectionHeader, Sheet, Tabs } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
-import { ymd } from "../lib/dates";
 import { isPerfectDay, type AppState, type Habit } from "../state/schema";
 import { useStore } from "../state/store";
 import { HabitEditor } from "./HabitEditor";
 import { Prayers } from "./Prayers";
+import { useToday } from "../state/useToday";
 
 function shift(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -38,7 +38,7 @@ function streakFor(state: AppState, habitId: string, today: string): number {
 function HabitsList() {
   const [editing, setEditing] = useState(false);
   const { state, dispatch } = useStore();
-  const today = ymd(new Date());
+  const today = useToday();
   const [open, setOpen] = useState<Habit | null>(null);
 
   const doneMap = state.done[today] ?? {};

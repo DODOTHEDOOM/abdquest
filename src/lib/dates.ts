@@ -27,7 +27,39 @@ export function ymd(d: Date): string {
 /** Legacy alias used throughout the old code as `wkYmd`. Same as `ymd`. */
 export const wkYmd = ymd;
 
-/** If the current time is before today's Fajr, the "logical day" is still yesterday. */
+/**
+ * The day the app should be recording against, which is not always the calendar
+ * day.
+ *
+ * The old app reset the day at Fajr rather than midnight: something logged at
+ * 2am belongs to the night you are still awake for, not to the morning you have
+ * not started. That is the behaviour people actually expect from a tracker with
+ * prayers in it, and it is carried across here.
+ *
+ * Local time throughout. The legacy version formatted with toISOString(), which
+ * is UTC, and produced the wrong key on British Summer Time evenings.
+ *
+ * Pure so it can be tested at arbitrary clock times: pass `now` rather than
+ * reading the clock inside.
+ */
+export function logicalDay(now: Date, fajrTime?: string | null): string {
+  if (!fajrTime) return ymd(now);
+  const m = /^(\d{1,2}):(\d{2})$/.exec(fajrTime.trim());
+  if (!m) return ymd(now);
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return ymd(now);
+
+  const minutesNow = now.getHours() * 60 + now.getMinutes();
+  if (minutesNow >= h * 60 + min) return ymd(now);
+
+  // Before Fajr: the previous day is still running.
+  const y = new Date(now);
+  y.setDate(y.getDate() - 1);
+  return ymd(y);
+}
+
+/** @deprecated Legacy UTC-based version. Use `logicalDay` instead. */
 export function getLogicalDay(fajrTime: string | null | undefined): string {
   if (!fajrTime) return legacyToday();
   const now = new Date();

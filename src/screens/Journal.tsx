@@ -9,8 +9,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { tick } from "../design/charts";
 import { Button, Card, SectionHeader, TextArea } from "../design/primitives";
-import { ymd } from "../lib/dates";
 import { useStore } from "../state/store";
+import { useToday } from "../state/useToday";
 
 export const MOODS = [
   { id: "strong", label: "Strong", icon: "💪" },
@@ -31,7 +31,7 @@ function prettyDate(key: string): string {
 
 export function Journal() {
   const { state, dispatch } = useStore();
-  const today = ymd(new Date());
+  const today = useToday();
   const saved = state.notes[today];
 
   const [text, setText] = useState(saved?.text ?? "");

@@ -8,6 +8,8 @@ import {
   nextPrayer,
   prayerConsistency,
   prayerStreak,
+  DEFAULT_CALC,
+  isOnTime,
 } from "../src/lib/prayer";
 
 beforeEach(() => localStorage.clear());
@@ -130,19 +132,47 @@ describe("fetchPrayerTimes", () => {
 
   it("maps the API names onto prayer ids and caches the result", async () => {
     const f = okFetch();
-    const r = await fetchPrayerTimes("2026-03-04", place, f as unknown as typeof fetch);
+    const r = await fetchPrayerTimes(
+      "2026-03-04",
+      place,
+      DEFAULT_CALC,
+      f as unknown as typeof fetch,
+    );
     expect(r?.times).toEqual(TIMES);
     expect(cachedTimes("2026-03-04", place)?.times).toEqual(TIMES);
 
     // A second call is served from cache without touching the network.
-    await fetchPrayerTimes("2026-03-04", place, f as unknown as typeof fetch);
+    await fetchPrayerTimes("2026-03-04", place, DEFAULT_CALC, f as unknown as typeof fetch);
     expect(f).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a cache entry from a different place", async () => {
     const f = okFetch();
-    await fetchPrayerTimes("2026-03-04", place, f as unknown as typeof fetch);
+    await fetchPrayerTimes("2026-03-04", place, DEFAULT_CALC, f as unknown as typeof fetch);
     expect(cachedTimes("2026-03-04", { lat: 51.5, lon: -0.12 })).toBeNull();
+  });
+
+  it("does not serve cached times computed with a different method", async () => {
+    const f = okFetch();
+    await fetchPrayerTimes("2026-03-04", place, DEFAULT_CALC, f as unknown as typeof fetch);
+    // Switching to Muslim World League must recompute, not reuse ISNA's answer.
+    expect(cachedTimes("2026-03-04", place, { method: 3, school: 0 })).toBeNull();
+    // And likewise for the Asr school.
+    expect(cachedTimes("2026-03-04", place, { method: 2, school: 1 })).toBeNull();
+    expect(cachedTimes("2026-03-04", place, DEFAULT_CALC)).not.toBeNull();
+  });
+
+  it("sends the chosen method and school to the API", async () => {
+    const f = okFetch();
+    await fetchPrayerTimes(
+      "2026-03-04",
+      place,
+      { method: 3, school: 1 },
+      f as unknown as typeof fetch,
+    );
+    const url = String((f as unknown as { mock: { calls: string[][] } }).mock.calls[0][0]);
+    expect(url).toContain("method=3");
+    expect(url).toContain("school=1");
   });
 
   it("returns null instead of throwing when offline", async () => {
@@ -150,14 +180,45 @@ describe("fetchPrayerTimes", () => {
       throw new Error("offline");
     });
     await expect(
-      fetchPrayerTimes("2026-03-04", place, dead as unknown as typeof fetch),
+      fetchPrayerTimes("2026-03-04", place, DEFAULT_CALC, dead as unknown as typeof fetch),
     ).resolves.toBeNull();
   });
 
   it("returns null on a bad response rather than inventing times", async () => {
     const bad = vi.fn(async () => ({ ok: false, json: async () => ({}) }) as unknown as Response);
     await expect(
-      fetchPrayerTimes("2026-03-04", place, bad as unknown as typeof fetch),
+      fetchPrayerTimes("2026-03-04", place, DEFAULT_CALC, bad as unknown as typeof fetch),
     ).resolves.toBeNull();
+  });
+});
+
+describe("isOnTime", () => {
+  const sunrise = "06:48";
+
+  it("counts a prayer inside its own window", () => {
+    expect(isOnTime("duhr", TIMES, 13 * 60 + 30, sunrise)).toBe(true);
+    expect(isOnTime("asr", TIMES, 17 * 60, sunrise)).toBe(true);
+  });
+
+  it("counts one prayed after the next has started as late", () => {
+    // Duhr prayed at 17:00, an hour after Asr began.
+    expect(isOnTime("duhr", TIMES, 17 * 60, sunrise)).toBe(false);
+  });
+
+  it("ends the Fajr window at sunrise, not at Duhr", () => {
+    expect(isOnTime("fajr", TIMES, 6 * 60, sunrise)).toBe(true);
+    expect(isOnTime("fajr", TIMES, 7 * 60, sunrise)).toBe(false);
+    // Without sunrise it can only fall back to the next prayer.
+    expect(isOnTime("fajr", TIMES, 7 * 60)).toBe(true);
+  });
+
+  it("treats the rest of the night after Isha as on time", () => {
+    expect(isOnTime("isha", TIMES, 23 * 60, sunrise)).toBe(true);
+  });
+
+  it("is null, not false, when the time is unknown", () => {
+    // Unknown must never be recorded as late.
+    expect(isOnTime("asr", {}, 17 * 60)).toBeNull();
+    expect(isOnTime("nonsense", TIMES, 17 * 60)).toBeNull();
   });
 });

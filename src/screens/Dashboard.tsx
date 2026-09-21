@@ -13,7 +13,6 @@ import {
 } from "../lib/training";
 import { BarStrip, Sparkline, ZoneBar, tick } from "../design/charts";
 import { MetricDetail, shortDate, type MetricSeriesPoint } from "../design/MetricDetail";
-import { ymd } from "../lib/dates";
 import { useStore } from "../state/store";
 import { habitsDoneOn, type AppState } from "../state/schema";
 import { fitnessAge } from "../lib/metrics/fitnessAge";
@@ -21,6 +20,7 @@ import { fmtHrs, recovery } from "../lib/metrics/recovery";
 import { sleep as sleepMetric } from "../lib/metrics/sleep";
 import { strain as strainMetric } from "../lib/metrics/strain";
 import type { DailyHealth } from "../lib/metrics/types";
+import { useToday } from "../state/useToday";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -96,7 +96,7 @@ export function Dashboard() {
   const profile = state.profile;
 
   const m = useMemo(() => {
-    const todayKey = ymd(new Date());
+    const todayKey = useToday();
     const all = Object.values(state.health).sort((a, b) => a.date.localeCompare(b.date));
     const today = all.find((d) => d.date === todayKey) ?? { date: todayKey };
     const history = all.filter((d) => d.date < todayKey);

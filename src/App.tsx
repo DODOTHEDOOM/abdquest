@@ -4,7 +4,6 @@ import { tick } from "./design/charts";
 import { Badge, NavBar, Sheet, Toast } from "./design/primitives";
 import { ThemePicker } from "./design/ThemePicker";
 import { applyTheme, themeById, type Theme } from "./design/themes";
-import { ymd } from "./lib/dates";
 import { Body } from "./screens/Body";
 import { Dashboard } from "./screens/Dashboard";
 import { Habits } from "./screens/Habits";
@@ -14,6 +13,7 @@ import { Training } from "./screens/Training";
 import { You } from "./screens/You";
 import { emptyState, habitsDoneOn, levelProgress } from "./state/schema";
 import { useStore } from "./state/store";
+import { useToday } from "./state/useToday";
 
 type Tab = "today" | "habits" | "training" | "body" | "progress" | "you";
 
@@ -39,7 +39,7 @@ export function App() {
   const [picker, setPicker] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const today = ymd(new Date());
+  const today = useToday();
   const level = levelProgress(state.xp);
 
   const doneToday = habitsDoneOn(state, today);

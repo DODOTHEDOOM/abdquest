@@ -232,7 +232,7 @@ function prayersFrom(v2: Record<string, unknown>): PrayerState {
     if (owed && owed > 0) debt[p.id] = Math.round(owed);
   }
 
-  return { done, debt };
+  return { done, debt, onTime: {}, fajrTime: str(v2.fajrTime) ?? null };
 }
 
 function notesFrom(v2: Record<string, unknown>): Record<string, Note> {

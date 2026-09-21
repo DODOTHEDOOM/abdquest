@@ -68,11 +68,51 @@ export const PRAYERS = [
 
 export type PrayerId = (typeof PRAYERS)[number]["id"];
 
+/**
+ * Aladhan calculation methods. Which one is correct is a matter of what your
+ * mosque follows, not of accuracy, so it is a setting rather than a constant.
+ * The angles below are what actually move Fajr and Isha.
+ */
+export const PRAYER_METHODS = [
+  { id: 3, name: "Muslim World League", detail: "Fajr 18°, Isha 17°. Common in the UK." },
+  { id: 2, name: "ISNA", detail: "Fajr 15°, Isha 15°. North America." },
+  { id: 4, name: "Umm al-Qura", detail: "Fajr 18.5°, Isha 90 min after Maghrib. Saudi Arabia." },
+  { id: 5, name: "Egyptian General Authority", detail: "Fajr 19.5°, Isha 17.5°." },
+  { id: 1, name: "Karachi", detail: "Fajr 18°, Isha 18°. South Asia." },
+  { id: 12, name: "Union des Organisations Islamiques de France", detail: "Fajr 12°, Isha 12°." },
+  { id: 13, name: "Diyanet", detail: "Turkey." },
+  { id: 15, name: "Moonsighting Committee", detail: "Seasonal adjustment for high latitudes." },
+] as const;
+
+/** Asr falls markedly later under the Hanafi position. */
+export const ASR_SCHOOLS = [
+  { id: 0, name: "Standard", detail: "Shafi’i, Maliki, Hanbali. Shadow length 1x." },
+  { id: 1, name: "Hanafi", detail: "Shadow length 2x, so Asr is noticeably later." },
+] as const;
+
+export const DEFAULT_PRAYER_METHOD = 2;
+export const DEFAULT_ASR_SCHOOL = 0;
+
 export interface PrayerState {
   /** date -> prayer id -> prayed. */
   done: Record<string, Record<string, boolean>>;
   /** Missed prayers still owed, per prayer. */
   debt: Record<string, number>;
+  /**
+   * date -> prayer id -> prayed within its window. Absent means not recorded,
+   * which is deliberately different from "recorded as late".
+   */
+  onTime?: Record<string, Record<string, boolean>>;
+  /**
+   * The most recent Fajr time seen, "HH:MM". Used to decide which day the app
+   * is recording against, since the day resets at Fajr rather than midnight.
+   * Fajr drifts a minute or two a day, so a slightly stale value is harmless.
+   */
+  fajrTime?: string | null;
+  /** Aladhan calculation method id. */
+  method?: number;
+  /** 0 standard, 1 Hanafi. */
+  school?: 0 | 1;
 }
 
 /** Where to compute prayer times for. Set once, from the device or by hand. */
@@ -162,7 +202,7 @@ export function emptyState(): AppState {
     water: [],
     notes: {},
     modules: { prayers: false },
-    prayers: { done: {}, debt: {} },
+    prayers: { done: {}, debt: {}, onTime: {}, fajrTime: null },
     migratedFrom: null,
   };
 }

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Badge, Button, Card, Field, SectionHeader, Sheet, TextInput } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
-import { ymd } from "../lib/dates";
 import { useStore } from "../state/store";
+import { useToday } from "../state/useToday";
 import {
   ACTIVITIES,
   activityById,
@@ -32,7 +32,7 @@ type SheetState =
   | { mode: "history"; exercise: Exercise };
 
 export function Training() {
-  const today = ymd(new Date());
+  const today = useToday();
   const { state, dispatch } = useStore();
   const sessions = state.sessions;
   const [sheet, setSheet] = useState<SheetState>(null);

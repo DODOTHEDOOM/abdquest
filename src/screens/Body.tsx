@@ -19,9 +19,9 @@ import {
   weightTrend,
   type DatedValue,
 } from "../lib/body";
-import { ymd } from "../lib/dates";
 import { fmtHrs } from "../lib/metrics/recovery";
 import { useStore } from "../state/store";
+import { useToday } from "../state/useToday";
 
 function signed(n: number, unit: string, decimals = 1): string {
   const r = Math.abs(n) < 0.05 ? 0 : n;
@@ -36,7 +36,7 @@ function parsed(raw: string, min: number, max: number): number | undefined {
 
 export function Body() {
   const { state, dispatch } = useStore();
-  const today = ymd(new Date());
+  const today = useToday();
   const p = state.profile;
 
   const [wt, setWt] = useState("");

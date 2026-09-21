@@ -112,7 +112,7 @@ describe("surviving a damaged file", () => {
     expect(r.ok).toBe(true);
     expect(r.state!.sessions).toEqual([]);
     expect(r.state!.done).toEqual({});
-    expect(r.state!.prayers).toEqual({ done: {}, debt: {} });
+    expect(r.state!.prayers).toEqual({ done: {}, debt: {}, onTime: {}, fajrTime: null });
     expect(r.state!.habits.length).toBeGreaterThan(0);
     expect(r.state!.xp).toBe(50);
   });
@@ -133,7 +133,7 @@ describe("surviving a damaged file", () => {
     expect(r.state!.sessions).toEqual([]);
     expect(r.state!.done).toEqual({});
     expect(r.state!.habits.length).toBeGreaterThan(0);
-    expect(r.state!.prayers).toEqual({ done: {}, debt: {} });
+    expect(r.state!.prayers).toEqual({ done: {}, debt: {}, onTime: {}, fajrTime: null });
   });
 
   it("never lets a negative or absurd xp through", () => {

@@ -76,7 +76,9 @@ export type Action =
   | { type: "updateHabit"; id: string; patch: Partial<Habit> }
   | { type: "removeHabit"; id: string }
   | { type: "setHabits"; habits: Habit[] }
-  | { type: "togglePrayer"; date: string; prayerId: string }
+  | { type: "togglePrayer"; date: string; prayerId: string; onTime?: boolean }
+  | { type: "setFajrTime"; time: string | null }
+  | { type: "setPrayerCalc"; method?: number; school?: 0 | 1 }
   | { type: "payPrayerDebt"; prayerId: string; count: number }
   | { type: "setPrayerDebt"; prayerId: string; count: number }
   | { type: "setModule"; key: "prayers"; on: boolean }
@@ -200,15 +202,38 @@ export function reducer(state: AppState, action: Action): AppState {
       if (countBefore < full && countAfter === full) xp += XP_ALL_PRAYERS;
       if (countBefore === full && countAfter < full) xp -= XP_ALL_PRAYERS;
 
+      // On-time is recorded alongside, and cleared when the prayer is undone so
+      // the two can never disagree about a prayer that is no longer marked.
+      const onTimeAll = { ...(state.prayers.onTime ?? {}) };
+      const onTimeDay = { ...(onTimeAll[action.date] ?? {}) };
+      if (was || action.onTime === undefined) delete onTimeDay[action.prayerId];
+      else onTimeDay[action.prayerId] = action.onTime;
+      onTimeAll[action.date] = onTimeDay;
+
       return {
         ...state,
         xp: Math.max(0, xp),
         prayers: {
           ...state.prayers,
           done: { ...state.prayers.done, [action.date]: day },
+          onTime: onTimeAll,
         },
       };
     }
+
+    case "setFajrTime":
+      if (state.prayers.fajrTime === action.time) return state;
+      return { ...state, prayers: { ...state.prayers, fajrTime: action.time } };
+
+    case "setPrayerCalc":
+      return {
+        ...state,
+        prayers: {
+          ...state.prayers,
+          ...(action.method !== undefined ? { method: action.method } : {}),
+          ...(action.school !== undefined ? { school: action.school } : {}),
+        },
+      };
 
     case "payPrayerDebt": {
       const owed = Math.max(0, state.prayers.debt[action.prayerId] ?? 0);

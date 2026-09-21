@@ -7,7 +7,6 @@
 
 import { useMemo } from "react";
 import { Badge as Chip, Card, ProgressBar, SectionHeader } from "../design/primitives";
-import { ymd } from "../lib/dates";
 import {
   badgesFor,
   dailyChallenges,
@@ -18,6 +17,7 @@ import {
 import { recentWeeks, weeklyReview } from "../lib/weeklyReview";
 import { libraryOf } from "../state/schema";
 import { useStore } from "../state/store";
+import { useToday } from "../state/useToday";
 
 function prettyWeek(weekStart: string): string {
   const [y, m, d] = weekStart.split("-").map(Number);
@@ -53,7 +53,7 @@ function ChallengeRow({ c }: { c: Challenge }) {
 
 export function Review() {
   const { state } = useStore();
-  const today = ymd(new Date());
+  const today = useToday();
 
   const review = useMemo(() => weeklyReview(state, today), [state, today]);
   const history = useMemo(() => recentWeeks(state, today, 8).slice(1), [state, today]);

@@ -8,7 +8,22 @@
  * never stop you recording that you prayed.
  */
 
-import { PRAYERS, type Place } from "../state/schema";
+import { DEFAULT_ASR_SCHOOL, DEFAULT_PRAYER_METHOD, PRAYERS, type Place } from "../state/schema";
+
+/**
+ * Which calculation the times were worked out with. Part of the cache identity:
+ * changing method or school changes the times, so cached entries computed under
+ * the old setting must not be served afterwards.
+ */
+export interface PrayerCalc {
+  method: number;
+  school: 0 | 1;
+}
+
+export const DEFAULT_CALC: PrayerCalc = {
+  method: DEFAULT_PRAYER_METHOD,
+  school: DEFAULT_ASR_SCHOOL,
+};
 
 export interface PrayerTimes {
   /** prayer id -> "HH:MM" local. */
@@ -17,6 +32,12 @@ export interface PrayerTimes {
   /** Where these were computed for, so a moved location can invalidate them. */
   lat: number;
   lon: number;
+  /** Sunrise, which ends the Fajr window. */
+  sunrise?: string;
+  /** e.g. "12 Rabi‘ al-awwal 1448", as the API formats it. */
+  hijri?: string;
+  method?: number;
+  school?: 0 | 1;
 }
 
 const CACHE_KEY = "abdquest_prayer_times";
@@ -54,14 +75,24 @@ export interface NextPrayer {
  * tomorrow's Fajr, so the card never goes blank late at night.
  */
 export function nextPrayer(times: Record<string, string>, nowMinutes: number): NextPrayer | null {
-  const list = PRAYERS.map((p) => ({ p, at: times[p.id], mins: minutesOf(times[p.id] ?? "") })).filter(
+  const list = PRAYERS.map((p) => ({
+    p,
+    at: times[p.id],
+    mins: minutesOf(times[p.id] ?? ""),
+  })).filter(
     (x): x is { p: (typeof PRAYERS)[number]; at: string; mins: number } => x.mins !== null,
   );
   if (!list.length) return null;
 
   for (const x of list) {
     if (x.mins >= nowMinutes) {
-      return { id: x.p.id, name: x.p.name, at: x.at, inMinutes: x.mins - nowMinutes, tomorrow: false };
+      return {
+        id: x.p.id,
+        name: x.p.name,
+        at: x.at,
+        inMinutes: x.mins - nowMinutes,
+        tomorrow: false,
+      };
     }
   }
   const first = list[0];
@@ -72,6 +103,43 @@ export function nextPrayer(times: Record<string, string>, nowMinutes: number): N
     inMinutes: 24 * 60 - nowMinutes + first.mins,
     tomorrow: true,
   };
+}
+
+/**
+ * Whether a prayer done at `nowMinutes` counts as within its window.
+ *
+ * The window runs from the prayer's own time until the next one starts, except
+ * Fajr, which ends at sunrise rather than at Duhr. Outside that window it was
+ * prayed late, which is worth recording honestly rather than flattening into a
+ * single tick.
+ *
+ * Returns null when the times are not known, which is different from "late" and
+ * must not be stored as one.
+ */
+export function isOnTime(
+  prayerId: string,
+  times: Record<string, string>,
+  nowMinutes: number,
+  sunrise?: string,
+): boolean | null {
+  const start = minutesOf(times[prayerId] ?? "");
+  if (start === null) return null;
+
+  const order: string[] = PRAYERS.map((p) => p.id);
+  const idx = order.indexOf(prayerId);
+  if (idx < 0) return null;
+
+  let end: number | null = null;
+  if (prayerId === "fajr") end = sunrise ? minutesOf(sunrise) : null;
+  if (end === null) {
+    const next = order[idx + 1];
+    end = next ? minutesOf(times[next] ?? "") : 24 * 60;
+  }
+  if (end === null) end = 24 * 60;
+
+  // Isha runs past midnight; treat anything after it on the same day as inside.
+  if (end <= start) return nowMinutes >= start;
+  return nowMinutes >= start && nowMinutes < end;
 }
 
 export function formatIn(minutes: number): string {
@@ -149,8 +217,8 @@ function readCache(): CacheShape {
 
 function writeCache(c: CacheShape): void {
   try {
-    // Keep it small — a week of days is plenty.
-    const keys = Object.keys(c).sort().slice(-7);
+    // Keep it small. A fortnight covers the backfill window and the next few days.
+    const keys = Object.keys(c).sort().slice(-14);
     const trimmed: CacheShape = {};
     for (const k of keys) trimmed[k] = c[k];
     localStorage.setItem(CACHE_KEY, JSON.stringify(trimmed));
@@ -159,14 +227,21 @@ function writeCache(c: CacheShape): void {
   }
 }
 
-/** Near enough that cached times are still right (~1km). */
-function samePlace(a: PrayerTimes, place: Place): boolean {
-  return Math.abs(a.lat - place.lat) < 0.01 && Math.abs(a.lon - place.lon) < 0.01;
+/** Near enough that cached times are still right (~1km), same calculation. */
+function stillValid(a: PrayerTimes, place: Place, calc: PrayerCalc): boolean {
+  if (Math.abs(a.lat - place.lat) >= 0.01 || Math.abs(a.lon - place.lon) >= 0.01) return false;
+  // An entry from before these were recorded predates the setting; recompute.
+  if (a.method !== calc.method || a.school !== calc.school) return false;
+  return true;
 }
 
-export function cachedTimes(dateKey: string, place: Place): PrayerTimes | null {
+export function cachedTimes(
+  dateKey: string,
+  place: Place,
+  calc: PrayerCalc = DEFAULT_CALC,
+): PrayerTimes | null {
   const hit = readCache()[dateKey];
-  return hit && samePlace(hit, place) ? hit : null;
+  return hit && stillValid(hit, place, calc) ? hit : null;
 }
 
 /**
@@ -176,20 +251,32 @@ export function cachedTimes(dateKey: string, place: Place): PrayerTimes | null {
 export async function fetchPrayerTimes(
   dateKey: string,
   place: Place,
+  calc: PrayerCalc = DEFAULT_CALC,
   fetchImpl: typeof fetch = fetch,
 ): Promise<PrayerTimes | null> {
-  const hit = cachedTimes(dateKey, place);
+  const hit = cachedTimes(dateKey, place, calc);
   if (hit) return hit;
 
   const [y, m, d] = dateKey.split("-");
   const url =
     `https://api.aladhan.com/v1/timings/${d}-${m}-${y}` +
-    `?latitude=${place.lat}&longitude=${place.lon}&method=2`;
+    `?latitude=${place.lat}&longitude=${place.lon}` +
+    `&method=${calc.method}&school=${calc.school}`;
   try {
     const res = await fetchImpl(url);
     if (!res.ok) return null;
-    const json = (await res.json()) as { data?: { timings?: Record<string, string> } };
+    const json = (await res.json()) as {
+      data?: {
+        timings?: Record<string, string>;
+        date?: {
+          hijri?: { day?: string; month?: { en?: string }; year?: string };
+        };
+      };
+    };
     const raw = json?.data?.timings;
+    const h = json?.data?.date?.hijri;
+    const hijri =
+      h?.day && h?.month?.en && h?.year ? `${h.day} ${h.month.en} ${h.year}` : undefined;
     if (!raw) return null;
     const times: Record<string, string> = {};
     for (const p of PRAYERS) {
@@ -197,7 +284,16 @@ export async function fetchPrayerTimes(
       if (t) times[p.id] = t;
     }
     if (!Object.keys(times).length) return null;
-    const out: PrayerTimes = { times, date: dateKey, lat: place.lat, lon: place.lon };
+    const out: PrayerTimes = {
+      times,
+      date: dateKey,
+      lat: place.lat,
+      lon: place.lon,
+      sunrise: cleanTime(raw.Sunrise ?? "") ?? undefined,
+      hijri,
+      method: calc.method,
+      school: calc.school,
+    };
     const cache = readCache();
     cache[dateKey] = out;
     writeCache(cache);

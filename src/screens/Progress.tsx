@@ -3,13 +3,13 @@ import { Card, ProgressBar, SectionHeader, Tabs } from "../design/primitives";
 import { Ring3D } from "../design/Ring3D";
 import { BarStrip, Sparkline } from "../design/charts";
 import { MetricDetail, type MetricSeriesPoint } from "../design/MetricDetail";
-import { ymd } from "../lib/dates";
 import { useStore } from "../state/store";
 import { Journal } from "./Journal";
 import { Review } from "./Review";
 import { fitnessAge } from "../lib/metrics/fitnessAge";
 import { recovery } from "../lib/metrics/recovery";
 import { strain as strainMetric } from "../lib/metrics/strain";
+import { useToday } from "../state/useToday";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -21,7 +21,7 @@ function ProgressOverview() {
   const profile = state.profile;
 
   const data = useMemo(() => {
-    const todayKey = ymd(new Date());
+    const todayKey = useToday();
     const all = Object.values(state.health)
       .filter((d) => d.date <= todayKey)
       .sort((a, b) => a.date.localeCompare(b.date));

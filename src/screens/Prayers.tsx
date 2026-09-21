@@ -3,24 +3,35 @@
  *
  * Times need a location and a network; tracking needs neither. If the times are
  * unavailable the five still tap, the streak still counts and the debt still
- * clears — the countdown card is the only thing that goes quiet.
+ * clears. Only the countdown and the on-time marking go quiet, and on-time is
+ * left unrecorded rather than guessed at.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { tick } from "../design/charts";
-import { Badge, Button, Card, SectionHeader } from "../design/primitives";
-import { ymd } from "../lib/dates";
+import { Badge, Button, Card, Field, SectionHeader, TextInput } from "../design/primitives";
 import {
   cachedTimes,
   fetchPrayerTimes,
   formatIn,
+  isOnTime,
   locate,
   nextPrayer,
   prayerConsistency,
   prayerStreak,
+  type PrayerTimes,
 } from "../lib/prayer";
-import { PRAYERS, prayersDoneOn, prayerDebtTotal } from "../state/schema";
+import {
+  ASR_SCHOOLS,
+  DEFAULT_ASR_SCHOOL,
+  DEFAULT_PRAYER_METHOD,
+  PRAYERS,
+  PRAYER_METHODS,
+  prayerDebtTotal,
+  prayersDoneOn,
+} from "../state/schema";
 import { useStore } from "../state/store";
+import { useToday } from "../state/useToday";
 
 function shift(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split("-").map(Number);
@@ -30,22 +41,39 @@ function shift(dateKey: string, days: number): string {
   return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
 }
 
+/** Friday, when Duhr is replaced by Jumu'ah. */
+function isFriday(dateKey: string): boolean {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay() === 5;
+}
+
+const dim: React.CSSProperties = { fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6 };
+
 export function Prayers() {
   const { state, dispatch } = useStore();
-  const today = ymd(new Date());
+  const today = useToday();
   const place = state.place;
 
-  const [times, setTimes] = useState<Record<string, string> | null>(() =>
-    place ? (cachedTimes(today, place)?.times ?? null) : null,
+  const calc = useMemo(
+    () => ({
+      method: state.prayers.method ?? DEFAULT_PRAYER_METHOD,
+      school: (state.prayers.school ?? DEFAULT_ASR_SCHOOL) as 0 | 1,
+    }),
+    [state.prayers.method, state.prayers.school],
+  );
+
+  const [data, setData] = useState<PrayerTimes | null>(() =>
+    place ? cachedTimes(today, place, calc) : null,
   );
   const [locating, setLocating] = useState(false);
   const [timesError, setTimesError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [debtEdit, setDebtEdit] = useState<Record<string, string>>({});
   const [nowMin, setNowMin] = useState(() => {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
   });
 
-  // Keep the countdown honest without re-rendering the whole screen every second.
   useEffect(() => {
     const t = setInterval(() => {
       const d = new Date();
@@ -54,20 +82,36 @@ export function Prayers() {
     return () => clearInterval(t);
   }, []);
 
+  // Refetch whenever the day, the place or the calculation changes.
   useEffect(() => {
     if (!place) return;
     let cancelled = false;
-    void fetchPrayerTimes(today, place).then((r) => {
+    setData(cachedTimes(today, place, calc));
+    void fetchPrayerTimes(today, place, calc).then((r) => {
       if (cancelled) return;
-      if (r) setTimes(r.times);
-      else setTimesError("Could not reach the prayer-times service. Tracking still works.");
+      if (r) {
+        setData(r);
+        setTimesError(null);
+      } else {
+        setTimesError("Could not reach the prayer-times service. Tracking still works.");
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [place, today]);
+  }, [place, today, calc]);
 
+  // Remember Fajr, because the app's day resets at it rather than at midnight.
+  const fajr = data?.times.fajr ?? null;
+  useEffect(() => {
+    if (fajr && fajr !== state.prayers.fajrTime) {
+      dispatch({ type: "setFajrTime", time: fajr });
+    }
+  }, [fajr, state.prayers.fajrTime, dispatch]);
+
+  const times = data?.times ?? null;
   const doneToday = state.prayers.done[today] ?? {};
+  const onTimeToday = state.prayers.onTime?.[today] ?? {};
   const doneCount = prayersDoneOn(state, today);
   const streak = useMemo(
     () => prayerStreak(state.prayers.done, today),
@@ -79,6 +123,8 @@ export function Prayers() {
   );
   const next = times ? nextPrayer(times, nowMin) : null;
   const debtTotal = prayerDebtTotal(state);
+  const friday = isFriday(today);
+  const onTimeCount = PRAYERS.filter((p) => onTimeToday[p.id]).length;
 
   const askLocation = async () => {
     setLocating(true);
@@ -91,9 +137,21 @@ export function Prayers() {
       );
   };
 
+  const toggle = (id: string) => {
+    tick();
+    // Unknown times mean on-time is left unrecorded, never recorded as late.
+    const ok = times ? isOnTime(id, times, nowMin, data?.sunrise) : null;
+    dispatch({
+      type: "togglePrayer",
+      date: today,
+      prayerId: id,
+      onTime: ok === null ? undefined : ok,
+    });
+  };
+
   return (
     <>
-      {/* ── Next prayer ─────────────────────────────────────────────────── */}
+      {/* Next prayer */}
       {next ? (
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -109,7 +167,9 @@ export function Prayers() {
               >
                 {next.tomorrow ? "Tomorrow" : "Next"}
               </div>
-              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 4 }}>{next.name}</div>
+              <div style={{ fontSize: 26, fontWeight: 700, marginTop: 4 }}>
+                {friday && next.id === "duhr" ? "Jumu’ah" : next.name}
+              </div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
@@ -120,18 +180,18 @@ export function Prayers() {
               </div>
             </div>
           </div>
+          {data?.hijri && (
+            <div
+              style={{ ...dim, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)" }}
+            >
+              {data.hijri}
+            </div>
+          )}
         </Card>
       ) : (
         <Card>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Prayer times</div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--text-dim)",
-              lineHeight: 1.6,
-              margin: "6px 0 12px",
-            }}
-          >
+          <div style={{ ...dim, margin: "6px 0 12px" }}>
             {place
               ? (timesError ?? "Working them out…")
               : "Share your location once and the app can show today's times and what is next. You can track your prayers either way."}
@@ -144,9 +204,9 @@ export function Prayers() {
         </Card>
       )}
 
-      {/* ── Today ───────────────────────────────────────────────────────── */}
+      {/* Today */}
       <SectionHeader
-        title="Today"
+        title={friday ? "Today · Friday" : "Today"}
         right={
           <Badge tone={doneCount === PRAYERS.length ? "accent" : "neutral"}>
             {doneCount}/{PRAYERS.length}
@@ -157,23 +217,23 @@ export function Prayers() {
         <div style={{ display: "grid", gap: 8 }}>
           {PRAYERS.map((p) => {
             const done = !!doneToday[p.id];
+            const late = done && onTimeToday[p.id] === false;
+            const jumuah = friday && p.id === "duhr";
             return (
               <button
                 key={p.id}
                 className="prayerrow"
                 aria-pressed={done}
-                onClick={() => {
-                  tick();
-                  dispatch({ type: "togglePrayer", date: today, prayerId: p.id });
-                }}
+                onClick={() => toggle(p.id)}
               >
                 <span className="prayerrow__icon" aria-hidden>
-                  {p.icon}
+                  {jumuah ? "\u{1F54C}" : p.icon}
                 </span>
                 <span className="prayerrow__body">
-                  <span className="prayerrow__name">{p.name}</span>
+                  <span className="prayerrow__name">{jumuah ? "Jumu’ah" : p.name}</span>
                   <span className="prayerrow__detail">
                     {times?.[p.id] ? times[p.id] : p.detail}
+                    {late && <span style={{ color: "var(--text-faint)" }}> &middot; late</span>}
                   </span>
                 </span>
                 <span className={`prayerrow__check${done ? " is-done" : ""}`} aria-hidden>
@@ -183,12 +243,17 @@ export function Prayers() {
             );
           })}
         </div>
+        {times && doneCount > 0 && (
+          <div style={{ ...dim, marginTop: 12, fontSize: 11.5 }}>
+            {onTimeCount} of {doneCount} within the window.
+          </div>
+        )}
       </Card>
 
-      {/* ── Consistency ─────────────────────────────────────────────────── */}
+      {/* Consistency */}
       <SectionHeader title="Consistency" />
       <Card>
-        <div style={{ display: "flex", gap: 20 }}>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 26, fontWeight: 700 }}>{streak}</div>
             <div style={{ fontSize: 11.5, color: "var(--text-dim)" }}>
@@ -228,7 +293,7 @@ export function Prayers() {
         </div>
       </Card>
 
-      {/* ── Debt ────────────────────────────────────────────────────────── */}
+      {/* Debt */}
       <SectionHeader
         title="Missed prayers"
         right={
@@ -238,13 +303,14 @@ export function Prayers() {
         }
       />
       <Card>
-        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6, marginBottom: 14 }}>
-          Prayers you owe, repaid by praying extras on top of the five. Set the count once and knock
-          it down as you go.
+        <div style={{ ...dim, marginBottom: 14 }}>
+          Prayers you owe, repaid by praying extras on top of the five. Tap Edit to set the count
+          in one go, then knock it down as you go.
         </div>
         <div style={{ display: "grid", gap: 10 }}>
           {PRAYERS.map((p) => {
             const owed = Math.max(0, state.prayers.debt[p.id] ?? 0);
+            const editing = debtEdit[p.id] !== undefined;
             return (
               <div
                 key={p.id}
@@ -271,34 +337,138 @@ export function Prayers() {
                     {owed > 0 ? `${owed} owed` : "Cleared"}
                   </div>
                 </div>
-                {owed > 0 ? (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {[1, 5].map((n) => (
-                      <Button
-                        key={n}
-                        sm
-                        onClick={() => {
-                          tick();
-                          dispatch({ type: "payPrayerDebt", prayerId: p.id, count: n });
-                        }}
-                      >
-                        +{Math.min(n, owed)}
-                      </Button>
-                    ))}
-                  </div>
+
+                {editing ? (
+                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ width: 78 }}>
+                      <TextInput
+                        type="number"
+                        inputMode="numeric"
+                        value={debtEdit[p.id]}
+                        aria-label={`Prayers owed for ${p.name}`}
+                        onChange={(e) => setDebtEdit({ ...debtEdit, [p.id]: e.target.value })}
+                      />
+                    </span>
+                    <Button
+                      sm
+                      variant="primary"
+                      onClick={() => {
+                        const n = Number(debtEdit[p.id]);
+                        if (isFinite(n) && n >= 0) {
+                          dispatch({ type: "setPrayerDebt", prayerId: p.id, count: n });
+                        }
+                        const rest = { ...debtEdit };
+                        delete rest[p.id];
+                        setDebtEdit(rest);
+                      }}
+                    >
+                      Set
+                    </Button>
+                  </span>
                 ) : (
-                  <Button
-                    sm
-                    onClick={() => dispatch({ type: "setPrayerDebt", prayerId: p.id, count: 1 })}
-                  >
-                    Add
-                  </Button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {owed > 0 &&
+                      [1, 5].map((n) => (
+                        <Button
+                          key={n}
+                          sm
+                          onClick={() => {
+                            tick();
+                            dispatch({ type: "payPrayerDebt", prayerId: p.id, count: n });
+                          }}
+                        >
+                          +{Math.min(n, owed)}
+                        </Button>
+                      ))}
+                    <Button
+                      sm
+                      onClick={() => setDebtEdit({ ...debtEdit, [p.id]: String(owed) })}
+                      aria-label={`Set the number owed for ${p.name}`}
+                    >
+                      Edit
+                    </Button>
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
       </Card>
+
+      {/* Settings */}
+      <SectionHeader
+        title="Prayer settings"
+        action={showSettings ? "Hide" : "Change"}
+        onAction={() => setShowSettings((v) => !v)}
+      />
+      {showSettings ? (
+        <Card>
+          <div style={{ display: "grid", gap: 14 }}>
+            <Field
+              label="Calculation method"
+              hint="This moves Fajr and Isha. Match whatever your mosque follows."
+            >
+              <select
+                className="field__control"
+                value={calc.method}
+                onChange={(e) => dispatch({ type: "setPrayerCalc", method: Number(e.target.value) })}
+              >
+                {PRAYER_METHODS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div style={{ ...dim, marginTop: -8, fontSize: 11.5 }}>
+              {PRAYER_METHODS.find((m) => m.id === calc.method)?.detail}
+            </div>
+
+            <Field label="Asr" hint="The Hanafi position puts Asr noticeably later.">
+              <select
+                className="field__control"
+                value={calc.school}
+                onChange={(e) =>
+                  dispatch({ type: "setPrayerCalc", school: Number(e.target.value) as 0 | 1 })
+                }
+              >
+                {ASR_SCHOOLS.map((sc) => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div style={{ ...dim, marginTop: -8, fontSize: 11.5 }}>
+              {ASR_SCHOOLS.find((sc) => sc.id === calc.school)?.detail}
+            </div>
+
+            <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Location</div>
+              <div style={{ ...dim, marginBottom: 10, fontSize: 11.5 }}>
+                {place
+                  ? `Using ${place.lat.toFixed(3)}, ${place.lon.toFixed(3)}.`
+                  : "Not set, so no times can be calculated."}
+              </div>
+              <Button sm onClick={askLocation} disabled={locating}>
+                {locating ? "Asking…" : place ? "Update my location" : "Use my location"}
+              </Button>
+              <div style={{ ...dim, marginTop: 8, fontSize: 11.5 }}>
+                Update this when you travel, or the times will be for where you were.
+              </div>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <Card>
+          <div style={dim}>
+            {PRAYER_METHODS.find((m) => m.id === calc.method)?.name}
+            {" · "}
+            {ASR_SCHOOLS.find((sc) => sc.id === calc.school)?.name} Asr
+            {place ? "" : " · no location set"}
+          </div>
+        </Card>
+      )}
     </>
   );
 }
