@@ -1,0 +1,12 @@
+{
+  "name": "Steady",
+  "short_name": "Steady",
+  "description": "A habit and health tracker that keeps everything on your device and never shows you a number it cannot justify.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1116",
+  "theme_color": "#0e1116",
+  "orientation": "portrait",
+  "icons": []
+}
