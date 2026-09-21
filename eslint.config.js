@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   // sw.js is a legacy self-unregistering stub; Phase 4 replaces it with a real
   // service worker (and its own worker-scoped lint config).
-  { ignores: ["dist/**", "legacy/**", "node_modules/**", "coverage/**", "sw.js"] },
+  { ignores: ["dist/**", "dist-public/**", "legacy/**", "node_modules/**", "coverage/**", "sw.js", "site/**"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -57,6 +57,22 @@ export default tseslint.config(
       "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "no-unused-vars": "off",
+    },
+  },
+  // The rebuilt app's service worker runs in a worker scope, not a window.
+  {
+    files: ["public/sw.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "script",
+      globals: {
+        self: "readonly",
+        caches: "readonly",
+        fetch: "readonly",
+        URL: "readonly",
+        Response: "readonly",
+        Request: "readonly",
+      },
     },
   },
 );
