@@ -1,0 +1,12 @@
+{
+  "name": "Abd's Quest",
+  "short_name": "Abd's Quest",
+  "description": "Habits, training and health, all on your phone.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#121311",
+  "theme_color": "#121311",
+  "orientation": "portrait",
+  "icons": []
+}
