@@ -19,9 +19,11 @@ function ProgressOverview() {
 
   const { state } = useStore();
   const profile = state.profile;
+  // Hooks cannot be called inside a useMemo callback: React has no way to track
+  // one there, and the render crashes with "rendered fewer hooks than expected".
+  const todayKey = useToday();
 
   const data = useMemo(() => {
-    const todayKey = useToday();
     const all = Object.values(state.health)
       .filter((d) => d.date <= todayKey)
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -31,7 +33,7 @@ function ProgressOverview() {
     }));
     const str = all.map((d) => ({ date: d.date, value: strainMetric(d, profile).strain }));
     return { all, rec, str };
-  }, [state, profile]);
+  }, [state, profile, todayKey]);
 
   const n = parseInt(range, 10);
   const all = data.all.slice(-n);

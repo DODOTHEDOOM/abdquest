@@ -94,9 +94,11 @@ export function Dashboard() {
 
   const { state } = useStore();
   const profile = state.profile;
+  // Hooks cannot be called inside a useMemo callback: React has no way to track
+  // one there, and the render crashes with "rendered fewer hooks than expected".
+  const todayKey = useToday();
 
   const m = useMemo(() => {
-    const todayKey = useToday();
     const all = Object.values(state.health).sort((a, b) => a.date.localeCompare(b.date));
     const today = all.find((d) => d.date === todayKey) ?? { date: todayKey };
     const history = all.filter((d) => d.date < todayKey);
@@ -114,7 +116,7 @@ export function Dashboard() {
       hasHealth: all.length > 0,
       ...trainingContext(state, today.date, recovery(today, history, state.profile).score),
     };
-  }, [state]);
+  }, [state, profile, todayKey]);
 
   const { all, today, rec, str, slp, fit, last14, last7, motiv, hasHealth } = m;
   const recPct = rec.score != null ? rec.score / 100 : 0;
