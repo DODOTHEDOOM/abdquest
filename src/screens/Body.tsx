@@ -83,6 +83,15 @@ function SleepStageBar({ stages }: { stages: SleepStages }) {
   );
 }
 
+/** The readings worth being able to correct by hand, with sane bounds. */
+const READINGS = [
+  { key: "sleepHrs", label: "Sleep", unit: " h", step: "0.1", min: 0, max: 24 },
+  { key: "rhr", label: "Resting heart rate", unit: " bpm", step: "1", min: 25, max: 200 },
+  { key: "hrv", label: "Heart-rate variability", unit: " ms", step: "1", min: 3, max: 250 },
+  { key: "steps", label: "Steps", unit: "", step: "100", min: 0, max: 200000 },
+  { key: "calOut", label: "Calories burned", unit: " kcal", step: "50", min: 0, max: 20000 },
+] as const;
+
 export function Body() {
   const { state, dispatch } = useStore();
   const today = useToday();
@@ -94,6 +103,7 @@ export function Body() {
   const [bed, setBed] = useState("");
   const [wake, setWake] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
+  const [fixEdit, setFixEdit] = useState<Record<string, string>>({});
 
   const say = (msg: string) => {
     setFlash(msg);
@@ -155,7 +165,12 @@ export function Body() {
   const logSleep = () => {
     const hrs = hoursBetween(bed, wake);
     if (hrs === null) return say("Enter both times as HH:MM");
-    dispatch({ type: "mergeHealth", date: today, day: { date: today, sleepHrs: hrs } });
+    dispatch({
+      type: "mergeHealth",
+      date: today,
+      day: { date: today, sleepHrs: hrs },
+      source: "manual",
+    });
     setBed("");
     setWake("");
     say(`Logged ${fmtHrs(hrs)}`);
@@ -416,6 +431,107 @@ export function Body() {
         <Button block variant="primary" style={{ marginTop: 12 }} onClick={logSleep}>
           Log last night
         </Button>
+      </Card>
+
+      {/* ── Corrections ─────────────────────────────────────────────────── */}
+      <SectionHeader title="Today's readings" />
+      <Card>
+        <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.6, marginBottom: 14 }}>
+          What your watch reported. If one of these is plainly wrong, correct it here and the
+          correction will stick: later syncs leave a corrected value alone.
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {READINGS.map((r) => {
+            const day = state.health[today];
+            const value = day?.[r.key] as number | undefined;
+            const corrected = (day?.manual ?? []).includes(r.key);
+            const editing = fixEdit[r.key] !== undefined;
+            return (
+              <div
+                key={r.key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 12px",
+                  borderRadius: 12,
+                  background: "var(--surface-2)",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{r.label}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-dim)" }}>
+                    {value === undefined ? "Nothing synced" : `${value}${r.unit}`}
+                    {corrected && (
+                      <span style={{ color: "var(--m-recovery)" }}> &middot; corrected</span>
+                    )}
+                  </div>
+                </div>
+
+                {editing ? (
+                  <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ width: 82 }}>
+                      <TextInput
+                        type="number"
+                        inputMode="decimal"
+                        step={r.step}
+                        value={fixEdit[r.key]}
+                        aria-label={`Correct ${r.label}`}
+                        onChange={(e) => setFixEdit({ ...fixEdit, [r.key]: e.target.value })}
+                      />
+                    </span>
+                    <Button
+                      sm
+                      variant="primary"
+                      onClick={() => {
+                        const n = parsed(fixEdit[r.key], r.min, r.max);
+                        if (n !== undefined) {
+                          dispatch({
+                            type: "mergeHealth",
+                            date: today,
+                            day: { date: today, [r.key]: n },
+                            source: "manual",
+                          });
+                          say(`${r.label} corrected`);
+                        }
+                        const rest = { ...fixEdit };
+                        delete rest[r.key];
+                        setFixEdit(rest);
+                      }}
+                    >
+                      Set
+                    </Button>
+                  </span>
+                ) : (
+                  <span style={{ display: "flex", gap: 6 }}>
+                    {corrected && (
+                      <Button
+                        sm
+                        onClick={() => {
+                          dispatch({ type: "clearHealthField", date: today, field: r.key });
+                          say(`${r.label} back to whatever syncs next`);
+                        }}
+                      >
+                        Undo
+                      </Button>
+                    )}
+                    <Button
+                      sm
+                      onClick={() =>
+                        setFixEdit({
+                          ...fixEdit,
+                          [r.key]: value === undefined ? "" : String(value),
+                        })
+                      }
+                    >
+                      {value === undefined ? "Add" : "Correct"}
+                    </Button>
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </Card>
 
       {/* ── Targets ─────────────────────────────────────────────────────── */}

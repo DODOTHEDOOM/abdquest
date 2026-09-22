@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge, Card, ProgressBar, SectionHeader, Sheet, Tabs } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
+import { DayPicker, dayLabel } from "../design/DayPicker";
 import { isPerfectDay, type AppState, type Habit } from "../state/schema";
 import { useStore } from "../state/store";
 import { HabitEditor } from "./HabitEditor";
@@ -38,7 +39,12 @@ function streakFor(state: AppState, habitId: string, today: string): number {
 function HabitsList() {
   const [editing, setEditing] = useState(false);
   const { state, dispatch } = useStore();
-  const today = useToday();
+  const realToday = useToday();
+  // Which day is being looked at. Defaults to today, and snaps back to it when
+  // the day rolls over while the app is open.
+  const [day, setDay] = useState(realToday);
+  const today = day > realToday ? realToday : day;
+  useEffect(() => setDay(realToday), [realToday]);
   const [open, setOpen] = useState<Habit | null>(null);
 
   const doneMap = state.done[today] ?? {};
@@ -79,7 +85,13 @@ function HabitsList() {
 
   return (
     <>
-      <SectionHeader title="Today" action="Edit habits" onAction={() => setEditing(true)} />
+      <DayPicker value={today} today={realToday} onChange={setDay} />
+
+      <SectionHeader
+        title={dayLabel(today, realToday)}
+        action="Edit habits"
+        onAction={() => setEditing(true)}
+      />
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <span style={{ fontSize: 26, fontWeight: 800 }}>
@@ -114,7 +126,12 @@ function HabitsList() {
                   aria-label={isDone ? `Mark ${habit.name} not done` : `Mark ${habit.name} done`}
                   onClick={() => {
                     tick(12);
-                    dispatch({ type: "toggleHabit", date: today, habitId: habit.id });
+                    dispatch({
+                      type: "toggleHabit",
+                      date: today,
+                      habitId: habit.id,
+                      today: realToday,
+                    });
                   }}
                   style={{
                     width: 30,

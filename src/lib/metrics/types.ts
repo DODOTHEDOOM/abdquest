@@ -45,6 +45,14 @@ export interface DailyHealth {
   calOut?: number;
   /** Minutes of logged workouts on this day (any type). */
   workoutMins?: number;
+  /**
+   * Field names on this day that were entered by hand.
+   *
+   * A correction has to outlast the next sync, or fixing a wrong reading is
+   * pointless: it would be silently overwritten a few minutes later. Anything
+   * listed here is left alone by incoming sync data.
+   */
+  manual?: string[];
 }
 
 export interface Profile {

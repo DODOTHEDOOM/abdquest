@@ -62,7 +62,17 @@ export function computeStreak(state: AppState, todayKey: string): number {
 // ── Actions ─────────────────────────────────────────────────────────────────
 
 export type Action =
-  | { type: "toggleHabit"; date: string; habitId: string }
+  | {
+      type: "toggleHabit";
+      date: string;
+      habitId: string;
+      /**
+       * The real current day. Editing a day you missed must not drag the streak
+       * back to that date, so the streak is always recomputed for today even
+       * when an older entry is what changed.
+       */
+      today?: string;
+    }
   | { type: "addSession"; session: Session }
   | { type: "removeSession"; id: string }
   | { type: "setProfile"; patch: Partial<Profile> }
@@ -83,7 +93,14 @@ export type Action =
   | { type: "setPrayerDebt"; prayerId: string; count: number }
   | { type: "setModule"; key: "prayers"; on: boolean }
   | { type: "setPlace"; place: Place }
-  | { type: "mergeHealth"; date: string; day: DailyHealth }
+  | {
+      type: "mergeHealth";
+      date: string;
+      day: DailyHealth;
+      /** "manual" wins over, and is protected from, later syncs. */
+      source?: "sync" | "manual";
+    }
+  | { type: "clearHealthField"; date: string; field: string }
   | { type: "syncAutoSessions"; date: string; sessions: Session[] }
   | { type: "replace"; state: AppState };
 
@@ -110,11 +127,14 @@ export function reducer(state: AppState, action: Action): AppState {
       if (wasPerfect && !nowPerfect) xp -= XP_PERFECT_DAY;
       next.xp = Math.max(0, xp);
 
-      const current = computeStreak(next, action.date);
+      // Always measured from today, never from the day being edited. Filling in
+      // last Tuesday should repair the streak, not move its end to Tuesday.
+      const anchor = action.today ?? action.date;
+      const current = computeStreak(next, anchor);
       next.streak = {
         current,
         best: Math.max(state.streak.best, current),
-        lastDay: action.date,
+        lastDay: anchor,
       };
       return next;
     }
@@ -274,11 +294,32 @@ export function reducer(state: AppState, action: Action): AppState {
       // with undefined, so a partial sync cannot blank a good day.
       const existing = state.health[action.date] ?? { date: action.date };
       const merged: DailyHealth = { ...existing };
+      const manual = new Set(existing.manual ?? []);
+      const byHand = action.source === "manual";
+
       for (const [k, v] of Object.entries(action.day)) {
+        if (k === "manual" || k === "date") continue;
         if (v === undefined || v === null || v === "") continue;
+        // A sync must not undo a correction someone made by hand.
+        if (!byHand && manual.has(k)) continue;
         (merged as unknown as Record<string, unknown>)[k] = v;
+        if (byHand) manual.add(k);
       }
+
+      if (manual.size) merged.manual = [...manual].sort();
       return { ...state, health: { ...state.health, [action.date]: merged } };
+    }
+
+    case "clearHealthField": {
+      // Drops a correction and lets the synced value return on the next sync.
+      const existing = state.health[action.date];
+      if (!existing) return state;
+      const next: DailyHealth = { ...existing };
+      delete (next as unknown as Record<string, unknown>)[action.field];
+      const manual = (existing.manual ?? []).filter((f) => f !== action.field);
+      if (manual.length) next.manual = manual;
+      else delete next.manual;
+      return { ...state, health: { ...state.health, [action.date]: next } };
     }
 
     case "syncAutoSessions": {

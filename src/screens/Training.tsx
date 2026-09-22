@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Badge, Button, Card, Field, SectionHeader, Sheet, TextInput } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
+import { shiftDay } from "../design/DayPicker";
 import { useStore } from "../state/store";
 import { useToday } from "../state/useToday";
 import {
@@ -24,6 +25,9 @@ import {
   type Session,
 } from "../lib/training";
 
+/** How far back the Earlier list reaches. */
+const EARLIER_DAYS = 30;
+
 type SheetState =
   | null
   | { mode: "pick" }
@@ -43,6 +47,14 @@ export function Training() {
   const thisWeek = weeks[weeks.length - 1];
   const lastWeek = weeks[weeks.length - 2];
   const todays = sessionsOn(sessions, today);
+  // Recent history, newest first, so a mistake can still be corrected after
+  // midnight rather than being stuck in the record forever.
+  const earlier = useMemo(() => {
+    const from = shiftDay(today, -EARLIER_DAYS);
+    return sessions
+      .filter((s) => s.date < today && s.date >= from)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [sessions, today]);
 
   function addSession(s: Session) {
     dispatch({ type: "addSession", session: s });
@@ -122,6 +134,26 @@ export function Training() {
             <SessionRow key={s.id} session={s} />
           ))}
         </div>
+      )}
+
+      {/* Everything before today. Without this, a session logged by mistake was
+          unreachable the moment the day rolled over, and so was permanent. */}
+      {earlier.length > 0 && (
+        <>
+          <SectionHeader
+            title="Earlier"
+            right={
+              <span style={{ fontSize: 12, color: "var(--text-faint)" }}>
+                last {EARLIER_DAYS} days
+              </span>
+            }
+          />
+          <div style={{ display: "grid", gap: 10 }}>
+            {earlier.map((s) => (
+              <SessionRow key={s.id} session={s} />
+            ))}
+          </div>
+        </>
       )}
 
       <SectionHeader title="Your lifts" />
@@ -225,11 +257,47 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * One logged session, with a way to correct it.
+ *
+ * Deleting was impossible before: `removeSession` existed in the store and
+ * nothing called it, so a session logged by mistake, or with the weight fat
+ * fingered, sat in the history permanently and dragged the personal records and
+ * volume totals with it.
+ *
+ * The date is editable too, because the common mistake is logging this morning's
+ * session tomorrow rather than not logging it at all.
+ */
 function SessionRow({ session }: { session: Session }) {
+  const { dispatch } = useStore();
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const a = activityById(session.activityId);
+
+  const moveTo = (date: string) => {
+    if (!date || date === session.date) return;
+    // Re-adding under a new date would award the session XP a second time, so
+    // the move is a remove and an add of the same session object.
+    dispatch({ type: "removeSession", id: session.id });
+    dispatch({ type: "addSession", session: { ...session, date } });
+    setOpen(false);
+  };
+
   return (
     <Card>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
+      >
         <span
           style={{
             width: 42,
@@ -250,9 +318,55 @@ function SessionRow({ session }: { session: Session }) {
           </span>
           <span style={{ display: "block", fontSize: 11.5, color: "var(--text-faint)" }}>
             {sessionHeadline(session)}
+            {session.auto && " · from your watch"}
           </span>
         </span>
+        <span style={{ fontSize: 12, color: "var(--text-faint)", flexShrink: 0 }} aria-hidden>
+          {open ? "✕" : "⋯"}
+        </span>
       </div>
+
+      {open && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+          <Field label="Date">
+            <TextInput type="date" value={session.date} onChange={(e) => moveTo(e.target.value)} />
+          </Field>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+            {confirming ? (
+              <>
+                <Button
+                  sm
+                  variant="danger"
+                  onClick={() => dispatch({ type: "removeSession", id: session.id })}
+                >
+                  Delete it
+                </Button>
+                <Button sm onClick={() => setConfirming(false)}>
+                  Keep
+                </Button>
+              </>
+            ) : (
+              <Button sm onClick={() => setConfirming(true)}>
+                Delete
+              </Button>
+            )}
+          </div>
+
+          <div
+            style={{
+              fontSize: 11.5,
+              color: "var(--text-dim)",
+              lineHeight: 1.55,
+              marginTop: 10,
+            }}
+          >
+            {session.auto
+              ? "Imported from your watch. Deleting it here will not stop it coming back on the next sync."
+              : "Deleting removes it from your records, personal records included."}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

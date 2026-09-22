@@ -103,7 +103,7 @@ export function useHealthSync(): HealthSync {
       const sessions = sessionsFromDay(date, raw);
       const mins = sessions.reduce((a, s) => a + (s.kind === "gym" ? 0 : s.minutes), 0);
       if (mins > 0) day.workoutMins = mins;
-      dispatch({ type: "mergeHealth", date, day });
+      dispatch({ type: "mergeHealth", date, day, source: "sync" });
       if (raw.exercises) dispatch({ type: "syncAutoSessions", date, sessions });
       return true;
     },

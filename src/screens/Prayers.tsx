@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { tick } from "../design/charts";
+import { DayPicker, dayLabel } from "../design/DayPicker";
 import { Badge, Button, Card, Field, SectionHeader, TextInput } from "../design/primitives";
 import {
   cachedTimes,
@@ -52,8 +53,12 @@ const dim: React.CSSProperties = { fontSize: 12, color: "var(--text-dim)", lineH
 
 export function Prayers() {
   const { state, dispatch } = useStore();
-  const today = useToday();
+  const realToday = useToday();
+  const [day, setDay] = useState(realToday);
+  const today = day > realToday ? realToday : day;
+  useEffect(() => setDay(realToday), [realToday]);
   const place = state.place;
+  const viewingPast = today !== realToday;
 
   const calc = useMemo(
     () => ({
@@ -125,7 +130,7 @@ export function Prayers() {
     () => prayerConsistency(state.prayers.done, today, 30),
     [state.prayers.done, today],
   );
-  const next = times ? nextPrayer(times, nowMin) : null;
+  const next = times && !viewingPast ? nextPrayer(times, nowMin) : null;
   const debtTotal = prayerDebtTotal(state);
   const friday = isFriday(today);
   const onTimeCount = PRAYERS.filter((p) => onTimeToday[p.id]).length;
@@ -185,8 +190,10 @@ export function Prayers() {
 
   const toggle = (id: string) => {
     tick();
-    // Unknown times mean on-time is left unrecorded, never recorded as late.
-    const ok = times ? isOnTime(id, times, nowMin, data?.sunrise) : null;
+    // On-time is judged against the clock, so it can only be known for today.
+    // Filling in a past day records that you prayed, and says nothing about
+    // when, rather than inventing a verdict from the current time.
+    const ok = times && !viewingPast ? isOnTime(id, times, nowMin, data?.sunrise) : null;
     dispatch({
       type: "togglePrayer",
       date: today,
@@ -239,7 +246,7 @@ export function Prayers() {
             </div>
           )}
         </Card>
-      ) : (
+      ) : viewingPast ? null : (
         <Card>
           <div style={{ fontSize: 13, fontWeight: 600 }}>Prayer times</div>
           <div style={{ ...dim, margin: "6px 0 12px" }}>
@@ -255,9 +262,11 @@ export function Prayers() {
         </Card>
       )}
 
-      {/* Today */}
+      {/* The day being recorded */}
+      <DayPicker value={today} today={realToday} onChange={setDay} />
+
       <SectionHeader
-        title={friday ? "Today · Friday" : "Today"}
+        title={friday ? `${dayLabel(today, realToday)} · Friday` : dayLabel(today, realToday)}
         right={
           <Badge tone={doneCount === PRAYERS.length ? "accent" : "neutral"}>
             {doneCount}/{PRAYERS.length}
@@ -294,7 +303,7 @@ export function Prayers() {
             );
           })}
         </div>
-        {times && doneCount > 0 && (
+        {times && doneCount > 0 && !viewingPast && (
           <div style={{ ...dim, marginTop: 12, fontSize: 11.5 }}>
             {onTimeCount} of {doneCount} within the window.
           </div>

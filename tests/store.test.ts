@@ -245,6 +245,64 @@ describe("reducer", () => {
     });
   });
 
+  it("a hand-entered correction survives the next sync", () => {
+    // The watch says 4.2 hours. You know you slept 7.5 and say so. The next
+    // sync must not quietly put 4.2 back.
+    let s = act(oneHabitState(), {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", sleepHrs: 4.2, rhr: 54 },
+      source: "sync",
+    });
+    s = act(s, {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", sleepHrs: 7.5 },
+      source: "manual",
+    });
+    s = act(s, {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", sleepHrs: 4.2, rhr: 55, hrv: 61 },
+      source: "sync",
+    });
+
+    expect(s.health["2026-03-04"].sleepHrs).toBe(7.5);
+    // Everything not corrected still updates normally.
+    expect(s.health["2026-03-04"].rhr).toBe(55);
+    expect(s.health["2026-03-04"].hrv).toBe(61);
+    expect(s.health["2026-03-04"].manual).toEqual(["sleepHrs"]);
+  });
+
+  it("clearing a correction lets the synced value come back", () => {
+    let s = act(oneHabitState(), {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", sleepHrs: 7.5 },
+      source: "manual",
+    });
+    s = act(s, { type: "clearHealthField", date: "2026-03-04", field: "sleepHrs" });
+    expect(s.health["2026-03-04"].sleepHrs).toBeUndefined();
+    expect(s.health["2026-03-04"].manual).toBeUndefined();
+
+    s = act(s, {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", sleepHrs: 4.2 },
+      source: "sync",
+    });
+    expect(s.health["2026-03-04"].sleepHrs).toBe(4.2);
+  });
+
+  it("an unmarked merge is treated as a sync, not a correction", () => {
+    const s = act(oneHabitState(), {
+      type: "mergeHealth",
+      date: "2026-03-04",
+      day: { date: "2026-03-04", steps: 900 },
+    });
+    expect(s.health["2026-03-04"].manual).toBeUndefined();
+  });
+
   it("re-syncing replaces imported sessions but never hand-logged ones", () => {
     const imported = (id: string, minutes: number): Session => ({
       id,
@@ -350,6 +408,41 @@ describe("reducer", () => {
       note: { text: "", mood: "tired" },
     });
     expect(s.notes["2026-03-04"]).toEqual({ text: "", mood: "tired" });
+  });
+
+  it("filling in a missed day repairs the streak without moving its end", () => {
+    // Monday and Wednesday done, Tuesday forgotten. Today is Wednesday.
+    const s0 = oneHabitState({
+      "2026-03-02": { h1: true },
+      "2026-03-04": { h1: true },
+    });
+    expect(computeStreak(s0, "2026-03-04")).toBe(1);
+
+    // Go back and tick Tuesday.
+    const s1 = act(s0, {
+      type: "toggleHabit",
+      date: "2026-03-03",
+      habitId: "h1",
+      today: "2026-03-04",
+    });
+
+    // Three in a row, and the streak still ends today rather than on Tuesday.
+    expect(s1.streak.current).toBe(3);
+    expect(s1.streak.lastDay).toBe("2026-03-04");
+  });
+
+  it("editing an old day does not resurrect a streak that has since broken", () => {
+    // A run that ended a fortnight ago. Filling one of its gaps must not claim
+    // a current streak.
+    const s0 = oneHabitState({ "2026-02-20": { h1: true }, "2026-02-22": { h1: true } });
+    const s1 = act(s0, {
+      type: "toggleHabit",
+      date: "2026-02-21",
+      habitId: "h1",
+      today: "2026-03-04",
+    });
+    expect(s1.streak.current).toBe(0);
+    expect(s1.streak.lastDay).toBe("2026-03-04");
   });
 
   it("adds a habit, edits it, and refuses a duplicate id", () => {

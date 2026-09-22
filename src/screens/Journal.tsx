@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { tick } from "../design/charts";
+import { DayPicker, dayLabel } from "../design/DayPicker";
 import { Button, Card, SectionHeader, TextArea } from "../design/primitives";
 import { useStore } from "../state/store";
 import { useToday } from "../state/useToday";
@@ -31,7 +32,10 @@ function prettyDate(key: string): string {
 
 export function Journal() {
   const { state, dispatch } = useStore();
-  const today = useToday();
+  const realToday = useToday();
+  const [day, setDay] = useState(realToday);
+  const today = day > realToday ? realToday : day;
+  useEffect(() => setDay(realToday), [realToday]);
   const saved = state.notes[today];
 
   const [text, setText] = useState(saved?.text ?? "");
@@ -64,7 +68,9 @@ export function Journal() {
 
   return (
     <>
-      <SectionHeader title="Today" />
+      <DayPicker value={today} today={realToday} onChange={setDay} />
+
+      <SectionHeader title={dayLabel(today, realToday)} />
       <Card>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
           {MOODS.map((m) => (
