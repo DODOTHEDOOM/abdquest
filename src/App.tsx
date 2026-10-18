@@ -51,7 +51,11 @@ export function App() {
   // One-time note when their old data has just been brought across.
   useEffect(() => {
     if (source === "v2") {
-      setToast("Your data moved across — nothing was changed in the old app");
+      setToast("Your data moved across. Nothing was changed in the old app.");
+    } else if (source === "v2-refresh") {
+      setToast(
+        "Brought across your latest data from the old app. Your previous copy is kept in You.",
+      );
     }
   }, [source]);
 

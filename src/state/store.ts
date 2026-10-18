@@ -9,7 +9,7 @@ import { createContext, useContext, useEffect, useReducer, useRef, useState } fr
 import type { DailyHealth } from "../lib/metrics/types";
 import type { Session } from "../lib/training";
 import { EDITION } from "../edition";
-import { readRollingBackup, saveRollingBackup } from "../lib/backup";
+import { readRollingBackup, saveRescuePoint, saveRollingBackup } from "../lib/backup";
 import { looksLikeV2, migrateV2 } from "./migrate";
 import {
   emptyState,
@@ -344,15 +344,79 @@ export function reducer(state: AppState, action: Action): AppState {
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
-export type StateSource = "v3" | "v3-backup" | "v2" | "new";
+export type StateSource = "v3" | "v3-backup" | "v2" | "v2-refresh" | "new";
+
+/**
+ * The most recent day this state has anything recorded on.
+ *
+ * Opening the app records nothing, so this is the last day something was
+ * actually logged, synced or ticked. Used to tell whether a saved snapshot of
+ * this app is older than what the old app has recorded since.
+ */
+export function latestActivity(state: AppState): string | null {
+  let latest: string | null = state.streak?.lastDay ?? null;
+  const see = (d: string | undefined | null) => {
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && (!latest || d > latest)) latest = d;
+  };
+  for (const [d, day] of Object.entries(state.done ?? {})) {
+    if (day && Object.keys(day).length) see(d);
+  }
+  for (const [d, day] of Object.entries(state.prayers?.done ?? {})) {
+    if (day && Object.keys(day).length) see(d);
+  }
+  for (const x of state.sessions ?? []) see(x.date);
+  for (const x of state.weight ?? []) see(x.date);
+  for (const x of state.water ?? []) see(x.date);
+  for (const x of state.calories ?? []) see(x.date);
+  for (const d of Object.keys(state.notes ?? {})) see(d);
+  return latest;
+}
+
+/**
+ * The old app's data, if it has been used more recently than `state`.
+ *
+ * The scenario this guards against is concrete. A snapshot of this app gets
+ * taken (the preview was opened once, or the app was tried and set aside) and
+ * then the old app carries on being used every day for a month. Loading the
+ * snapshot as-is would silently show a month-old record and ignore everything
+ * since, which looks exactly like data loss to the person holding the phone.
+ */
+function newerLegacy(state: AppState): AppState | null {
+  if (!EDITION.migrateLegacy) return null;
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    if (!raw) return null;
+    const v2 = JSON.parse(raw);
+    if (!looksLikeV2(v2)) return null;
+    const v2Last = typeof v2.lastDay === "string" ? v2.lastDay : null;
+    if (!v2Last) return null;
+    const ours = latestActivity(state);
+    // Only replace on positive evidence. A snapshot with nothing dated in it
+    // cannot be shown to be older than anything, so it is left alone rather
+    // than overwritten on a guess.
+    if (!ours || v2Last <= ours) return null;
+    return migrateV2(v2);
+  } catch {
+    return null;
+  }
+}
 
 export function loadState(): { state: AppState; source: StateSource } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.version === 3)
-        return { state: { ...emptyState(), ...parsed }, source: "v3" };
+      if (parsed && parsed.version === 3) {
+        const current: AppState = { ...emptyState(), ...parsed };
+        const fresher = newerLegacy(current);
+        if (fresher) {
+          // Keep the stale snapshot as the rescue copy, so You -> Your data ->
+          // Undo can put it back if the newer one turns out to be wrong.
+          saveRescuePoint(current);
+          return { state: fresher, source: "v2-refresh" };
+        }
+        return { state: current, source: "v3" };
+      }
     }
   } catch {
     /* fall through to the legacy blob */

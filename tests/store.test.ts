@@ -20,7 +20,7 @@ import {
   type AppState,
 } from "../src/state/schema";
 import type { GymSession, Session } from "../src/lib/training";
-import { saveRollingBackup } from "../src/lib/backup";
+import { readRescuePoint, saveRollingBackup } from "../src/lib/backup";
 
 beforeEach(() => localStorage.clear());
 
@@ -85,6 +85,71 @@ describe("loading", () => {
     const { state, source } = loadState();
     expect(source).toBe("v3-backup");
     expect(state.xp).toBe(9999);
+  });
+
+  it("prefers a month of newer old-app data over a stale snapshot of this app", () => {
+    // The real scenario: this app was opened once on 1 March and set aside,
+    // then the old app was used every day until 4 April.
+    const stale = {
+      ...emptyState(),
+      xp: 500,
+      habits: [{ id: "h", name: "Move" }],
+      done: { "2026-03-01": { h: true } },
+      streak: { current: 1, best: 9, lastDay: "2026-03-01" },
+      migratedFrom: "v2" as const,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stale));
+    localStorage.setItem(
+      LEGACY_KEY,
+      JSON.stringify({ ...V2_BLOB, xp: 2400, lastDay: "2026-04-04", streak: 30, bestStreak: 30 }),
+    );
+
+    const { state, source } = loadState();
+    expect(source).toBe("v2-refresh");
+    expect(state.xp).toBe(2400);
+    expect(state.streak.current).toBe(30);
+    // The stale snapshot is kept, so it can be put back from the data panel.
+    expect(readRescuePoint()?.xp).toBe(500);
+  });
+
+  it("keeps this app's data when it is the newer of the two", () => {
+    // After the switchover the old app stops changing, and this one moves on.
+    const current = {
+      ...emptyState(),
+      xp: 9000,
+      habits: [{ id: "h", name: "Move" }],
+      done: { "2026-04-10": { h: true } },
+      streak: { current: 5, best: 9, lastDay: "2026-04-10" },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    localStorage.setItem(LEGACY_KEY, JSON.stringify({ ...V2_BLOB, lastDay: "2026-04-04" }));
+
+    const { state, source } = loadState();
+    expect(source).toBe("v3");
+    expect(state.xp).toBe(9000);
+  });
+
+  it("treats the same last day as nothing newer", () => {
+    const current = {
+      ...emptyState(),
+      habits: [{ id: "h", name: "Move" }],
+      done: { "2026-03-04": { h: true } },
+      streak: { current: 1, best: 1, lastDay: "2026-03-04" },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    localStorage.setItem(LEGACY_KEY, JSON.stringify(V2_BLOB)); // lastDay 2026-03-04
+    expect(loadState().source).toBe("v3");
+  });
+
+  it("still never writes to or removes the old app's data while refreshing", () => {
+    const raw = JSON.stringify({ ...V2_BLOB, lastDay: "2026-04-04" });
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...emptyState(), streak: { current: 0, best: 0, lastDay: "2026-03-01" } }),
+    );
+    localStorage.setItem(LEGACY_KEY, raw);
+    loadState();
+    expect(localStorage.getItem(LEGACY_KEY)).toBe(raw);
   });
 
   it("falls back rather than throwing on corrupt stored data", () => {

@@ -182,6 +182,37 @@ export function You({
 
       <DataPanel />
 
+      {EDITION.migrateLegacy && (
+        <>
+          <SectionHeader title="Classic app" />
+          <Card>
+            <div style={{ fontSize: 12.5, color: "var(--text-dim)", lineHeight: 1.6 }}>
+              The original Abd&rsquo;s Quest is still here, untouched, with everything up to the day
+              you switched. This app never writes to its data, so it is a genuine way back if you
+              ever need one.
+            </div>
+            <a
+              href={location.pathname.endsWith("/") ? "../classic.html" : "./classic.html"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                minHeight: 44,
+                marginTop: 12,
+                padding: "0 16px",
+                borderRadius: 12,
+                border: "1px solid var(--border)",
+                color: "var(--text)",
+                textDecoration: "none",
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              Open the classic app
+            </a>
+          </Card>
+        </>
+      )}
+
       <SectionHeader title="About" />
       <Card>
         <p style={{ fontSize: 12.5, color: "var(--text-dim)", lineHeight: 1.65, margin: 0 }}>

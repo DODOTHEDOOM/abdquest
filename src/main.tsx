@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./design/tokens.css";
 import { App } from "./App";
 import { EDITION } from "./edition";
+import { Recovery } from "./Recovery";
 import { StoreProvider } from "./state/StoreProvider";
 
 const mount = document.getElementById("app");
@@ -11,23 +12,36 @@ if (mount) {
 
   createRoot(mount).render(
     <StrictMode>
-      <StoreProvider>
-        <App />
-      </StoreProvider>
+      {/* Outside the store on purpose: if loading the data is what throws,
+          the recovery screen must still render. */}
+      <Recovery>
+        <StoreProvider>
+          <App />
+        </StoreProvider>
+      </Recovery>
     </StrictMode>,
   );
 }
 
 /**
- * Offline support, registered ONLY from a directory index.
+ * Offline support.
  *
- * Two service workers cannot share a scope. Registering from
- * /abdquest/preview.html would claim /abdquest/ and take over AbdQuest.html,
- * the app in daily use, serving it from this app's cache. A path ending in "/"
- * means the app is deployed in its own directory, where its scope can only
- * cover itself.
+ * Registered from exactly two kinds of address, each paired with a worker
+ * written for that scope:
+ *
+ *  - a directory install such as /abdquest/app/, whose ./sw.js covers only
+ *    that directory;
+ *  - /abdquest/AbdQuest.html, the address the Home Screen icon has always
+ *    opened, whose ./sw.js is the root worker that serves both this app and
+ *    classic.html, each cached under its own url.
+ *
+ * Any other page (preview.html and friends) registers nothing. Two workers
+ * cannot share a scope, and a preview has no business replacing the one that
+ * keeps the real app working offline.
  */
-if ("serviceWorker" in navigator && location.pathname.endsWith("/")) {
+const isDirectoryInstall = location.pathname.endsWith("/");
+const isHomeScreenApp = /\/AbdQuest\.html$/.test(location.pathname);
+if ("serviceWorker" in navigator && (isDirectoryInstall || isHomeScreenApp)) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {
       // Offline support is a bonus. Failing to register must never break the app.
