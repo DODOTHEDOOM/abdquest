@@ -1,19 +1,31 @@
-// AbdQuest service worker — offline support.
+// AbdQuest service worker: offline support.
 //
 // Strategy:
 //   HTML / navigations -> network-first: a fresh deploy always wins while online,
 //                         and the last good copy is served when offline.
-//   everything else GET -> cache-first, refreshed in the background. This covers
-//                         the CDN React bundle and Google Fonts so the app can
-//                         boot with no connection at all.
+//   everything else GET -> cache-first, refreshed in the background. Covers
+//                         Google Fonts and the classic app's CDN React bundle.
 //
-// CACHE is versioned; activate() deletes every other cache, so a bumped version
-// wipes the old one. There is no way for a stale HTML to get "stuck": the HTML
-// is only ever read from cache when the network genuinely fails.
+// v2 change: each page is cached under its OWN url. v1 stored every HTML
+// response under the single key "./AbdQuest.html", which was harmless while
+// there was only one page. Once AbdQuest.html became the rebuilt app and the
+// original moved to classic.html, opening the classic app would overwrite the
+// cached AbdQuest.html, and the Home Screen icon could then open the old app
+// while offline. Keying by url makes the two independent.
+//
+// Health, OAuth and prayer-time APIs are never cached. A stale reading is worse
+// than no reading.
+//
+// Service workers cannot read or write localStorage, so nothing in here can
+// touch saved data. The worst a bug here can do is serve an out-of-date page.
 
-const CACHE = "abdquest-v1";
-const CORE = ["./AbdQuest.html", "./manifest.json"];
-const HTML_KEY = "./AbdQuest.html";
+const CACHE = "abdquest-v2";
+const CORE = [
+  "./AbdQuest.html",
+  "./classic.html",
+  "./manifest.webmanifest",
+  "./manifest.json",
+];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
@@ -42,41 +54,65 @@ function isHTML(req) {
   return req.method === "GET" && (req.headers.get("accept") || "").includes("text/html");
 }
 
+const NEVER_CACHE = [
+  "health.googleapis.com",
+  "oauth2.googleapis.com",
+  "accounts.google.com",
+  "api.aladhan.com",
+];
+
+/** Drop the query so ?code=... from an OAuth return does not fragment the cache. */
+function pageKey(req) {
+  const u = new URL(req.url);
+  u.search = "";
+  u.hash = "";
+  return u.toString();
+}
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
 
+  let url;
+  try {
+    url = new URL(req.url);
+  } catch {
+    return;
+  }
+  if (NEVER_CACHE.includes(url.hostname)) return;
+
   if (isHTML(req)) {
+    const key = pageKey(req);
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches
-            .open(CACHE)
-            .then((c) => c.put(HTML_KEY, copy))
-            .catch(() => {});
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(key, copy)).catch(() => {});
+          }
           return res;
         })
-        .catch(() => caches.match(req).then((r) => r || caches.match(HTML_KEY))),
+        .catch(() =>
+          caches
+            .match(key)
+            .then((r) => r || caches.match(new URL("./AbdQuest.html", self.registration.scope).toString())),
+        ),
     );
     return;
   }
 
   e.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
+    caches.match(req).then((hit) => {
+      const fresh = fetch(req)
         .then((res) => {
-          if (res && (res.ok || res.type === "opaque")) {
+          if (res.ok) {
             const copy = res.clone();
-            caches
-              .open(CACHE)
-              .then((c) => c.put(req, copy))
-              .catch(() => {});
+            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
           }
           return res;
         })
-        .catch(() => cached);
-      return cached || network;
+        .catch(() => hit);
+      return hit || fresh;
     }),
   );
 });
