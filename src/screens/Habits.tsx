@@ -180,7 +180,7 @@ function HabitsList() {
                   </div>
                   <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 2 }}>
                     {habit.bonus
-                      ? "Bonus — does not break a perfect day"
+                      ? "Bonus. Does not break a perfect day"
                       : streak > 0
                         ? `${streak}-day streak`
                         : "Start a streak today"}
@@ -232,7 +232,7 @@ function HabitDetail({ state, habit, today }: { state: AppState; habit: Habit; t
         </Card>
       </div>
       <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }}>
-        Completion · 14 days — tap a day
+        Completion · 14 days. Tap a day
       </div>
       <BarStrip
         values={history}

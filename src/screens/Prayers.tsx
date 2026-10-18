@@ -133,7 +133,11 @@ export function Prayers() {
   const next = times && !viewingPast ? nextPrayer(times, nowMin) : null;
   const debtTotal = prayerDebtTotal(state);
   const friday = isFriday(today);
-  const onTimeCount = PRAYERS.filter((p) => onTimeToday[p.id]).length;
+  const onTimeCount = PRAYERS.filter((p) => onTimeToday[p.id] === true).length;
+  // Only prayers whose timing was actually recorded. Prayers brought across
+  // from the old app, or filled in for a past day, have no timing, and counting
+  // them claimed they were all prayed late.
+  const timedCount = PRAYERS.filter((p) => onTimeToday[p.id] !== undefined).length;
 
   const askLocation = async () => {
     setLocating(true);
@@ -303,9 +307,9 @@ export function Prayers() {
             );
           })}
         </div>
-        {times && doneCount > 0 && !viewingPast && (
+        {times && timedCount > 0 && !viewingPast && (
           <div style={{ ...dim, marginTop: 12, fontSize: 11.5 }}>
-            {onTimeCount} of {doneCount} within the window.
+            {onTimeCount} of {timedCount} prayed within the window.
           </div>
         )}
       </Card>
@@ -335,7 +339,7 @@ export function Prayers() {
             return (
               <span
                 key={key}
-                title={`${key} — ${n}/5`}
+                title={`${key}: ${n}/5`}
                 style={{
                   flex: 1,
                   height: 26,
@@ -555,7 +559,9 @@ export function Prayers() {
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Location</div>
               <div style={{ ...dim, marginBottom: 10, fontSize: 11.5 }}>
                 {place
-                  ? `Using ${place.lat.toFixed(3)}, ${place.lon.toFixed(3)}.`
+                  ? place.label
+                    ? `Using ${place.label} (${place.lat.toFixed(3)}, ${place.lon.toFixed(3)}).`
+                    : `Using ${place.lat.toFixed(3)}, ${place.lon.toFixed(3)}.`
                   : "Not set, so no times can be calculated."}
               </div>
               <Button sm onClick={askLocation} disabled={locating}>

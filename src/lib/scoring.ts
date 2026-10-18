@@ -91,7 +91,7 @@ export const MILESTONES: Milestone[] = [
     xp: 5000,
     rarity: "legendary",
     title: "One Full Year",
-    msg: "365 days. Abdelrahman — you did it.",
+    msg: "365 days, Abdelrahman. You did it.",
   },
 ];
 

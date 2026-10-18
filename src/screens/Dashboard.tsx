@@ -53,7 +53,7 @@ const VITALS: {
     pick: (d) => d.rhr,
     goodDirection: "down",
     explanation:
-      "Your heart rate at complete rest. It drops as your cardiovascular fitness improves, and rises temporarily when you're under-recovered, ill, dehydrated or stressed. A single day means little — the trend is what matters.",
+      "Your heart rate at complete rest. It drops as your cardiovascular fitness improves, and rises temporarily when you're under-recovered, ill, dehydrated or stressed. A single day means little. The trend is what matters.",
   },
   {
     id: "hrv",
@@ -74,7 +74,7 @@ const VITALS: {
     decimals: 1,
     pick: (d) => d.resp,
     explanation:
-      "Breaths per minute while you sleep. It's remarkably stable night to night, which is exactly why a jump above your normal is a useful early warning that something is off — often illness before you feel symptoms.",
+      "Breaths per minute while you sleep. It's remarkably stable night to night, which is exactly why a jump above your normal is a useful early warning that something is off, often illness before you feel symptoms.",
   },
   {
     id: "spo2",
@@ -85,7 +85,7 @@ const VITALS: {
     pick: (d) => d.spo2,
     goodDirection: "up",
     explanation:
-      "The percentage of oxygen your blood is carrying, measured overnight. Healthy readings usually sit in the mid-90s and above. Consumer sensors are not medical grade — treat persistent low readings as a reason to talk to a doctor, not a diagnosis.",
+      "The percentage of oxygen your blood is carrying, measured overnight. Healthy readings usually sit in the mid-90s and above. Consumer sensors are not medical grade. Treat persistent low readings as a reason to talk to a doctor, not a diagnosis.",
   },
 ];
 
@@ -232,7 +232,7 @@ export function Dashboard() {
               label="Sleep"
               color="var(--m-sleep)"
               onClick={() => setDetail({ kind: "sleep" })}
-              value={slp.actualHrs ? fmtHrs(slp.actualHrs) : "—"}
+              value={slp.actualHrs ? fmtHrs(slp.actualHrs) : "–"}
               sub={`${Math.round((slp.performance ?? 0) * 100)}% of need`}
             />
           </div>
@@ -241,7 +241,7 @@ export function Dashboard() {
 
       {!hasHealth && (
         <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 10, lineHeight: 1.5 }}>
-          No watch readings yet — recovery, effort and sleep fill in once Google Health data comes
+          No watch readings yet. Recovery, effort and sleep fill in once Google Health data comes
           through.
         </div>
       )}
@@ -258,20 +258,31 @@ export function Dashboard() {
           }}
         >
           <div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <span
-                style={{
-                  fontSize: 44,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  color: "var(--m-fitness)",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {fit.fitnessAge != null ? <CountUp value={fit.fitnessAge} /> : "—"}
-              </span>
-              <span style={{ fontSize: 14, color: "var(--text-dim)" }}>years</span>
-            </div>
+            {fit.fitnessAge != null ? (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span
+                  style={{
+                    fontSize: 44,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    color: "var(--m-fitness)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  <CountUp value={fit.fitnessAge} />
+                </span>
+                <span style={{ fontSize: 14, color: "var(--text-dim)" }}>years</span>
+              </div>
+            ) : (
+              // A dash next to "years" read as a broken number. Say what is
+              // missing instead, and where to put it.
+              <div style={{ maxWidth: 220 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.35 }}>{fit.label}</div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 4 }}>
+                  Add it under You, then Profile.
+                </div>
+              </div>
+            )}
             <div style={{ marginTop: 8 }}>
               {fit.delta != null && (
                 <Badge tone={fit.delta <= 0 ? "accent" : "warn"}>
@@ -280,7 +291,7 @@ export function Dashboard() {
               )}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 10 }}>
-              VO₂max {fit.vo2max ?? "—"} ml/kg/min
+              VO₂max {fit.vo2max ?? "–"} ml/kg/min
             </div>
           </div>
           <div style={{ width: 110, flexShrink: 0 }}>
@@ -342,7 +353,7 @@ export function Dashboard() {
           </>
         ) : (
           <div style={{ fontSize: 13, color: "var(--text-faint)" }}>
-            No hard effort recorded today — that&rsquo;s a rest day.
+            No hard effort recorded today. That&rsquo;s a rest day.
           </div>
         )}
         <div style={{ marginTop: 20 }}>
@@ -398,7 +409,7 @@ export function Dashboard() {
           />
           <MiniStat
             label="Consistency"
-            value={slp.consistency != null ? `${Math.round(slp.consistency * 100)}%` : "—"}
+            value={slp.consistency != null ? `${Math.round(slp.consistency * 100)}%` : "–"}
             sub={slp.bedtimeSdMins != null ? `±${slp.bedtimeSdMins}m` : undefined}
           />
         </div>
@@ -444,7 +455,7 @@ export function Dashboard() {
                   <span>{c.context ?? ""}</span>
                   <span>
                     {c.score == null
-                      ? "no data — excluded"
+                      ? "no data. Excluded"
                       : `${Math.round(c.score * 100)}% · counts for ${Math.round((c.weight / rec.coverage) * 100)}%`}
                   </span>
                 </div>
@@ -453,8 +464,8 @@ export function Dashboard() {
             ))}
           </div>
           <p style={{ fontSize: 12, color: "var(--text-faint)", lineHeight: 1.65, marginTop: 18 }}>
-            HRV and resting heart rate are compared against your own 30-day rolling baseline — the
-            standard HRV-guided readiness approach (Plews, Buchheit) — then blended with sleep
+            HRV and resting heart rate are compared against your own 30-day rolling baseline. The
+            standard HRV-guided readiness approach (Plews, Buchheit). Then blended with sleep
             performance and respiratory rate. Anything without data is dropped and the rest
             re-weighted, so the score is always built from real readings. An estimate, not medical
             advice.
@@ -477,13 +488,13 @@ export function Dashboard() {
             str.zoneMins && str.zoneMins.some((z) => z > 0) ? (
               <>
                 <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }}>
-                  Today&rsquo;s zones — tap a band
+                  Today&rsquo;s zones. Tap a band
                 </div>
                 <ZoneBar mins={str.zoneMins} />
               </>
             ) : undefined
           }
-          explanation={`Effort is Banister's TRIMP — every minute is weighted by how hard your heart was working as a share of its usable range, then curved onto 0–21 so a hard session lands around 14. Today's raw TRIMP was ${str.trimp}. Time below roughly a fifth of your heart-rate reserve is daily living, not training, so it doesn't count.`}
+          explanation={`Effort is Banister's TRIMP. Every minute is weighted by how hard your heart was working as a share of its usable range, then curved onto 0–21 so a hard session lands around 14. Today's raw TRIMP was ${str.trimp}. Time below roughly a fifth of your heart-rate reserve is daily living, not training, so it doesn't count.`}
         />
       )}
 
@@ -506,11 +517,11 @@ export function Dashboard() {
               />
               <MiniStat
                 label="Bedtime spread"
-                value={slp.bedtimeSdMins != null ? `±${slp.bedtimeSdMins}m` : "—"}
+                value={slp.bedtimeSdMins != null ? `±${slp.bedtimeSdMins}m` : "–"}
               />
             </div>
           }
-          explanation={`Your baseline need is ${fmtHrs(profile.sleepNeedHrs ?? 8)}, topped up by a slice of outstanding debt (capped at one extra hour so the target stays reachable) and by up to 45 minutes after a hard day. Debt is a decayed rolling shortfall over the last 14 nights. Consistency measures how tightly your bedtimes cluster — regularity matters about as much as duration.`}
+          explanation={`Your baseline need is ${fmtHrs(profile.sleepNeedHrs ?? 8)}, topped up by a slice of outstanding debt (capped at one extra hour so the target stays reachable) and by up to 45 minutes after a hard day. Debt is a decayed rolling shortfall over the last 14 nights. Consistency measures how tightly your bedtimes cluster. Regularity matters about as much as duration.`}
         />
       )}
 
@@ -532,7 +543,7 @@ export function Dashboard() {
           }))}
           extra={
             <div style={{ display: "grid", gap: 10 }}>
-              <MiniRow label="VO₂max" value={`${fit.vo2max ?? "—"} ml/kg/min`} />
+              <MiniRow label="VO₂max" value={`${fit.vo2max ?? "–"} ml/kg/min`} />
               <MiniRow
                 label="Source"
                 value={fit.vo2Source === "device" ? "Your watch" : "Estimated from your data"}
@@ -540,7 +551,7 @@ export function Dashboard() {
               <MiniRow label="Your actual age" value={`${profile.age}`} />
             </div>
           }
-          explanation={`Your VO₂max is compared against published population medians for your age and sex. Your fitness age is the age at which your VO₂max would be typical (Nes et al., the HUNT fitness-age study). The median VO₂max for a ${profile.sex === "female" ? "woman" : "man"} of ${profile.age} is about ${profile.sex === "female" ? (47.1 - 0.294 * (profile.age ?? 22)).toFixed(1) : (57.8 - 0.372 * (profile.age ?? 22)).toFixed(1)} — the gap between that and yours is what moves this number. Cardio training is the fastest way to move it.`}
+          explanation={`Your VO₂max is compared against published population medians for your age and sex. Your fitness age is the age at which your VO₂max would be typical (Nes et al., the HUNT fitness-age study). The median VO₂max for a ${profile.sex === "female" ? "woman" : "man"} of ${profile.age} is about ${profile.sex === "female" ? (47.1 - 0.294 * (profile.age ?? 22)).toFixed(1) : (57.8 - 0.372 * (profile.age ?? 22)).toFixed(1)}. The gap between that and yours is what moves this number. Cardio training is the fastest way to move it.`}
         />
       )}
 
@@ -620,14 +631,20 @@ function VitalTile({
   const prior = clean.slice(0, -1);
   const avg = prior.length ? prior.reduce((a, b) => a + b, 0) / prior.length : null;
   const diff = value != null && avg != null ? value - avg : null;
-  const good = diff == null || !goodDirection ? null : goodDirection === "up" ? diff > 0 : diff < 0;
+  // A change that rounds to zero at the precision shown is no change. Showing
+  // "down 0.0" with a down arrow, and colouring it as good or bad, was wrong.
+  const places = decimals || 1;
+  const shown = diff == null ? null : Number(Math.abs(diff).toFixed(places));
+  const flat = shown === 0;
+  const good =
+    diff == null || flat || !goodDirection ? null : goodDirection === "up" ? diff > 0 : diff < 0;
 
   return (
     <Card onClick={onClick} ariaLabel={`${label} details`}>
       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)" }}>{label}</div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 3, marginTop: 4 }}>
         <span style={{ fontSize: 26, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-          {value != null ? value.toFixed(decimals) : "—"}
+          {value != null ? value.toFixed(decimals) : "–"}
         </span>
         <span style={{ fontSize: 11, color: "var(--text-faint)" }}>{unit.trim()}</span>
       </div>
@@ -640,7 +657,7 @@ function VitalTile({
             fontWeight: 600,
           }}
         >
-          {diff > 0 ? "▲" : "▼"} {Math.abs(diff).toFixed(decimals || 1)} vs avg
+          {flat ? "Level with avg" : `${diff > 0 ? "▲" : "▼"} ${shown?.toFixed(places)} vs avg`}
         </div>
       )}
       <div style={{ marginTop: 8 }}>

@@ -168,7 +168,7 @@ export const DEFAULT_HABITS: Habit[] = [
   {
     id: "sleep",
     name: "In bed before 1am",
-    detail: "Lights out — scrolling in bed does not count.",
+    detail: "Lights out. Scrolling in bed does not count.",
     icon: "🌙",
   },
   {

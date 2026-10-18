@@ -297,7 +297,7 @@ export const THEMES: Theme[] = [
   {
     id: "aurum",
     name: "Aurum",
-    blurb: "Black and gold — a nod to the original Quest",
+    blurb: "Black and gold. A nod to the original Quest",
     unlockLevel: 20,
     dark: true,
     vars: dark({

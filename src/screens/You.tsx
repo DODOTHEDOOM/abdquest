@@ -31,8 +31,8 @@ export function You({
           margin: "-4px 0 14px",
         }}
       >
-        You&rsquo;re Level {level}. New palettes unlock as you level up — tap a locked one to
-        preview it.
+        You&rsquo;re Level {level}. New palettes unlock as you level up. Tap a locked one to preview
+        it.
       </div>
       <ThemePicker value={themeId} level={level} onChange={onPickTheme} />
 
@@ -41,7 +41,7 @@ export function You({
         <div
           style={{ fontSize: 12.5, color: "var(--text-dim)", lineHeight: 1.6, marginBottom: 16 }}
         >
-          Fitness age and effort need these to be accurate — they feed the VO₂max and
+          Fitness age and effort need these to be accurate. They feed the VO₂max and
           heart-rate-reserve maths.
         </div>
         <div style={{ display: "grid", gap: 14 }}>
@@ -102,7 +102,7 @@ export function You({
           </div>
           <Field
             label="Sleep need (hours)"
-            hint="Your personal baseline — most adults sit between 7 and 9."
+            hint="Your personal baseline. Most adults sit between 7 and 9."
           >
             <TextInput
               type="number"
@@ -142,7 +142,7 @@ export function You({
               }}
             >
               The five daily prayers, times for your location, and a ledger for missed ones. Turning
-              this off only hides it — nothing you have recorded is deleted.
+              this off only hides it. Nothing you have recorded is deleted.
             </span>
           </span>
           <input

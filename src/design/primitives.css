@@ -380,7 +380,11 @@ textarea.field__control {
   bottom: calc(72px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 300;
-  max-width: min(92vw, 420px);
+  /* left: 50% alone caps a shrink-to-fit box at half the screen, which is why
+     a one-line message wrapped onto four. Size to the content instead. */
+  width: max-content;
+  max-width: min(calc(100vw - 32px), 420px);
+  text-align: center;
   padding: var(--sp-3) var(--sp-4);
   border-radius: var(--radius-sm);
   font-size: var(--fs-14);
@@ -729,19 +733,44 @@ button.motiv:active {
 .stepper button:active {
   background: var(--surface-2);
 }
-.stepper > span {
+.stepper__value {
   flex: 1;
-  text-align: center;
-  font-size: 15px;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  cursor: text;
+}
+.stepper__value input {
+  width: 100%;
+  min-width: 0;
+  max-width: 5.5ch;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: right;
+  color: var(--text);
+  font-family: inherit;
+  /* 16px stops iOS zooming the page when the field is focused. */
+  font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
-.stepper > span i {
+.stepper__value input:focus {
+  outline: none;
+  text-align: center;
+  max-width: 7ch;
+}
+.stepper:focus-within {
+  border-color: var(--accent);
+}
+.stepper__value i {
   font-style: normal;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-faint);
+  white-space: nowrap;
 }
 .setno {
   display: grid;

@@ -87,7 +87,7 @@ function ProgressOverview() {
             color2="var(--m-recovery-2)"
           >
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>{avgRec ?? "—"}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1 }}>{avgRec ?? "–"}</div>
               <div
                 style={{
                   fontSize: 8,
@@ -105,7 +105,7 @@ function ProgressOverview() {
             <Row label="Total effort" value={totalStrain.toFixed(0)} sub="TRIMP-weighted" />
             <Row
               label="Fitness age"
-              value={fitNow?.fitnessAge != null ? `${fitNow.fitnessAge}` : "—"}
+              value={fitNow?.fitnessAge != null ? `${fitNow.fitnessAge}` : "–"}
               sub={
                 fitDelta != null
                   ? fitDelta <= 0
@@ -138,7 +138,7 @@ function ProgressOverview() {
         >
           <span style={{ color: "var(--text-faint)" }}>{n} days</span>
           <span style={{ color: "var(--text-dim)", fontWeight: 600 }}>
-            average {avgRec ?? "—"}%
+            average {avgRec ?? "–"}%
           </span>
         </div>
       </Card>
@@ -164,7 +164,7 @@ function ProgressOverview() {
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
             <span style={{ fontSize: 13, color: "var(--text-dim)" }}>Sleep</span>
             <span style={{ fontSize: 13, fontWeight: 700 }}>
-              {avgSleep ? `${avgSleep.toFixed(1)}h avg` : "—"}
+              {avgSleep ? `${avgSleep.toFixed(1)}h avg` : "–"}
             </span>
           </div>
           <BarStrip
@@ -212,7 +212,7 @@ function ProgressOverview() {
           goodDirection="up"
           series={data.rec as MetricSeriesPoint[]}
           onClose={() => setOpen(null)}
-          explanation="Your daily recovery score over time. Sustained highs mean you're absorbing your training; a run of lows means the load is outpacing your recovery — take an easier few days and watch it climb back."
+          explanation="Your daily recovery score over time. Sustained highs mean you're absorbing your training; a run of lows means the load is outpacing your recovery. Take an easier few days and watch it climb back."
         />
       )}
       {open === "strain" && (
@@ -222,7 +222,7 @@ function ProgressOverview() {
           color="var(--m-strain)"
           series={data.str as MetricSeriesPoint[]}
           onClose={() => setOpen(null)}
-          explanation="Daily cardiovascular effort on the 0–21 TRIMP scale. Consistency beats heroics — a steady rhythm of moderate days with occasional hard ones builds fitness faster than sporadic maximum efforts."
+          explanation="Daily cardiovascular effort on the 0–21 TRIMP scale. Consistency beats heroics. A steady rhythm of moderate days with occasional hard ones builds fitness faster than sporadic maximum efforts."
         />
       )}
     </>

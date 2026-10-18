@@ -43,6 +43,11 @@ function arr(v: unknown): unknown[] {
 function obj(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }
+/** A number only if it falls in a sane range; anything else is dropped, not clamped. */
+function inRange(v: number | undefined, min: number, max: number): number | undefined {
+  return v !== undefined && v >= min && v <= max ? v : undefined;
+}
+
 const isDate = (k: string) => /^\d{4}-\d{2}-\d{2}$/.test(k);
 
 /** v2 kept habits, "life quests" and bonus quests in separate lists. */
@@ -294,6 +299,12 @@ export function migrateV2(value: unknown): AppState {
     profile: {
       ...base.profile,
       weightKg: latestWeight,
+      // The old app's targets. Whether they were chosen or left at its
+      // defaults, they are what that app measured progress against, so
+      // dropping them would make the water, food and weight bars vanish.
+      waterTargetMl: inRange(num(v2.waterTarget), 250, 10000),
+      kcalTarget: inRange(num(v2.calTarget), 500, 10000),
+      weightTargetKg: inRange(num(v2.wtTarget), 20, 400),
     },
     // Their habits already exist, so there is nothing to set up.
     onboarded: habits.length > 0,
@@ -313,6 +324,11 @@ export function migrateV2(value: unknown): AppState {
     water,
     notes: notesFrom(v2),
     modules: { prayers: usedPrayers },
+    // The old app had Sheffield's coordinates built in and always showed times.
+    // Without this, prayer times would disappear on the first day until
+    // location was granted. Same place and the same method 2 the old app used,
+    // so the times match exactly; it can be changed in Prayers settings.
+    ...(usedPrayers ? { place: { lat: 53.3811, lon: -1.4701, label: "Sheffield" } } : {}),
     prayers,
     migratedFrom: "v2",
   };

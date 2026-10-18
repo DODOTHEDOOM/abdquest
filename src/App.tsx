@@ -71,7 +71,7 @@ export function App() {
 
   const pickTheme = (t: Theme, locked: boolean) => {
     dispatch({ type: "setTheme", themeId: t.id });
-    setToast(locked ? `Previewing ${t.name} — unlocks at Level ${t.unlockLevel}` : `${t.name} on`);
+    setToast(locked ? `Previewing ${t.name}. Unlocks at Level ${t.unlockLevel}` : `${t.name} on`);
   };
 
   // Setup runs first for anyone arriving with no data. This sits AFTER every
@@ -100,7 +100,7 @@ export function App() {
 
       {saveFailed && (
         <div className="savefail">
-          Could not save — this device may be out of storage. Export a backup from the You tab.
+          Could not save. This device may be out of storage. Export a backup from the You tab.
         </div>
       )}
 
@@ -174,7 +174,7 @@ export function App() {
       {picker && (
         <Sheet
           title="Colourways"
-          sub={`You are Level ${level.level} — bolder palettes unlock as you climb`}
+          sub={`You are Level ${level.level}. Bolder palettes unlock as you climb`}
           onClose={() => setPicker(false)}
         >
           <ThemePicker value={state.themeId} level={level.level} onChange={pickTheme} />

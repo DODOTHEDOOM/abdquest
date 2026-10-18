@@ -112,7 +112,7 @@ export function Review() {
               style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 14, lineHeight: 1.6 }}
             >
               Measured over the {review.daysElapsed} day{review.daysElapsed === 1 ? "" : "s"} of
-              this week so far, not a full seven — a week in progress is not a week you failed.
+              this week so far, not a full seven. A week in progress is not a week you failed.
             </div>
           </>
         )}
@@ -194,7 +194,7 @@ export function Review() {
                   </div>
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 700 }}>
-                  {w.score === null ? "—" : `${w.score}%`}
+                  {w.score === null ? "–" : `${w.score}%`}
                 </div>
               </div>
             </Card>

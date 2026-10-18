@@ -94,3 +94,24 @@ export function wkParse(k: string): Date {
   const p = k.split("-");
   return new Date(+p[0], +p[1] - 1, +p[2]);
 }
+
+function fromKey(dateKey: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+}
+
+/** "Saturday 17 October". Falls back to the raw key rather than "Invalid Date". */
+export function longDate(dateKey: string): string {
+  const d = fromKey(dateKey);
+  return d
+    ? d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })
+    : dateKey;
+}
+
+/** "17 Oct 2026", for places where the year is worth keeping, like a record. */
+export function shortDate(dateKey: string): string {
+  const d = fromKey(dateKey);
+  return d
+    ? d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : dateKey;
+}

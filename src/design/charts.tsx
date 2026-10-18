@@ -375,7 +375,7 @@ export function ZoneBar({
           <strong style={{ color: ZONE_COLORS[sel] }}>
             Zone {sel + 1} · {ZONE_NAMES[sel]}
           </strong>{" "}
-          — {Math.round(mins[sel])} min ({Math.round((mins[sel] / total) * 100)}% of active time)
+          {Math.round(mins[sel])} min ({Math.round((mins[sel] / total) * 100)}% of active time)
         </div>
       )}
     </div>

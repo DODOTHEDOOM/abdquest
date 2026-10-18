@@ -92,7 +92,7 @@ export function recovery(
       label: "Heart-rate variability",
       score: hrvScore,
       weight: 0.5,
-      display: today.hrv ? `${Math.round(today.hrv)} ms` : "—",
+      display: today.hrv ? `${Math.round(today.hrv)} ms` : "–",
       context: hrvContext,
     },
     {
@@ -100,7 +100,7 @@ export function recovery(
       label: "Resting heart rate",
       score: rhrScore,
       weight: 0.25,
-      display: today.rhr ? `${Math.round(today.rhr)} bpm` : "—",
+      display: today.rhr ? `${Math.round(today.rhr)} bpm` : "–",
       context: rhrContext,
     },
     {
@@ -108,7 +108,7 @@ export function recovery(
       label: "Sleep",
       score: sleepScore,
       weight: 0.2,
-      display: today.sleepHrs ? fmtHrs(today.sleepHrs) : "—",
+      display: today.sleepHrs ? fmtHrs(today.sleepHrs) : "–",
       context: `need ${fmtHrs(need)}`,
     },
     {
@@ -116,7 +116,7 @@ export function recovery(
       label: "Respiratory rate",
       score: respScore,
       weight: 0.05,
-      display: today.resp ? `${today.resp.toFixed(1)} br/min` : "—",
+      display: today.resp ? `${today.resp.toFixed(1)} br/min` : "–",
       context: respContext,
     },
   ];

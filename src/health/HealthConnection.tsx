@@ -51,7 +51,7 @@ export function HealthConnection() {
       await navigator.clipboard.writeText(text);
       setFlash(`${what} copied`);
     } catch {
-      setFlash("Could not copy — select it by hand");
+      setFlash("Could not copy. Select it by hand");
     }
     setTimeout(() => setFlash(null), 2200);
   };
@@ -161,7 +161,7 @@ export function HealthConnection() {
                 </div>
               ))}
               <div style={{ ...dim, fontSize: 11 }}>
-                &ldquo;ok&rdquo; means it came through. Anything else is the reason it did not — a
+                &ldquo;ok&rdquo; means it came through. Anything else is the reason it did not. A
                 403 is a missing permission, and &ldquo;nothing recorded&rdquo; means Google
                 genuinely holds no data for that day yet.
               </div>
@@ -191,8 +191,8 @@ export function HealthConnection() {
                 color: "var(--text-dim)",
               }}
             >
-              You are in a browser tab, not the home-screen app. The two do not share a login —
-              connect here, then use <strong>Copy connection code</strong> and paste it into the
+              You are in a browser tab, not the home-screen app. The two do not share a login.
+              Connect here, then use <strong>Copy connection code</strong> and paste it into the
               home-screen app.
             </div>
           )}
@@ -216,7 +216,7 @@ export function HealthConnection() {
             </div>
             <div style={{ ...dim, marginBottom: 8, fontSize: 11.5 }}>
               Paste this into your OAuth client under <strong>Authorized redirect URIs</strong>.
-              Google matches it character for character — a different page of the same app is a
+              Google matches it character for character. A different page of the same app is a
               different URI, and a mismatch is the{" "}
               <strong>&ldquo;Access blocked: redirect_uri_mismatch&rdquo;</strong> error.
             </div>

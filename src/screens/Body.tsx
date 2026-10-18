@@ -8,6 +8,7 @@
 
 import { useMemo, useState } from "react";
 import { BarStrip, Sparkline, tick } from "../design/charts";
+import { dayLabel } from "../design/DayPicker";
 import { Button, Card, Field, ProgressBar, SectionHeader, TextInput } from "../design/primitives";
 import {
   averageOf,
@@ -199,7 +200,7 @@ export function Body() {
                   </span>
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginTop: 5 }}>
-                  {trend.latestDate === today ? "Today" : trend.latestDate}
+                  {trend.latestDate ? dayLabel(trend.latestDate, today) : ""}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -384,7 +385,7 @@ export function Body() {
         {kcalVals.length > 1 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginBottom: 8 }}>
-              Last 14 days — tap a bar
+              Last 14 days. Tap a bar
             </div>
             <BarStrip
               values={seriesFor(kcalVals, today, 14)}
@@ -401,7 +402,7 @@ export function Body() {
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <div style={{ fontSize: 28, fontWeight: 800 }}>
-            {lastNight !== null ? fmtHrs(lastNight) : "—"}
+            {lastNight !== null ? fmtHrs(lastNight) : "–"}
           </div>
           <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
             {sleepAvg !== null ? `${fmtHrs(sleepAvg)} average` : "no nights yet"}

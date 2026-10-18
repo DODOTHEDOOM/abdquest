@@ -121,7 +121,7 @@ export function useHealthSync(): HealthSync {
         // "no data". They need completely different things from you.
         if (isConnected() && !(await ensureToken())) {
           setStatus(
-            "Your Google sign-in has expired. Reconnect below — while the consent screen is in Testing, Google ends the session every 7 days.",
+            "Your Google sign-in has expired. Reconnect below. While the consent screen is in Testing, Google ends the session every 7 days.",
           );
           setConnected(false);
           return;
@@ -147,7 +147,7 @@ export function useHealthSync(): HealthSync {
           setStatus(
             isConnected()
               ? "Nothing came back. Your watch may not have synced to Google yet."
-              : "Sync failed — reconnect below.",
+              : "Sync failed. Reconnect below.",
           );
           setConnected(isConnected());
           return;
@@ -158,7 +158,7 @@ export function useHealthSync(): HealthSync {
         if (rt?.steps) bits.push(`${rt.steps.toLocaleString()} steps`);
         if (rt?.sleepHrs) bits.push(`${rt.sleepHrs.toFixed(1)}h sleep`);
         if (rt?.rhr) bits.push(`${rt.rhr} bpm resting`);
-        setStatus(bits.length ? `Synced — ${bits.join(", ")}` : "Synced");
+        setStatus(bits.length ? `Synced: ${bits.join(", ")}` : "Synced");
       } catch (e) {
         setStatus(`Sync error: ${e instanceof Error ? e.message : String(e)}`);
       } finally {

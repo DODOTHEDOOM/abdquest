@@ -145,7 +145,7 @@ export function fitnessAge(
       delta: null,
       vo2max: v.vo2max,
       vo2Source: v.source,
-      label: "Add your sex in You — the norms differ for men and women",
+      label: "Needs your sex, because the norms differ for men and women",
     };
   }
   const { intercept, slope } = norms;
@@ -163,7 +163,7 @@ export function fitnessAge(
             ? "Right on your age"
             : delta <= 5
               ? `${delta} years older`
-              : `${delta} years older — room to improve`;
+              : `${delta} years older. Room to improve`;
 
   return { fitnessAge: fa, delta, vo2max: v.vo2max, vo2Source: v.source, label };
 }

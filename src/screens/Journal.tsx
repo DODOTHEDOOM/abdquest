@@ -120,7 +120,7 @@ export function Journal() {
       {history.length === 0 ? (
         <Card>
           <div style={{ fontSize: 12.5, color: "var(--text-dim)", lineHeight: 1.6 }}>
-            Nothing written yet. One honest line a day is enough — in a month it is the only record
+            Nothing written yet. One honest line a day is enough. In a month it is the only record
             of what actually changed.
           </div>
         </Card>

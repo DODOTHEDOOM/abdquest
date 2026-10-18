@@ -56,7 +56,7 @@ export function MetricDetail({
     };
   }, [series, range]);
 
-  const fmt = (v: number | null) => (v == null ? "—" : v.toFixed(decimals) + unit);
+  const fmt = (v: number | null) => (v == null ? "–" : v.toFixed(decimals) + unit);
   const trendGood =
     view.trend == null || !goodDirection
       ? null
@@ -84,7 +84,7 @@ export function MetricDetail({
             fontVariantNumeric: "tabular-nums",
           }}
         >
-          {view.latest != null ? view.latest.toFixed(decimals) : "—"}
+          {view.latest != null ? view.latest.toFixed(decimals) : "–"}
         </span>
         <span style={{ fontSize: 15, color: "var(--text-dim)" }}>{unit}</span>
       </div>
@@ -155,7 +155,7 @@ export function MetricDetail({
       </p>
       <p style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6, marginTop: 10 }}>
         Based on {view.count} day{view.count === 1 ? "" : "s"} with data in this range. An estimate
-        from your own readings — not medical advice.
+        from your own readings. Not medical advice.
       </p>
     </Sheet>
   );

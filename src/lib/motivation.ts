@@ -131,9 +131,7 @@ export function motivation(ctx: MotivationContext): MotivationCard {
     return {
       tone: "celebrate",
       icon: "🏆",
-      headline: first
-        ? `First record — ${recentPR.exercise}`
-        : `New PR — ${recentPR.exercise}`,
+      headline: first ? `First record: ${recentPR.exercise}` : `New PR: ${recentPR.exercise}`,
       detail: first
         ? `${recentPR.next}${unit} on the board. Now there is a number to beat.`
         : `${recentPR.next}${unit}, up ${gain}${unit} on your best. That is the whole point.`,
@@ -148,7 +146,7 @@ export function motivation(ctx: MotivationContext): MotivationCard {
       headline: `Your ${streak}-day streak is on the line`,
       detail:
         habitsTotal > 0
-          ? `Nothing logged yet today. One habit keeps it alive — do not throw away ${streak} days.`
+          ? `Nothing logged yet today. One habit keeps it alive. Do not throw away ${streak} days.`
           : "Nothing logged yet today. Log something before midnight.",
     };
   }
@@ -169,7 +167,7 @@ export function motivation(ctx: MotivationContext): MotivationCard {
     return {
       tone: "push",
       icon: "⚡",
-      headline: `Recovery ${recovery}% — your body is ready`,
+      headline: `Recovery ${recovery}%. Your body is ready`,
       detail: "This is the day to go hard. Days like this are where progress actually comes from.",
     };
   }
@@ -179,7 +177,7 @@ export function motivation(ctx: MotivationContext): MotivationCard {
     return {
       tone: "ease",
       icon: "🌙",
-      headline: `Recovery ${recovery}% — take it easy`,
+      headline: `Recovery ${recovery}%. Take it easy`,
       detail: trainedToday
         ? "You have already trained. Eat well, sleep early, come back stronger tomorrow."
         : "Go light today. Resting on purpose is training, not quitting.",
@@ -216,7 +214,7 @@ export function motivation(ctx: MotivationContext): MotivationCard {
     return {
       tone: "push",
       icon: "👊",
-      headline: `Behind last week — ${thisWeekSessions} v ${lastWeekSessions} sessions`,
+      headline: `Behind last week: ${thisWeekSessions} v ${lastWeekSessions} sessions`,
       detail: "Not a failure, just a gap. One session today closes it.",
     };
   }
@@ -226,7 +224,7 @@ export function motivation(ctx: MotivationContext): MotivationCard {
     return {
       tone: "celebrate",
       icon: "✅",
-      headline: "Perfect day — everything done",
+      headline: "Perfect day. Everything done",
       detail: streak > 0 ? `That is ${streak} days in a row now.` : "Do it again tomorrow.",
     };
   }

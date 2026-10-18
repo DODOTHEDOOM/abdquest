@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Badge, Button, Card, Field, SectionHeader, Sheet, TextInput } from "../design/primitives";
 import { BarStrip, tick } from "../design/charts";
 import { shiftDay } from "../design/DayPicker";
+import { longDate, shortDate } from "../lib/dates";
 import { useStore } from "../state/store";
 import { useToday } from "../state/useToday";
 import {
@@ -69,7 +70,7 @@ export function Training() {
           <span>
             <strong>New personal record</strong>
             <br />
-            {pr.name} — {pr.next}
+            {pr.name}: {pr.next}
             {pr.kind === "weight" ? "kg" : " reps"}
           </span>
         </div>
@@ -125,7 +126,7 @@ export function Training() {
       {todays.length === 0 ? (
         <Card>
           <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>
-            Nothing logged yet today. Gym, a run, a swim, five-a-side — it all counts.
+            Nothing logged yet today. Gym, a run, a swim, five-a-side. It all counts.
           </div>
         </Card>
       ) : (
@@ -384,6 +385,7 @@ function Stepper({
   min?: number;
   suffix?: string;
 }) {
+  const [draft, setDraft] = useState<string | null>(null);
   return (
     <div className="stepper">
       <button
@@ -396,10 +398,31 @@ function Stepper({
       >
         −
       </button>
-      <span>
-        {value}
+      {/* Typeable as well as steppable. Fixed steps alone meant a 32 minute run
+          or a 5.2 km distance could not be recorded at all, and getting from the
+          default 40 kg to 140 kg took forty taps. */}
+      <label className="stepper__value">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={draft ?? String(value)}
+          aria-label={suffix ? `Value in ${suffix.trim()}` : "Value"}
+          onFocus={(e) => {
+            setDraft(String(value));
+            e.target.select();
+          }}
+          onChange={(e) => {
+            const raw = e.target.value.replace(",", ".");
+            setDraft(raw);
+            const n = Number(raw);
+            // Keep the half-typed "5." on screen, but only commit real numbers.
+            if (raw.trim() !== "" && isFinite(n))
+              onChange(Math.max(min, Math.round(n * 100) / 100));
+          }}
+          onBlur={() => setDraft(null)}
+        />
         {suffix && <i>{suffix}</i>}
-      </span>
+      </label>
       <button
         type="button"
         onClick={() => {
@@ -586,7 +609,7 @@ function EffortForm({
   const [intensity, setIntensity] = useState<Intensity>("steady");
 
   return (
-    <Sheet title={a.name} sub={`${a.icon} ${date}`} onClose={onCancel}>
+    <Sheet title={a.name} sub={`${a.icon} ${longDate(date)}`} onClose={onCancel}>
       <div style={{ display: "grid", gap: 16 }}>
         <div>
           <div className="field__label">Minutes</div>
@@ -667,19 +690,21 @@ function HistorySheet({ exercise, onClose }: { exercise: Exercise; onClose: () =
             <span style={{ fontSize: 12, color: "var(--text-faint)" }}>{unit}</span>
           </div>
           {exercise.pr.date && (
-            <div style={{ fontSize: 10.5, color: "var(--text-faint)" }}>{exercise.pr.date}</div>
+            <div style={{ fontSize: 10.5, color: "var(--text-faint)" }}>
+              {shortDate(exercise.pr.date)}
+            </div>
           )}
         </Card>
         <Card>
           <div style={{ fontSize: 10.5, color: "var(--text-dim)", fontWeight: 600 }}>Last time</div>
           <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6, lineHeight: 1.4 }}>
-            {exercise.lastSets ? setsSummary(exercise.lastSets, exercise.metric) : "—"}
+            {exercise.lastSets ? setsSummary(exercise.lastSets, exercise.metric) : "–"}
           </div>
         </Card>
       </div>
 
       <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 10 }}>
-        Top set per session — tap a bar
+        Top set per session. Tap a bar
       </div>
       <BarStrip values={series} color="var(--m-strain)" height={68} format={(v) => `${v}${unit}`} />
     </Sheet>

@@ -188,6 +188,30 @@ describe("migrateV2", () => {
     expect(noPrayers.prayers.done).toEqual({});
   });
 
+  it("carries the old app's targets so the progress bars do not vanish", () => {
+    const t = migrateV2({ ...V2, waterTarget: 3000, calTarget: 1900, wtTarget: 120 });
+    expect(t.profile.waterTargetMl).toBe(3000);
+    expect(t.profile.kcalTarget).toBe(1900);
+    expect(t.profile.weightTargetKg).toBe(120);
+  });
+
+  it("drops a nonsense target rather than clamping it into a believable one", () => {
+    const t = migrateV2({ ...V2, waterTarget: 9e9, calTarget: -5, wtTarget: "lots" });
+    expect(t.profile.waterTargetMl).toBeUndefined();
+    expect(t.profile.kcalTarget).toBeUndefined();
+    expect(t.profile.weightTargetKg).toBeUndefined();
+  });
+
+  it("keeps Sheffield, where the old app always calculated prayer times", () => {
+    // Without this, prayer times disappear on day one until location is granted.
+    expect(s.place).toEqual({ lat: 53.3811, lon: -1.4701, label: "Sheffield" });
+  });
+
+  it("sets no place for someone who never used prayers", () => {
+    const none = migrateV2({ ...V2, prayers: [], prayerHist: {}, debt: {} });
+    expect(none.place).toBeUndefined();
+  });
+
   it("treats an existing user as already set up", () => {
     expect(s.onboarded).toBe(true);
   });
