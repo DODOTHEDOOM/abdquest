@@ -76,6 +76,11 @@ export interface HealthSync {
   backfill: (days: number) => void;
   cancelBackfill: () => void;
   progress: BackfillProgress;
+  /**
+   * The outcome of returning from Google's sign-in, for the app shell to show
+   * wherever the person lands. Null until a sign-in return is processed.
+   */
+  notice: { ok: boolean; text: string; at: number } | null;
 }
 
 export function useHealthSync(): HealthSync {
@@ -85,6 +90,7 @@ export function useHealthSync(): HealthSync {
   const [lastSync, setLastSync] = useState(readLast);
   const [status, setStatus] = useState<string | null>(null);
   const [diag, setDiag] = useState<DayDiagnostics[] | null>(null);
+  const [notice, setNotice] = useState<HealthSync["notice"]>(null);
   const running = useRef(false);
   const cancelled = useRef(false);
   const [progress, setProgress] = useState<BackfillProgress>({
@@ -176,12 +182,14 @@ export function useHealthSync(): HealthSync {
       if (cancelled) return;
       if (r.handled) {
         setConnected(true);
-        setStatus("Connected ✓");
+        setStatus("Connected. Syncing now.");
+        setNotice({ ok: true, text: "Google Health connected. Syncing now.", at: Date.now() });
         void run(false);
         return;
       }
       if (r.error) {
         setStatus(r.error);
+        setNotice({ ok: false, text: `Google Health did not connect: ${r.error}`, at: Date.now() });
         return;
       }
       if (isConnected() && Date.now() - readLast() > QUIET_SYNC_AFTER_MS) void run(false);
@@ -254,6 +262,7 @@ export function useHealthSync(): HealthSync {
       cancelled.current = true;
     },
     progress,
+    notice,
     syncNow: () => void run(true),
     forget: () => {
       ghDisconnect();

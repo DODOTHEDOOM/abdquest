@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./design/tokens.css";
 import { App } from "./App";
 import { EDITION } from "./edition";
+import { HealthSyncProvider } from "./health/HealthSyncProvider";
 import { Recovery } from "./Recovery";
 import { StoreProvider } from "./state/StoreProvider";
 
@@ -16,7 +17,9 @@ if (mount) {
           the recovery screen must still render. */}
       <Recovery>
         <StoreProvider>
-          <App />
+          <HealthSyncProvider>
+            <App />
+          </HealthSyncProvider>
         </StoreProvider>
       </Recovery>
     </StrictMode>,

@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { Badge, Button, Card, Field, TextInput } from "../design/primitives";
 import { connect, exportCode, importCode, isStandalone, redirectUri } from "./index";
-import { useHealthSync } from "./useHealthSync";
+import { useHealth } from "./HealthSyncProvider";
 
 function readSaved(key: string): string {
   try {
@@ -36,7 +36,7 @@ const dim: React.CSSProperties = {
 };
 
 export function HealthConnection() {
-  const sync = useHealthSync();
+  const sync = useHealth();
   const [cid, setCid] = useState(() => readSaved("abdquest_gh_cid"));
   const [csec, setCsec] = useState(() => readSaved("abdquest_gh_csec"));
   const [showImport, setShowImport] = useState(false);

@@ -12,6 +12,7 @@ import { Progress } from "./screens/Progress";
 import { Training } from "./screens/Training";
 import { You } from "./screens/You";
 import { emptyState, habitsDoneOn, levelProgress } from "./state/schema";
+import { useHealth } from "./health/HealthSyncProvider";
 import { useStore } from "./state/store";
 import { useToday } from "./state/useToday";
 
@@ -47,6 +48,13 @@ export function App() {
   useEffect(() => {
     applyTheme(themeById(state.themeId));
   }, [state.themeId]);
+
+  // Coming back from Google's sign-in can land on any screen, so the outcome
+  // is shown here rather than only on the Connections panel.
+  const health = useHealth();
+  useEffect(() => {
+    if (health.notice) setToast(health.notice.text);
+  }, [health.notice]);
 
   // One-time note when their old data has just been brought across.
   useEffect(() => {
