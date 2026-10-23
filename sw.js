@@ -19,7 +19,7 @@
 // Service workers cannot read or write localStorage, so nothing in here can
 // touch saved data. The worst a bug here can do is serve an out-of-date page.
 
-const CACHE = "abdquest-v2";
+const CACHE = "abdquest-v3";
 const CORE = [
   "./AbdQuest.html",
   "./classic.html",
@@ -59,6 +59,7 @@ const NEVER_CACHE = [
   "oauth2.googleapis.com",
   "accounts.google.com",
   "api.aladhan.com",
+  "world.openfoodfacts.org",
 ];
 
 /** Drop the query so ?code=... from an OAuth return does not fragment the cache. */
